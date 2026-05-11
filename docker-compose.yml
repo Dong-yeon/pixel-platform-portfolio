@@ -1,0 +1,17 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: pixelfactory-postgres
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_DB: pixelfactory
+      POSTGRES_USER: pixel
+      POSTGRES_PASSWORD: pixel
+    volumes:
+      - ./docker/postgres/data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U pixel -d pixelfactory"]
+      interval: 10s
+      timeout: 5s
+      retries: 5

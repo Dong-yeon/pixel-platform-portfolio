@@ -1,0 +1,70 @@
+spring:
+  application:
+    name: pixelfactory-backend
+  profiles:
+    active: local
+
+server:
+  port: 8081
+
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
+    operations-sorter: method
+  api-docs:
+    path: /v3/api-docs
+
+jwt:
+  # TODO: Move this value to an environment variable or Secret Manager outside local development.
+  secret: "pixel-factory-local-jwt-secret-key-must-be-at-least-32-bytes"
+  access-token-expiration-minutes: 120
+
+---
+spring:
+  config:
+    activate:
+      on-profile: local
+  datasource:
+    url: jdbc:postgresql://localhost:5432/pixelfactory
+    username: pixel
+    password: pixel
+    driver-class-name: org.postgresql.Driver
+  jpa:
+    hibernate:
+      ddl-auto: update
+    properties:
+      hibernate:
+        format_sql: true
+        default_batch_fetch_size: 100
+    open-in-view: false
+    show-sql: true
+
+logging:
+  level:
+    org.hibernate.SQL: debug
+    org.hibernate.orm.jdbc.bind: trace
+
+---
+spring:
+  config:
+    activate:
+      on-profile: dev
+  datasource:
+    # TODO: Inject dev database settings through deployment environment variables.
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/pixelfactory}
+    username: ${SPRING_DATASOURCE_USERNAME:pixel}
+    password: ${SPRING_DATASOURCE_PASSWORD:pixel}
+    driver-class-name: org.postgresql.Driver
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        format_sql: false
+        default_batch_fetch_size: 100
+    open-in-view: false
+    show-sql: false
+
+jwt:
+  secret: ${JWT_SECRET:pixel-factory-dev-jwt-secret-key-must-be-at-least-32-bytes}
+  access-token-expiration-minutes: ${JWT_ACCESS_TOKEN_EXPIRATION_MINUTES:120}
