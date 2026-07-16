@@ -8,7 +8,6 @@ import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
-import jakarta.persistence.Lob;
 import jakarta.persistence.Table;
 import lombok.AccessLevel;
 import lombok.Getter;
@@ -52,7 +51,7 @@ public class FactoryEvent extends BaseEntity {
     @Column(nullable = false, length = 500)
     private String message;
 
-    @Lob
+    @Column(columnDefinition = "text")
     private String payloadJson;
 
     public FactoryEvent(

@@ -15,3 +15,16 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+
+  mosquitto:
+    image: eclipse-mosquitto:2
+    container_name: pixelfactory-mosquitto
+    ports:
+      - "1883:1883"
+    volumes:
+      - ./mosquitto/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+    healthcheck:
+      test: ["CMD-SHELL", "mosquitto_sub -t '$$SYS/#' -C 1 -W 3 | grep -q ."]
+      interval: 10s
+      timeout: 5s
+      retries: 5

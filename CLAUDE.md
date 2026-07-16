@@ -50,9 +50,9 @@ simulator ──MQTT──▶ [Mosquitto broker] ──▶ oee-service ──Web
 ## 로드맵
 
 - **Phase 0** — CLAUDE.md 작성, 모노레포 재구성, 게임 플레이버/범위 밖 코드 정리 ✅
-- **Phase 1** — infra에 Mosquitto 추가, MQTT 토픽 설계(`factory/{line}/{equipment}/...`),
-  simulator 최소 구현(설비 상태·생산 카운트 발행), oee-service MQTT 컨슈머,
-  설비/라인 마스터 엔티티, Flyway 도입, 실제 인증(User + PasswordEncoder)으로 Mock 교체
+- **Phase 1** — infra에 Mosquitto 추가, MQTT 토픽 설계(`docs/mqtt-topics.md`),
+  simulator 최소 구현(설비 상태·사이클 발행), oee-service MQTT 컨슈머,
+  설비/라인 마스터 엔티티, Flyway 도입, 실제 인증(User + PasswordEncoder)으로 Mock 교체 ✅
 - **Phase 2** — OEE 계산 엔진(설비/라인/시프트 단위), WebSocket/SSE 실시간 push
 - **Phase 3** — web 대시보드(실시간 OEE, 이벤트 타임라인, 작업지시 조작), Railway 배포
 - **Phase 4** — ai-service (AI_ANOMALY_DETECTED 발행 주체)
