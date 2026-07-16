@@ -6,8 +6,5 @@ public enum TargetType {
     WORK_ORDER,
     LOT,
     EQUIPMENT,
-    AGV,
-    WAREHOUSE,
-    QMS_BUILDING,
-    FACTORY_MAP
+    LINE
 }

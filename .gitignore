@@ -8,4 +8,4 @@ out/
 .vscode/
 
 .env
-docker/postgres/data/
+infra/postgres-data/

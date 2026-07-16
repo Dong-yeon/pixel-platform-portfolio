@@ -32,9 +32,7 @@ public class AuthService {
     private UserRole resolveMockRole(String username) {
         return switch (username.toLowerCase()) {
             case "admin" -> UserRole.ADMIN;
-            case "qms" -> UserRole.QMS_MANAGER;
             case "inspector" -> UserRole.INSPECTOR;
-            case "warehouse" -> UserRole.WAREHOUSE_OPERATOR;
             default -> UserRole.OPERATOR;
         };
     }
@@ -42,9 +40,7 @@ public class AuthService {
     private String resolveMockName(String username) {
         return switch (username.toLowerCase()) {
             case "admin" -> "관리자";
-            case "qms" -> "QMS 담당자";
             case "inspector" -> "검사 담당자";
-            case "warehouse" -> "창고 담당자";
             default -> "작업자";
         };
     }

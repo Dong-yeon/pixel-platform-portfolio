@@ -1,55 +1,39 @@
-# PixelFactory Backend
+# PixelFactory
 
-PixelFactory MVP의 Spring Boot 3 기반 백엔드 초기 구성입니다.
+자동차 부품 가공 라인 **OEE 실시간 모니터링** 데모.
+이벤트 기반 컴포저블 구조 — 자세한 목표/원칙/로드맵은 [CLAUDE.md](CLAUDE.md) 참고.
 
-## Stack
+## 구조
 
-- Java 17
-- Spring Boot 3
-- Gradle
-- PostgreSQL
-- Spring Security
-- JWT
-- Spring Data JPA
-- QueryDSL
-- Swagger/OpenAPI
+| 디렉터리 | 역할 | 상태 |
+|---|---|---|
+| `services/oee-service/` | Spring Boot 3 백엔드 (이벤트 수집·OEE 계산·API) | 개발 중 |
+| `simulator/` | 설비 시뮬레이터 (MQTT 발행) | Phase 1 예정 |
+| `web/` | 실시간 OEE 대시보드 | Phase 3 예정 |
+| `infra/` | docker-compose (PostgreSQL, 추후 Mosquitto) | — |
+| `docs/` | 백로그, 설계 문서 | — |
 
-## Run PostgreSQL
+## 실행 (로컬)
 
-```bash
-docker compose up -d postgres
-```
-
-## Run Backend
-
-Gradle Wrapper로 실행합니다.
-
-```bash
-./gradlew bootRun
-```
-
-Windows PowerShell:
+요구 사항: Docker Desktop, JDK 17
 
 ```powershell
+# 1. PostgreSQL 기동
+cd infra
+docker compose up -d postgres
+
+# 2. 백엔드 실행 (포트 8081)
+cd ..\services\oee-service
 .\gradlew.bat bootRun
 ```
 
-Swagger UI:
+- Swagger UI: http://localhost:8081/swagger-ui.html
+- Health: `GET http://localhost:8081/api/health`
 
-```text
-http://localhost:8080/swagger-ui.html
-```
-
-Health Check:
-
-```text
-GET http://localhost:8080/api/health
-```
-
-Mock Login:
+## Mock 로그인 (임시)
 
 ```http
-POST http://localhost:8080/api/auth/login
+POST http://localhost:8081/api/auth/login
 Content-Type: application/json
 
 {
@@ -58,14 +42,8 @@ Content-Type: application/json
 }
 ```
 
-## Mock Users
-
-현재 로그인은 MVP 초기 Mock입니다.
-
 - `admin` → `ADMIN`
-- `qms` → `QMS_MANAGER`
 - `inspector` → `INSPECTOR`
-- `warehouse` → `WAREHOUSE_OPERATOR`
 - 그 외 → `OPERATOR`
 
-TODO: 다음 단계에서 실제 UserRepository + PasswordEncoder 기반 인증으로 교체합니다.
+Phase 1에서 User 테이블 + PasswordEncoder 기반 실제 인증으로 교체 예정.
