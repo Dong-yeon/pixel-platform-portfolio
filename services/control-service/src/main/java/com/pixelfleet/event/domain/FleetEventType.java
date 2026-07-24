@@ -1,0 +1,16 @@
+package com.pixelfleet.event.domain;
+
+public enum FleetEventType {
+    ROBOT_REGISTERED,
+    ROBOT_STATUS_CHANGED,
+    ROBOT_POSITION_UPDATED,
+    ROBOT_BATTERY_LOW,
+    ROBOT_OFFLINE,
+    TASK_CREATED,
+    TASK_ASSIGNED,
+    TASK_STARTED,
+    TASK_COMPLETED,
+    TASK_FAILED,
+    TASK_RETRIED,
+    TASK_CANCELLED
+}

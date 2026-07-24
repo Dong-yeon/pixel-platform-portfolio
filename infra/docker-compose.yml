@@ -1,0 +1,30 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: pixelfleet-postgres
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_DB: pixelfleet
+      POSTGRES_USER: fleet
+      POSTGRES_PASSWORD: fleet
+    volumes:
+      - ./postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U fleet -d pixelfleet"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  mosquitto:
+    image: eclipse-mosquitto:2
+    container_name: pixelfleet-mosquitto
+    ports:
+      - "1883:1883"
+    volumes:
+      - ./mosquitto/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+    healthcheck:
+      test: ["CMD-SHELL", "mosquitto_sub -t '$$SYS/#' -C 1 -W 3 | grep -q ."]
+      interval: 10s
+      timeout: 5s
+      retries: 5
