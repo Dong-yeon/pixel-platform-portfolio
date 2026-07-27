@@ -11,6 +11,7 @@ import com.pixelfleet.event.service.FleetEventService;
 import com.pixelfleet.robot.domain.Robot;
 import com.pixelfleet.robot.domain.RobotStatus;
 import com.pixelfleet.robot.service.RobotService;
+import com.pixelfleet.task.dispatch.AssignmentPolicy;
 import com.pixelfleet.task.domain.TaskPriority;
 import com.pixelfleet.task.domain.TaskStatus;
 import com.pixelfleet.task.domain.TransportTask;
@@ -35,17 +36,20 @@ public class TaskService {
     private final RobotService robotService;
     private final FleetEventService fleetEventService;
     private final RobotCommandPublisher robotCommandPublisher;
+    private final AssignmentPolicy assignmentPolicy;
 
     public TaskService(
             TransportTaskRepository taskRepository,
             RobotService robotService,
             FleetEventService fleetEventService,
-            RobotCommandPublisher robotCommandPublisher
+            RobotCommandPublisher robotCommandPublisher,
+            AssignmentPolicy assignmentPolicy
     ) {
         this.taskRepository = taskRepository;
         this.robotService = robotService;
         this.fleetEventService = fleetEventService;
         this.robotCommandPublisher = robotCommandPublisher;
+        this.assignmentPolicy = assignmentPolicy;
     }
 
     @Transactional(readOnly = true)
@@ -77,12 +81,14 @@ public class TaskService {
     }
 
     /**
-     * Assign the single highest-priority pending task to an available robot, if any.
-     * Called on a schedule / on new task or newly-idle robot. Returns the assigned
-     * task, or {@code null} when there is nothing to dispatch.
+     * Assign one pending task to the best-matched available robot, if any.
      *
-     * TODO(Phase 2): replace "first available robot" with nearest-robot-by-distance and
-     * battery-aware selection, and consider traffic/deadlock avoidance for >1 robot.
+     * <p>Task order: highest priority first, FIFO within the same priority. Robot choice is
+     * delegated to {@link AssignmentPolicy} (nearest to origin, battery-aware). Returns the
+     * assigned task, or {@code null} when there is nothing to dispatch or no suitable robot
+     * (e.g. every free robot is too low on battery — the task then waits).
+     *
+     * TODO: traffic/deadlock avoidance once more than a couple of robots share the floor.
      */
     @Transactional
     public TransportTask dispatchOnce() {
@@ -90,15 +96,18 @@ public class TaskService {
         if (pending.isEmpty()) {
             return null;
         }
+        // pending is already id-ascending (FIFO); a stable ordering by descending priority
+        // keeps FIFO within each priority band.
         TransportTask next = pending.stream()
-                .max(Comparator.comparingInt(t -> t.getPriority().getWeight()))
+                .min(Comparator.comparingInt((TransportTask t) -> -t.getPriority().getWeight())
+                        .thenComparingLong(TransportTask::getId))
                 .orElseThrow();
 
         List<Robot> available = robotService.findAvailable();
-        if (available.isEmpty()) {
+        Robot robot = assignmentPolicy.selectRobot(next, available).orElse(null);
+        if (robot == null) {
             return null;
         }
-        Robot robot = available.get(0);
 
         next.assignTo(robot.getId());
         // Mark the robot busy immediately so the next dispatch pass can't double-assign it.
