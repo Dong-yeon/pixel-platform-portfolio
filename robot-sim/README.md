@@ -39,7 +39,8 @@ curl -s -X POST http://localhost:8082/api/tasks \
   -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
   -d '{"taskCode":"T-1001","originNode":"STATION-A","destinationNode":"WAREHOUSE","priority":"HIGH"}'
 
-# 3) 배차 → 관제 서버가 가용 로봇에 GOTO 발행 → 시뮬레이터가 수행
+# 3) 배차는 스케줄러가 2초마다 자동 실행(대기 작업 → 가용 로봇에 GOTO 발행).
+#    즉시 돌리고 싶으면 수동 호출:
 curl -s -X POST http://localhost:8082/api/tasks/dispatch -H "Authorization: Bearer $TOKEN"
 
 # 4) 이벤트/로봇 상태 확인

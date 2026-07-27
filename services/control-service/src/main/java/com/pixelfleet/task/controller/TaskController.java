@@ -46,7 +46,11 @@ public class TaskController {
         return ApiResponse.ok(created);
     }
 
-    /** Manually trigger one dispatch pass (until Phase 2 wires this to a scheduler). */
+    /**
+     * Manually trigger one assignment. Dispatch also runs automatically on a fixed delay
+     * (see DispatchScheduler / {@code dispatch.*}); this endpoint stays for demos and for
+     * when {@code dispatch.enabled=false}.
+     */
     @PostMapping("/dispatch")
     public ApiResponse<TaskResponse> dispatch() {
         var assigned = taskService.dispatchOnce();

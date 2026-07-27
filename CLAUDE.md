@@ -55,9 +55,9 @@
 ## 로드맵
 
 - **Phase 0** — 리포 셋업, 공통 코어 이식, 도메인 골격(robot/task/event), MQTT 계약 ✅
-- **Phase 1** — robot-sim 구현(상태·위치·배터리·작업 텔레메트리 발행 + GOTO 수행),
-  downlink 명령 토픽(`fleet/{code}/command`) ✅ (현재). 남은 것: 배차 스케줄러(주기 실행),
-  작업 할당 정책 고도화(최근접·배터리 가중)
+- **Phase 1** — robot-sim(상태·위치·배터리·작업 텔레메트리 + GOTO 수행),
+  downlink 명령 토픽(`fleet/{code}/command`), 배차 스케줄러(주기 자동 dispatch) ✅ (현재).
+  남은 것: 작업 할당 정책 고도화(최근접·배터리 가중)
 - **Phase 2** — WebSocket/SSE 실시간 push (로봇 위치/이벤트를 대시보드로)
 - **Phase 3** — web 관제 대시보드(지도·로봇 마커·작업 조작), Railway 배포
 - **Phase 4** — robot-sim 을 ROS 2(Gazebo + TurtleBot3 + Nav2) 브릿지로 교체, 멀티로봇 교통정리

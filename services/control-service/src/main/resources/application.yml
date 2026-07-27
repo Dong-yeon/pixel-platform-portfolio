@@ -29,6 +29,12 @@ mqtt:
   client-id: control-service
   topic-filter: "fleet/#"
 
+dispatch:
+  # Automatic dispatch: drains pending tasks to available robots on a fixed delay.
+  # Set enabled=false to dispatch only via POST /api/tasks/dispatch.
+  enabled: ${DISPATCH_ENABLED:true}
+  interval-ms: ${DISPATCH_INTERVAL_MS:2000}
+
 ---
 spring:
   config:
