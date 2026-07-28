@@ -10,7 +10,7 @@ Happyeon SmartFactory Pixel Project — 여러 제조 도메인 모듈을 **API 
                   └───────────┬─────────────┘
                               │
                   ┌───────────┴─────────────┐
-                  │  API Gateway (8080)     │
+                  │  API Gateway (9000)     │
                   └───────────┬─────────────┘
                   ┌───────────┴─────────────┐
                   │                         │
@@ -18,7 +18,7 @@ Happyeon SmartFactory Pixel Project — 여러 제조 도메인 모듈을 **API 
           │ PixelFactory   │       │ PixelFleet     │
           │ OEE·설비·생산   │       │ AMR·작업지시    │
           │ 불량·PLC       │       │ 배터리·경로     │
-          │ :8081          │       │ :8082          │
+          │ :9001          │       │ :9002          │
           └────────────────┘       └────────────────┘
 ```
 
@@ -31,10 +31,35 @@ Happyeon SmartFactory Pixel Project — 여러 제조 도메인 모듈을 **API 
 | `modules/pixel-factory/` | 가공라인 **OEE 모니터링** (MQTT·이벤트 소싱) | 이식 완료 |
 | `modules/pixel-fleet/` | AMR **군집 관제(FMS)** (MQTT·Redis·WebSocket) | 이식 완료 |
 | `shared/` | 공통 코어(common·auth·user) — 모듈 공유 | 예정 (P5) |
-| `infra/` | docker-compose (PostgreSQL, Mosquitto, Redis) | 예정 (P2) |
+| `infra/` | docker-compose (PostgreSQL, Mosquitto, Redis) | 완료 |
 | `docs/` | 플랫폼 문서·재구성 계획서 | — |
 
 향후 확장: PixelVision(비전 검사), PixelQuality(품질), PixelEnergy(에너지), PixelAI(이상감지).
+
+## 포트 규약
+
+플랫폼은 **9000번대**를 쓴다 (다른 로컬 프로젝트와 충돌 방지).
+
+| 포트 | 서비스 |
+|---|---|
+| 9000 | API Gateway |
+| 9001 | pixel-factory |
+| 9002 | pixel-fleet |
+| 9100 | 통합 대시보드 (dev) |
+| 5432 / 1883 / 6379 | Postgres / Mosquitto / Redis |
+
+새 모듈은 9003(vision), 9004(quality) … 순으로 이어간다.
+
+## 로컬 실행
+
+```bash
+cd infra && docker compose up -d          # Postgres + Mosquitto + Redis
+```
+```powershell
+cd modules\pixel-factory\services\oee-service     ; .\gradlew.bat bootRun   # :9001
+cd modules\pixel-fleet\services\control-service   ; .\gradlew.bat bootRun   # :9002
+cd modules\pixel-fleet\robot-sim                  ; .\gradlew.bat bootRun
+```
 
 ## 원칙
 

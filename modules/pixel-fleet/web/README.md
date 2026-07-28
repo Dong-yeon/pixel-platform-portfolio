@@ -14,15 +14,15 @@ React + TypeScript + Vite. 관제 서버(control-service)와 **REST + STOMP/WebS
 
 ## 실행 (개발)
 
-관제 서버(:8082) + 시뮬레이터 + 인프라가 떠 있는 상태에서:
+관제 서버(:9002) + 시뮬레이터 + 인프라가 떠 있는 상태에서:
 
 ```bash
 cd web
 npm install
-npm run dev        # http://localhost:5173
+npm run dev        # http://localhost:9100
 ```
 
-Vite dev 서버가 `/api`·`/ws`를 :8082로 프록시하므로 CORS 설정이 필요 없다.
+Vite dev 서버가 `/api`·`/ws`를 :9002로 프록시하므로 CORS 설정이 필요 없다.
 데모 계정: `admin` / `dispatcher` / `operator` · 비밀번호 `password`.
 
 ## 빌드

@@ -22,7 +22,7 @@
 cd infra
 docker compose up -d
 
-# 2. 백엔드 실행 (포트 8081) — 첫 기동 시 Flyway 마이그레이션 + 데모 유저 시드
+# 2. 백엔드 실행 (포트 9001) — 첫 기동 시 Flyway 마이그레이션 + 데모 유저 시드
 cd ..\services\oee-service
 .\gradlew.bat bootRun
 
@@ -31,8 +31,8 @@ cd simulator
 .\gradlew.bat run
 ```
 
-- Swagger UI: http://localhost:8081/swagger-ui.html
-- Health: `GET http://localhost:8081/api/health`
+- Swagger UI: http://localhost:9001/swagger-ui.html
+- Health: `GET http://localhost:9001/api/health`
 - 이벤트 확인: `GET /api/events/recent`, 설비 상태: `GET /api/equipments`
 - MQTT 토픽 계약: [docs/mqtt-topics.md](docs/mqtt-topics.md)
 - 시뮬레이터 배속: `SIM_SPEED` 환경변수 (기본 10배속)
@@ -48,7 +48,7 @@ cd simulator
 | `operator` | OPERATOR |
 
 ```http
-POST http://localhost:8081/api/auth/login
+POST http://localhost:9001/api/auth/login
 Content-Type: application/json
 
 {

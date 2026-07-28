@@ -30,22 +30,22 @@ cd robot-sim
 
 ```bash
 # 1) 로그인 → 토큰
-TOKEN=$(curl -s -X POST http://localhost:8082/api/auth/login \
+TOKEN=$(curl -s -X POST http://localhost:9002/api/auth/login \
   -H "Content-Type: application/json" \
   -d '{"username":"admin","password":"password"}' | jq -r '.data.accessToken')
 
 # 2) 운송 작업 생성 (노드는 STATION-A/B/C, WAREHOUSE, DOCK-1/2 사용)
-curl -s -X POST http://localhost:8082/api/tasks \
+curl -s -X POST http://localhost:9002/api/tasks \
   -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
   -d '{"taskCode":"T-1001","originNode":"STATION-A","destinationNode":"WAREHOUSE","priority":"HIGH"}'
 
 # 3) 배차는 스케줄러가 2초마다 자동 실행(대기 작업 → 가용 로봇에 GOTO 발행).
 #    즉시 돌리고 싶으면 수동 호출:
-curl -s -X POST http://localhost:8082/api/tasks/dispatch -H "Authorization: Bearer $TOKEN"
+curl -s -X POST http://localhost:9002/api/tasks/dispatch -H "Authorization: Bearer $TOKEN"
 
 # 4) 이벤트/로봇 상태 확인
-curl -s http://localhost:8082/api/events -H "Authorization: Bearer $TOKEN"
-curl -s http://localhost:8082/api/robots -H "Authorization: Bearer $TOKEN"
+curl -s http://localhost:9002/api/events -H "Authorization: Bearer $TOKEN"
+curl -s http://localhost:9002/api/robots -H "Authorization: Bearer $TOKEN"
 ```
 
 ## 설정 (`application.yml`, `sim.*`)

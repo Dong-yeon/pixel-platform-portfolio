@@ -11,8 +11,9 @@ spring:
         enabled: false   # we use RedisTemplate/pub-sub, not Spring Data Redis repositories
 
 server:
-  # Railway injects PORT; fall back to 8082 for local runs.
-  port: ${PORT:8082}
+  # Pixel Platform은 9000번대를 쓴다 (gateway 9000 / factory 9001 / fleet 9002).
+  # Railway 등 배포 환경은 PORT를 주입한다.
+  port: ${PORT:9002}
   servlet:
     encoding:
       charset: UTF-8

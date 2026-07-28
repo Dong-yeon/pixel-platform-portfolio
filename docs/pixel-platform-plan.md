@@ -16,8 +16,8 @@
 pixel-platform/                     (레포 1개 · GitHub: Dong-yeon/pixel-platform)
                                     (로컬: D:\happyeon\99.Happyeon\pixel-platform — clone 완료)
 ├── platform/
-│   ├── gateway/         Spring Cloud Gateway — /api/factory/** → 8081, /api/fleet/** → 8082
-│   └── dashboard/       통합 React (OEE + AMR + KPI), 게이트웨이(8080)만 바라봄
+│   ├── gateway/         Spring Cloud Gateway — /api/factory/** → 9001, /api/fleet/** → 9002
+│   └── dashboard/       통합 React (OEE + AMR + KPI), 게이트웨이(9000)만 바라봄
 ├── modules/
 │   ├── pixel-factory/   OEE  (기존 GitHub 레포 → subtree 이식, 히스토리 보존)
 │   └── pixel-fleet/     AMR  (현재 로컬 레포 → subtree 이식, 히스토리 보존)
@@ -29,7 +29,7 @@ pixel-platform/                     (레포 1개 · GitHub: Dong-yeon/pixel-plat
 └── .gitignore
 ```
 
-포트: gateway **8080** · factory **8081** · fleet **8082** · dashboard(dev) **5173**(prod는 게이트웨이가 서빙).
+포트: gateway **9000** · factory **9001** · fleet **9002** · dashboard(dev) **9100**(prod는 게이트웨이가 서빙).
 
 ---
 
@@ -75,7 +75,7 @@ pixel-platform/                     (레포 1개 · GitHub: Dong-yeon/pixel-plat
 - ~~**P0. 골격**~~ — ✅ 완료(레포 생성·clone 완료). 남은 것: `.gitignore`/`docs`/`infra`/`scripts` 스켈레톤 추가
 - **P1. 모듈 이식** — subtree add로 pixel-fleet, pixel-factory 이식 → **각 모듈 개별 빌드 통과 확인**
 - **P2. 통합 인프라** — 루트 docker-compose(postgres 2DB + mosquitto + redis) → 두 모듈 기동 검증
-- **P3. 게이트웨이** — Spring Cloud Gateway + 라우트(`/api/factory/**`→8081, `/api/fleet/**`→8082) → 라우팅 검증
+- **P3. 게이트웨이** — Spring Cloud Gateway + 라우트(`/api/factory/**`→9001, `/api/fleet/**`→9002) → 라우팅 검증
 - **P4. 통합 대시보드** — `platform/dashboard` React(모듈 선택 → OEE/AMR 뷰), pixel-fleet/web 흡수(D3) → 게이트웨이 경유 실측
 - **P5. 공통 코어 추출 (D4)** — common/auth/user를 `shared/`로 이동, 두 모듈이 의존 → 양쪽 빌드·런타임 재검증
 - **P6. 게이트웨이 중앙 인증 (D5)** — JWT 검증을 게이트웨이로, 모듈은 신뢰 헤더 기반 → 인증 흐름 재검증

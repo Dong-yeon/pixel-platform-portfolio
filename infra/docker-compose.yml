@@ -1,0 +1,60 @@
+# Pixel Platform — 통합 로컬 인프라.
+# 모듈들이 공유하는 백엔드 서비스만 띄운다(앱은 각 모듈에서 gradlew bootRun).
+#
+#   docker compose up -d          기동
+#   docker compose down           정지 (데이터 유지)
+#   docker compose down -v        정지 + 데이터 삭제 (스키마/초기화 다시)
+name: pixel-platform
+
+services:
+  # 모듈당 DB 하나(DB per module). pixelfactory는 아래 환경변수로,
+  # pixelfleet은 postgres-init/01-create-databases.sql 로 생성된다.
+  postgres:
+    image: postgres:16-alpine
+    container_name: pixel-postgres
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_DB: pixelfactory
+      POSTGRES_USER: pixel
+      POSTGRES_PASSWORD: pixel
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./postgres-init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U pixel -d pixelfactory"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # 모듈 공용 브로커. 토픽 네임스페이스로 분리한다: factory/#, fleet/#
+  mosquitto:
+    image: eclipse-mosquitto:2
+    container_name: pixel-mosquitto
+    ports:
+      - "1883:1883"
+    volumes:
+      - ./mosquitto/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+    healthcheck:
+      test: ["CMD-SHELL", "mosquitto_sub -t '$$SYS/#' -C 1 -W 3 | grep -q ."]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # pixel-fleet 전용: 로봇 라이브 상태 + 실시간 push 팬아웃(Pub/Sub).
+  redis:
+    image: redis:7-alpine
+    container_name: pixel-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  postgres-data:
+  redis-data:

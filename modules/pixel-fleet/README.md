@@ -21,13 +21,13 @@ Spring Boot 관제 서버 + MQTT + (ROS 2 / 시뮬레이터) 로봇 + React 관�
 cd infra
 docker compose up -d
 
-# 2) 관제 서버 실행 (포트 8082)
+# 2) 관제 서버 실행 (포트 9002)
 cd ../services/control-service
 ./gradlew bootRun          # Windows: .\gradlew.bat bootRun
 ```
 
-- Swagger UI: http://localhost:8082/swagger-ui.html
-- Health: http://localhost:8082/api/health
+- Swagger UI: http://localhost:9002/swagger-ui.html
+- Health: http://localhost:9002/api/health
 
 ## 인증
 
@@ -35,7 +35,7 @@ JWT 기반. 데모 계정(비밀번호 `password`): `admin`, `dispatcher`, `oper
 `/api/auth/login` 과 `/api/health`, Swagger 를 제외한 모든 `/api/**` 는 토큰이 필요하다.
 
 ```bash
-curl -X POST http://localhost:8082/api/auth/login \
+curl -X POST http://localhost:9002/api/auth/login \
   -H "Content-Type: application/json" \
   -d '{"username":"admin","password":"password"}'
 ```
