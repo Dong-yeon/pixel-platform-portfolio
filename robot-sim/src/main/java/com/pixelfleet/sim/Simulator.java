@@ -167,15 +167,19 @@ public class Simulator {
                 log.warn("GOTO for unknown robot '{}'. Ignoring.", robotCode);
                 return;
             }
-            if (robot.getState() != RobotState.IDLE) {
-                log.warn("Robot {} is {} (not IDLE); ignoring GOTO.", robotCode, robot.getState());
+            String taskCode = json.path("taskCode").asText();
+            // Accept unless the robot is already executing a task or charging. In particular a
+            // roaming robot (MOVING with no task) must yield: roaming is cosmetic idle motion, and
+            // rejecting the GOTO here would orphan the task the server already marked ASSIGNED.
+            if (robot.hasTask() || robot.getState() == RobotState.CHARGING) {
+                log.warn("Robot {} busy ({}, hasTask={}); ignoring GOTO for {}.",
+                        robotCode, robot.getState(), robot.hasTask(), taskCode);
                 return;
             }
-            String taskCode = json.path("taskCode").asText();
             double[] origin = nodeMap.resolve(json.path("origin").asText());
             double[] destination = nodeMap.resolve(json.path("destination").asText());
 
-            robot.assignTask(taskCode, origin, destination);
+            robot.assignTask(taskCode, origin, destination); // overrides any in-progress roam
             publishStatus(robot);           // now MOVING
             publishTask(robot, "started", null);
             log.info("Robot {} accepted task {} ({} -> {})",

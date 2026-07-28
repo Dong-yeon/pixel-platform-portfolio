@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>PixelFleet — 실시간 push 테스트</title>
+  <script src="https://cdn.jsdelivr.net/npm/sockjs-client@1/dist/sockjs.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@stomp/stompjs@7/bundles/stomp.umd.min.js"></script>
+  <style>
+    body { font: 14px/1.5 system-ui, sans-serif; margin: 20px; color: #1a1a1a; }
+    h1 { font-size: 18px; }
+    #status { padding: 2px 8px; border-radius: 4px; font-weight: 600; }
+    .up { background: #d1f7d1; color: #0a6b0a; }
+    .down { background: #fadadc; color: #a11; }
+    .cols { display: flex; gap: 24px; flex-wrap: wrap; }
+    table { border-collapse: collapse; }
+    th, td { border: 1px solid #ddd; padding: 4px 10px; text-align: left; }
+    th { background: #f4f4f4; }
+    .map { position: relative; width: 320px; height: 240px; border: 1px solid #ccc; background: #fafafa; }
+    .bot { position: absolute; width: 14px; height: 14px; border-radius: 50%; transform: translate(-50%,-50%);
+           font-size: 9px; color: #fff; text-align: center; line-height: 14px; transition: all .4s linear; }
+    #events { max-height: 260px; overflow: auto; font-family: monospace; font-size: 12px; }
+    #events div { padding: 1px 0; border-bottom: 1px solid #f0f0f0; }
+    .ERROR { color: #c00; } .WARNING { color: #b60; } .INFO { color: #333; }
+  </style>
+</head>
+<body>
+  <h1>PixelFleet 실시간 push <span id="status" class="down">연결 중…</span></h1>
+  <p>서버 <code>/topic/robots</code>, <code>/topic/events</code> 구독. 로봇이 움직이면 즉시 반영됩니다.</p>
+  <div class="cols">
+    <div>
+      <h3>로봇 (map: 32×24)</h3>
+      <div class="map" id="map"></div>
+      <table><thead><tr><th>code</th><th>status</th><th>batt%</th><th>x</th><th>y</th></tr></thead>
+      <tbody id="robots"></tbody></table>
+    </div>
+    <div style="flex:1; min-width:320px;">
+      <h3>이벤트 타임라인</h3>
+      <div id="events"></div>
+    </div>
+  </div>
+
+  <script>
+    const MAP_W = 32, MAP_H = 24, PX_W = 320, PX_H = 240;
+    const robots = {};
+    const statusEl = document.getElementById('status');
+    const robotsBody = document.getElementById('robots');
+    const mapEl = document.getElementById('map');
+    const eventsEl = document.getElementById('events');
+    const colors = { IDLE:'#2a7', MOVING:'#37c', CHARGING:'#b60', ERROR:'#c00', OFFLINE:'#999' };
+
+    function renderRobot(r) {
+      robots[r.robotCode] = r;
+      // table
+      let row = document.getElementById('r-' + r.robotCode);
+      if (!row) { row = document.createElement('tr'); row.id = 'r-' + r.robotCode; robotsBody.appendChild(row); }
+      row.innerHTML = `<td>${r.robotCode}</td><td>${r.status}</td><td>${r.batteryPercent}</td>`
+                    + `<td>${r.posX.toFixed(1)}</td><td>${r.posY.toFixed(1)}</td>`;
+      // map marker
+      let dot = document.getElementById('d-' + r.robotCode);
+      if (!dot) { dot = document.createElement('div'); dot.id = 'd-' + r.robotCode; dot.className = 'bot';
+                  dot.title = r.robotCode; mapEl.appendChild(dot); }
+      dot.style.left = (r.posX / MAP_W * PX_W) + 'px';
+      dot.style.top  = (r.posY / MAP_H * PX_H) + 'px';
+      dot.style.background = colors[r.status] || '#999';
+      dot.textContent = r.robotCode.slice(-1);
+    }
+
+    function renderEvent(e) {
+      const div = document.createElement('div');
+      div.className = e.severity;
+      const t = (e.occurredAt || '').replace('T', ' ').slice(11, 19);
+      div.textContent = `${t}  ${e.eventType}  ${e.message}`;
+      eventsEl.prepend(div);
+    }
+
+    const client = new StompJs.Client({
+      webSocketFactory: () => new SockJS('/ws'),
+      reconnectDelay: 3000,
+      onConnect: () => {
+        statusEl.textContent = '연결됨'; statusEl.className = 'up';
+        client.subscribe('/topic/robots', m => renderRobot(JSON.parse(m.body)));
+        client.subscribe('/topic/events', m => renderEvent(JSON.parse(m.body)));
+      },
+      onWebSocketClose: () => { statusEl.textContent = '끊김 (재연결 중)'; statusEl.className = 'down'; }
+    });
+    client.activate();
+  </script>
+</body>
+</html>

@@ -58,7 +58,8 @@
 - **Phase 1** — robot-sim(상태·위치·배터리·작업 텔레메트리 + GOTO 수행),
   downlink 명령 토픽(`fleet/{code}/command`), 배차 스케줄러(주기 자동 dispatch),
   할당 정책(우선순위 FIFO + 최근접·배터리 인지) ✅ (현재)
-- **Phase 2** — WebSocket/SSE 실시간 push (로봇 위치/이벤트를 대시보드로)
+- **Phase 2** — STOMP/WebSocket 실시간 push(`/topic/robots`·`/topic/events`),
+  트랜잭션 커밋 후 브로드캐스트, 로밍-배차 레이스 수정 ✅
 - **Phase 3** — web 관제 대시보드(지도·로봇 마커·작업 조작), Railway 배포
 - **Phase 4** — robot-sim 을 ROS 2(Gazebo + TurtleBot3 + Nav2) 브릿지로 교체, 멀티로봇 교통정리
 

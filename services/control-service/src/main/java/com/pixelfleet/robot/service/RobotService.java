@@ -7,16 +7,20 @@ import com.pixelfleet.event.domain.FleetEventType;
 import com.pixelfleet.event.domain.SourceType;
 import com.pixelfleet.event.domain.TargetType;
 import com.pixelfleet.event.service.FleetEventService;
+import com.pixelfleet.realtime.RobotStateChangedEvent;
 import com.pixelfleet.robot.domain.Robot;
 import com.pixelfleet.robot.domain.RobotStatus;
+import com.pixelfleet.robot.dto.RobotResponse;
 import com.pixelfleet.robot.repository.RobotRepository;
 import java.util.List;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Applies robot telemetry to master state and records the matching fleet event.
  * The MQTT handler is the main caller; every mutation goes through {@link FleetEventService}.
+ * Live-state changes are published as {@link RobotStateChangedEvent} for post-commit push.
  */
 @Service
 public class RobotService {
@@ -26,10 +30,16 @@ public class RobotService {
 
     private final RobotRepository robotRepository;
     private final FleetEventService fleetEventService;
+    private final ApplicationEventPublisher eventPublisher;
 
-    public RobotService(RobotRepository robotRepository, FleetEventService fleetEventService) {
+    public RobotService(
+            RobotRepository robotRepository,
+            FleetEventService fleetEventService,
+            ApplicationEventPublisher eventPublisher
+    ) {
         this.robotRepository = robotRepository;
         this.fleetEventService = fleetEventService;
+        this.eventPublisher = eventPublisher;
     }
 
     @Transactional(readOnly = true)
@@ -52,7 +62,7 @@ public class RobotService {
     public void changeStatus(String robotCode, RobotStatus status, String payloadJson) {
         Robot robot = requireByCode(robotCode);
         if (robot.getStatus() == status) {
-            // Idempotent telemetry (robot re-reports the same status): refresh heartbeat, no event.
+            // Idempotent telemetry (robot re-reports the same status): refresh heartbeat, no event/push.
             robot.changeStatus(status);
             return;
         }
@@ -69,6 +79,7 @@ public class RobotService {
                 TargetType.ROBOT, robot.getId(),
                 null, severity,
                 "Robot " + robotCode + " changed to " + status, payloadJson);
+        publishStateChanged(robot);
     }
 
     @Transactional
@@ -77,7 +88,8 @@ public class RobotService {
         robot.updatePosition(posX, posY);
         // Position is high-frequency live telemetry, not a discrete state transition, so we keep only
         // the last-known value on the robot and do NOT append a fleet_event per tick (retention cost).
-        // Phase 2 pushes the updated position straight to dashboards over WebSocket instead.
+        // We DO push it live so the dashboard map animates.
+        publishStateChanged(robot);
     }
 
     @Transactional
@@ -87,7 +99,7 @@ public class RobotService {
         robot.updateBattery(batteryPercent);
 
         if (wasAboveThreshold && batteryPercent < LOW_BATTERY_THRESHOLD) {
-            // TODO(Phase 2): enqueue an automatic return-to-charge task for this robot.
+            // TODO: enqueue an automatic return-to-charge task for this robot.
             fleetEventService.record(
                     FleetEventType.ROBOT_BATTERY_LOW,
                     SourceType.ROBOT, robot.getId(),
@@ -95,6 +107,12 @@ public class RobotService {
                     null, EventSeverity.WARNING,
                     "Robot " + robotCode + " battery low: " + batteryPercent + "%", payloadJson);
         }
+        publishStateChanged(robot);
+    }
+
+    /** Emit a snapshot for post-commit WebSocket push (see RealtimeBroadcaster). */
+    private void publishStateChanged(Robot robot) {
+        eventPublisher.publishEvent(new RobotStateChangedEvent(RobotResponse.from(robot)));
     }
 
     private Robot requireByCode(String robotCode) {
