@@ -1,3 +1,7 @@
+# Distinct project name so this stack doesn't collide with sibling projects
+# (e.g. PixelFactory/infra) that would otherwise share the default project name "infra".
+name: pixelfleet
+
 services:
   postgres:
     image: postgres:16-alpine

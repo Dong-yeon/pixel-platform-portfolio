@@ -41,10 +41,12 @@ public class Robot extends BaseEntity {
     @Column(nullable = false)
     private int batteryPercent;
 
-    @Column(nullable = false)
+    // Explicit column names: the default naming strategy maps posX -> "posx" (a trailing
+    // capital gets no underscore), but the migration uses snake_case pos_x/pos_y.
+    @Column(name = "pos_x", nullable = false)
     private double posX;
 
-    @Column(nullable = false)
+    @Column(name = "pos_y", nullable = false)
     private double posY;
 
     private LocalDateTime lastHeartbeatAt;
