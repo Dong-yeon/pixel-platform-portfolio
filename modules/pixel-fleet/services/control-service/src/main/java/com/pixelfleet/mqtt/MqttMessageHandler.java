@@ -50,7 +50,7 @@ public class MqttMessageHandler {
                 case "task" -> handleTask(json);
                 default -> log.debug("Ignoring unsupported message kind '{}' on topic {}", kind, topic);
             }
-        } catch (com.pixelfleet.common.exception.BusinessException e) {
+        } catch (com.pixelplatform.core.common.exception.BusinessException e) {
             // e.g. telemetry for a robot/task that isn't registered yet — log, don't crash the consumer.
             log.warn("Could not apply telemetry from topic {}: {}", topic, e.getMessage());
         }

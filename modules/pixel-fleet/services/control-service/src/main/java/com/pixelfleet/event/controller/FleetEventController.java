@@ -1,6 +1,6 @@
 package com.pixelfleet.event.controller;
 
-import com.pixelfleet.common.response.ApiResponse;
+import com.pixelplatform.core.common.response.ApiResponse;
 import com.pixelfleet.event.dto.FleetEventResponse;
 import com.pixelfleet.event.service.FleetEventService;
 import java.util.List;

@@ -1,6 +1,6 @@
 package com.pixelfactory.event.domain;
 
-import com.pixelfactory.common.entity.BaseEntity;
+import com.pixelplatform.core.common.entity.BaseEntity;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;

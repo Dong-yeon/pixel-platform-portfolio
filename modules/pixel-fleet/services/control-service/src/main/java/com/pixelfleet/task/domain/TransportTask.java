@@ -1,8 +1,8 @@
 package com.pixelfleet.task.domain;
 
-import com.pixelfleet.common.entity.BaseEntity;
-import com.pixelfleet.common.exception.BusinessException;
-import com.pixelfleet.common.exception.ErrorCode;
+import com.pixelplatform.core.common.entity.BaseEntity;
+import com.pixelplatform.core.common.exception.BusinessException;
+import com.pixelplatform.core.common.exception.ErrorCode;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;

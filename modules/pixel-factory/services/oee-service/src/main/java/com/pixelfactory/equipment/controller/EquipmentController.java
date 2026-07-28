@@ -1,6 +1,6 @@
 package com.pixelfactory.equipment.controller;
 
-import com.pixelfactory.common.response.ApiResponse;
+import com.pixelplatform.core.common.response.ApiResponse;
 import com.pixelfactory.equipment.dto.EquipmentResponse;
 import com.pixelfactory.equipment.dto.ProductionLineResponse;
 import com.pixelfactory.equipment.service.EquipmentService;

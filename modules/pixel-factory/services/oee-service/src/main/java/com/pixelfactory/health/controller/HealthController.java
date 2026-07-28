@@ -1,6 +1,6 @@
 package com.pixelfactory.health.controller;
 
-import com.pixelfactory.common.response.ApiResponse;
+import com.pixelplatform.core.common.response.ApiResponse;
 import java.time.LocalDateTime;
 import java.util.Map;
 import org.springframework.web.bind.annotation.GetMapping;

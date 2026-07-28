@@ -48,6 +48,12 @@ factory는 플러그인이 준 기본 DB를 그대로 쓴다.
 각 서비스는 **New Service → GitHub Repo → 같은 저장소** 로 만들고, 아래대로 설정한다.
 `railway.json`이 각 디렉터리에 있으므로 빌드 방식(Dockerfile)은 자동으로 잡힌다.
 
+> **두 모듈(pixel-factory·pixel-fleet)은 Root Directory가 `/`다.** 공통 코어 `shared/`를
+> Gradle 복합 빌드로 참조하는데, Docker는 컨텍스트 밖(`../`)을 못 읽으므로 이미지 빌드에
+> 레포 전체가 필요하다. 두 서비스가 루트를 공유하면 `/railway.json` 하나를 서로 다른
+> Dockerfile로 쓸 수 없으므로, 대신 **`RAILWAY_DOCKERFILE_PATH` 환경변수**로 각자
+> Dockerfile을 지정한다(UI의 Dockerfile Path 설정도 동일한 역할).
+>
 > **`railway.json`은 Root Directory 바로 아래에 있어야 한다.** Railway는 설정 파일을
 > Root Directory 기준으로 찾는다. 위치가 어긋나면 Dockerfile 빌더인 줄 모르고 자동 감지로
 > 넘어가 **2~3초 만에 빌드가 실패**한다(로그도 거의 남지 않는다).
@@ -67,9 +73,11 @@ factory는 플러그인이 준 기본 DB를 그대로 쓴다.
 
 | 항목 | 값 |
 |---|---|
-| Root Directory | `modules/pixel-factory/services/oee-service` |
+| Root Directory | `/` ← **레포 루트** (shared/가 빌드에 필요) |
+| Dockerfile Path | `modules/pixel-factory/services/oee-service/Dockerfile` |
 
 ```
+RAILWAY_DOCKERFILE_PATH=modules/pixel-factory/services/oee-service/Dockerfile
 SPRING_PROFILES_ACTIVE=dev
 SERVER_ADDRESS=::
 PORT=9001
@@ -85,9 +93,11 @@ JWT_SECRET=<32바이트 이상 랜덤 문자열>
 
 | 항목 | 값 |
 |---|---|
-| Root Directory | `modules/pixel-fleet/services/control-service` |
+| Root Directory | `/` ← **레포 루트** (shared/가 빌드에 필요) |
+| Dockerfile Path | `modules/pixel-fleet/services/control-service/Dockerfile` |
 
 ```
+RAILWAY_DOCKERFILE_PATH=modules/pixel-fleet/services/control-service/Dockerfile
 SPRING_PROFILES_ACTIVE=dev
 SERVER_ADDRESS=::
 PORT=9002

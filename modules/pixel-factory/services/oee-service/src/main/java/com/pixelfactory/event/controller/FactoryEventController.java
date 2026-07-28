@@ -1,6 +1,6 @@
 package com.pixelfactory.event.controller;
 
-import com.pixelfactory.common.response.ApiResponse;
+import com.pixelplatform.core.common.response.ApiResponse;
 import com.pixelfactory.event.dto.FactoryEventCreateRequest;
 import com.pixelfactory.event.dto.FactoryEventResponse;
 import com.pixelfactory.event.service.FactoryEventService;

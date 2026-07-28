@@ -1,6 +1,6 @@
 package com.pixelfleet.robot.controller;
 
-import com.pixelfleet.common.response.ApiResponse;
+import com.pixelplatform.core.common.response.ApiResponse;
 import com.pixelfleet.robot.dto.RobotResponse;
 import com.pixelfleet.robot.service.RobotService;
 import java.util.List;

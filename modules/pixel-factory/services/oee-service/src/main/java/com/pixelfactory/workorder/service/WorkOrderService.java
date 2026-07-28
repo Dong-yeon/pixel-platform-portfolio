@@ -1,7 +1,7 @@
 package com.pixelfactory.workorder.service;
 
-import com.pixelfactory.common.exception.BusinessException;
-import com.pixelfactory.common.exception.ErrorCode;
+import com.pixelplatform.core.common.exception.BusinessException;
+import com.pixelplatform.core.common.exception.ErrorCode;
 import com.pixelfactory.event.domain.EventSeverity;
 import com.pixelfactory.event.domain.FactoryEventType;
 import com.pixelfactory.event.domain.SourceType;

@@ -1,7 +1,7 @@
 package com.pixelfleet.robot.service;
 
-import com.pixelfleet.common.exception.BusinessException;
-import com.pixelfleet.common.exception.ErrorCode;
+import com.pixelplatform.core.common.exception.BusinessException;
+import com.pixelplatform.core.common.exception.ErrorCode;
 import com.pixelfleet.event.domain.EventSeverity;
 import com.pixelfleet.event.domain.FleetEventType;
 import com.pixelfleet.event.domain.SourceType;

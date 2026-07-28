@@ -1,8 +1,8 @@
 package com.pixelfactory.user;
 
-import com.pixelfactory.user.domain.User;
-import com.pixelfactory.user.domain.UserRole;
-import com.pixelfactory.user.repository.UserRepository;
+import com.pixelplatform.core.user.domain.User;
+import com.pixelplatform.core.user.domain.UserRole;
+import com.pixelplatform.core.user.repository.UserRepository;
 import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

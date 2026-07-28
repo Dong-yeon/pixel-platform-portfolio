@@ -1,6 +1,6 @@
 package com.pixelfleet.task.controller;
 
-import com.pixelfleet.common.response.ApiResponse;
+import com.pixelplatform.core.common.response.ApiResponse;
 import com.pixelfleet.task.dto.CreateTaskRequest;
 import com.pixelfleet.task.dto.TaskResponse;
 import com.pixelfleet.task.service.TaskService;

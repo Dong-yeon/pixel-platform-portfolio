@@ -1,6 +1,8 @@
 package com.pixelfactory.auth.security;
 
-import com.pixelfactory.auth.jwt.JwtAuthenticationFilter;
+import com.pixelplatform.core.auth.jwt.JwtAuthenticationFilter;
+import com.pixelplatform.core.auth.security.RestAccessDeniedHandler;
+import com.pixelplatform.core.auth.security.RestAuthenticationEntryPoint;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
