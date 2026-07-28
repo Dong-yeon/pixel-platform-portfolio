@@ -44,9 +44,12 @@ while IFS=$'\t' read -r rel names; do
     state=$([ -d "$dst" ] && echo "DIFF" || echo "NEW ")
     echo "[$state] $name  ->  $rel"
     if [ "$CHECK" -eq 0 ]; then
-      mkdir -p "$(dirname "$dst")"
-      rm -rf "$dst"
-      cp -r "$src" "$dst"
+      mkdir -p "$dst"
+      # rm 이 막힌 환경(샌드박스 등)에서 rm 실패 후 cp -r 이 dst 안에 한 겹 더 복사돼
+      # <name>/<name>/ 중첩 디렉터리를 만든다. rm 은 실패 허용, 복사는 -T 로 "내용만" 덮어쓴다.
+      rm -rf "$dst" 2>/dev/null || true
+      mkdir -p "$dst"
+      cp -rT "$src" "$dst"
     fi
   done
 done < "$MAP"
