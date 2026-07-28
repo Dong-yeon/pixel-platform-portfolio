@@ -1,0 +1,86 @@
+spring:
+  application:
+    name: oee-service
+  profiles:
+    active: local
+
+server:
+  port: 8081
+  servlet:
+    encoding:
+      charset: UTF-8
+      force: true
+
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
+    operations-sorter: method
+  api-docs:
+    path: /v3/api-docs
+
+jwt:
+  # TODO: Move this value to an environment variable or Secret Manager outside local development.
+  secret: "pixel-factory-local-jwt-secret-key-must-be-at-least-32-bytes"
+  access-token-expiration-minutes: 120
+
+mqtt:
+  enabled: true
+  broker-url: tcp://localhost:1883
+  client-id: oee-service
+  topic-filter: "factory/#"
+
+---
+spring:
+  config:
+    activate:
+      on-profile: local
+  datasource:
+    url: jdbc:postgresql://localhost:5432/pixelfactory
+    username: pixel
+    password: pixel
+    driver-class-name: org.postgresql.Driver
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        format_sql: true
+        default_batch_fetch_size: 100
+    open-in-view: false
+    show-sql: true
+
+logging:
+  level:
+    org.hibernate.SQL: debug
+    org.hibernate.orm.jdbc.bind: trace
+
+---
+spring:
+  config:
+    activate:
+      on-profile: dev
+  datasource:
+    # TODO: Inject dev database settings through deployment environment variables.
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/pixelfactory}
+    username: ${SPRING_DATASOURCE_USERNAME:pixel}
+    password: ${SPRING_DATASOURCE_PASSWORD:pixel}
+    driver-class-name: org.postgresql.Driver
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        format_sql: false
+        default_batch_fetch_size: 100
+    open-in-view: false
+    show-sql: false
+
+jwt:
+  secret: ${JWT_SECRET:pixel-factory-dev-jwt-secret-key-must-be-at-least-32-bytes}
+  access-token-expiration-minutes: ${JWT_ACCESS_TOKEN_EXPIRATION_MINUTES:120}
+
+mqtt:
+  enabled: ${MQTT_ENABLED:true}
+  broker-url: ${MQTT_BROKER_URL:tcp://localhost:1883}
+  client-id: ${MQTT_CLIENT_ID:oee-service}
+  topic-filter: "factory/#"
