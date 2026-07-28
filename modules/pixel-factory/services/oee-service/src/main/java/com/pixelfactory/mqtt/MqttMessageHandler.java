@@ -10,6 +10,9 @@ import com.pixelfactory.event.domain.FactoryEventType;
 import com.pixelfactory.event.domain.SourceType;
 import com.pixelfactory.event.domain.TargetType;
 import com.pixelfactory.event.service.FactoryEventService;
+import com.pixelfactory.workorder.domain.WorkOrder;
+import com.pixelfactory.workorder.domain.WorkOrderStatus;
+import com.pixelfactory.workorder.repository.WorkOrderRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -22,15 +25,18 @@ public class MqttMessageHandler {
 
     private final EquipmentService equipmentService;
     private final FactoryEventService factoryEventService;
+    private final WorkOrderRepository workOrderRepository;
     private final ObjectMapper objectMapper;
 
     public MqttMessageHandler(
             EquipmentService equipmentService,
             FactoryEventService factoryEventService,
+            WorkOrderRepository workOrderRepository,
             ObjectMapper objectMapper
     ) {
         this.equipmentService = equipmentService;
         this.factoryEventService = factoryEventService;
+        this.workOrderRepository = workOrderRepository;
         this.objectMapper = objectMapper;
     }
 
@@ -97,13 +103,25 @@ public class MqttMessageHandler {
     private void handleCycle(String equipmentCode, Long equipmentId, JsonNode json, String payload) {
         boolean defect = json.path("defect").asBoolean(false);
 
+        // 사이클 1회 = 생산 1개. 그 설비에서 진행 중인 작업지시가 있으면 실적을 올린다.
+        // (진행 중 작업지시가 없으면 설비만 돌고 실적은 잡히지 않는다 — 실제 현장과 같다.)
+        Long workOrderId = null;
+        if (equipmentId != null) {
+            WorkOrder workOrder = workOrderRepository
+                    .findFirstByEquipmentIdAndStatusOrderByIdAsc(equipmentId, WorkOrderStatus.IN_PROGRESS)
+                    .orElse(null);
+            if (workOrder != null && workOrder.recordCycle(defect)) {
+                workOrderId = workOrder.getId();
+            }
+        }
+
         factoryEventService.record(
                 FactoryEventType.CYCLE_COMPLETED,
                 SourceType.EQUIPMENT,
                 equipmentId,
                 TargetType.EQUIPMENT,
                 equipmentId,
-                null,
+                workOrderId,
                 null,
                 defect ? EventSeverity.WARNING : EventSeverity.INFO,
                 (defect ? "Defect cycle completed: " : "Cycle completed: ") + equipmentCode,

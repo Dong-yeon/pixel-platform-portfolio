@@ -57,16 +57,23 @@ export interface FleetEvent extends TimelineEvent {
   taskId: number | null
 }
 
-// 공장 지도 좌표 — control-service LocationRegistry / robot-sim NodeMap과 일치해야 한다.
-export const MAP_W = 32
+// 공장 평면도(44 × 24) — control-service LocationRegistry / robot-sim NodeMap과 일치해야 한다.
+// 상단 LINE-1 가공, 하단 LINE-2 조립·검사, 가운데는 AMR 통로.
+export const MAP_W = 44
 export const MAP_H = 24
 export const NODES: Record<string, [number, number]> = {
-  'DOCK-1': [2, 2],
-  'DOCK-2': [2, 22],
-  'STATION-A': [12, 6],
-  'STATION-B': [26, 9],
-  'STATION-C': [19, 19],
-  WAREHOUSE: [30, 22],
+  'DOCK-1': [3, 3],
+  'DOCK-2': [3, 21],
+  WAREHOUSE: [3, 12],
+  'STATION-A1': [11, 5.5],
+  'STATION-A2': [18, 5.5],
+  'STATION-A3': [25, 5.5],
+  'STATION-A4': [32, 5.5],
+  'STATION-B1': [11, 18.5],
+  'STATION-B2': [18, 18.5],
+  'STATION-B3': [25, 18.5],
+  'STATION-B4': [32, 18.5],
+  SHIPPING: [41, 12],
 }
 
 /**
@@ -77,9 +84,16 @@ export const NODES: Record<string, [number, number]> = {
  * pos_x/pos_y를 추가해 서버가 내려주도록 정식화한다(docs/BACKLOG.md).
  */
 export const EQUIPMENT_POSITIONS: Record<string, [number, number]> = {
-  'CNC-01': [10, 3.5], // STATION-A 옆
-  'CNC-02': [28.5, 6], // STATION-B 옆
-  'MCT-01': [17, 16.5], // STATION-C 옆
+  // LINE-1 가공 — 각 설비가 자기 하역 지점(STATION-A*) 바로 위에 선다
+  'CNC-01': [11, 2.4],
+  'CNC-02': [18, 2.4],
+  'CNC-03': [25, 2.4],
+  'MCT-01': [32, 2.4],
+  // LINE-2 조립·검사 — 하역 지점(STATION-B*) 바로 아래
+  'ASM-01': [11, 21.6],
+  'ASM-02': [18, 21.6],
+  'INS-01': [25, 21.6],
+  'PKG-01': [32, 21.6],
 }
 
 // ---------- pixel-factory (OEE) ----------

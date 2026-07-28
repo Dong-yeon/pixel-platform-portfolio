@@ -3,7 +3,7 @@
 Pixel Platform을 Railway에 올리는 절차. **배포 실행에는 동연님의 Railway 계정 인증이
 필요**하므로, 이 문서는 그대로 따라 하면 되도록 설정값을 전부 적어 두었다.
 
-## 서비스 구성 (6개 + 플러그인 2개)
+## 서비스 구성 (7개 + 플러그인 2개)
 
 ```
 [퍼블릭]  gateway (+대시보드 번들)  ← 유일하게 도메인을 여는 서비스
@@ -11,7 +11,8 @@ Pixel Platform을 Railway에 올리는 절차. **배포 실행에는 동연님�
 [프라이빗] ├─ pixel-factory
            ├─ pixel-fleet
            ├─ mosquitto
-           └─ robot-sim
+           ├─ robot-sim     (AMR 6대)
+           └─ factory-sim   (설비 8대)
 [플러그인] Postgres · Redis
 ```
 
@@ -126,6 +127,22 @@ MQTT_CLIENT_ID=robot-sim
 > 시뮬레이터는 1초마다 텔레메트리를 발행한다. 사용량이 부담되면 이 서비스만
 > 꺼 두면 된다(대시보드는 계속 뜨고, 로봇만 OFFLINE으로 보인다).
 
+### 2-4b. factory-sim (프라이빗)
+
+| 항목 | 값 |
+|---|---|
+| Root Directory | `modules/pixel-factory/simulator` |
+| 도메인 | 없음 (웹 서버가 없는 워커) |
+
+```
+MQTT_URL=tcp://mosquitto.railway.internal:1883
+SIM_SPEED=10
+```
+
+> 설비 8대가 사이클·상태(RUNNING/DOWN)를 발행한다. `SIM_SPEED`는 배속으로,
+> 10이면 30초 사이클을 3초에 낸다. 사용량을 줄이려면 값을 낮추거나(느려짐)
+> 이 서비스를 꺼 둔다(설비가 IDLE로 남는다).
+
 ### 2-5. gateway + 대시보드 (퍼블릭)
 
 | 항목 | 값 |
@@ -184,6 +201,7 @@ Mosquitto도 같은 이유로 배포용 설정(`mosquitto.railway.conf`)에서 b
 
 ## 비용 감각
 
-상시 구동 서비스가 5개(gateway/factory/fleet/mosquitto/robot-sim) + 플러그인 2개다.
-Hobby 플랜에서 충분히 돌아가지만, robot-sim이 초당 텔레메트리를 만들어 리소스를 가장
-많이 쓴다. 데모하지 않을 때는 robot-sim을 꺼 두면 사용량이 크게 줄어든다.
+상시 구동 서비스가 6개(gateway/factory/fleet/mosquitto/robot-sim/factory-sim) + 플러그인 2개다.
+리소스를 가장 많이 쓰는 건 **두 시뮬레이터**다 — robot-sim은 초당 텔레메트리를,
+factory-sim은 설비 8대의 사이클을 계속 만든다. 데모하지 않을 때는 이 둘을 꺼 두면
+사용량과 DB 증가가 크게 줄어든다(대시보드는 계속 뜨고 설비·로봇만 멈춰 보인다).

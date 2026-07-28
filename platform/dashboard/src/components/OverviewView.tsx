@@ -60,7 +60,8 @@ export function OverviewView({
 
   return (
     <div className="overview">
-      <section className="card">
+      {/* 지도(좌) + 지표(우)를 한 줄에 놓아 스크롤 없이 전체가 보이도록 한다. */}
+      <section className="card map-panel">
         <div className="module-head">
           <h2>공장 현황</h2>
           <span className="muted small">
@@ -71,16 +72,16 @@ export function OverviewView({
         <UnifiedMap equipments={equipments} robots={robots} tasks={tasks} />
         <div className="umap-legend">
           <span><i className="lg-swatch" style={{ background: '#27ae60' }} />설비 가동</span>
-          <span><i className="lg-swatch" style={{ background: '#9aa5b4' }} />설비 대기</span>
-          <span><i className="lg-swatch" style={{ background: '#e0392b' }} />설비 고장</span>
+          <span><i className="lg-swatch" style={{ background: '#9aa5b4' }} />대기</span>
+          <span><i className="lg-swatch" style={{ background: '#e0392b' }} />고장</span>
           <span><i className="lg-dot" style={{ background: '#2d7ff9' }} />AMR 이동</span>
-          <span><i className="lg-dot" style={{ background: '#27ae60' }} />AMR 대기</span>
-          <span><i className="lg-dot" style={{ background: '#e08a00' }} />AMR 충전</span>
+          <span><i className="lg-dot" style={{ background: '#27ae60' }} />대기</span>
+          <span><i className="lg-dot" style={{ background: '#e08a00' }} />충전</span>
           <span style={{ color: '#2d7ff9' }}>┈ 운송 경로</span>
         </div>
       </section>
 
-      <section className="card module-card" onClick={() => onGo('factory')} role="button" tabIndex={0}>
+      <section className="card module-card kpi-panel" onClick={() => onGo('factory')} role="button" tabIndex={0}>
         <div className="module-head">
           <h2>PixelFactory — OEE</h2>
           <span className="link">자세히 →</span>
@@ -97,7 +98,7 @@ export function OverviewView({
         </div>
       </section>
 
-      <section className="card module-card" onClick={() => onGo('fleet')} role="button" tabIndex={0}>
+      <section className="card module-card kpi-panel" onClick={() => onGo('fleet')} role="button" tabIndex={0}>
         <div className="module-head">
           <h2>PixelFleet — AMR</h2>
           <span className="link">자세히 →</span>
@@ -115,7 +116,7 @@ export function OverviewView({
         </div>
       </section>
 
-      <section className="card">
+      <section className="card timeline-panel">
         <h2>통합 이벤트 타임라인 <span className="muted small">[F] 공장 · [A] 물류</span></h2>
         <EventTimeline events={merged} />
       </section>
