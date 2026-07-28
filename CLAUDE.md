@@ -29,8 +29,13 @@
 | `services/control-service/` | Spring Boot 3 관제 서버 — 작업 수집·배정·상태머신, 이벤트 영속화, REST/WebSocket API |
 | `robot-sim/` | 가짜 로봇 시뮬레이터 — 위치/상태/배터리/작업 이벤트를 MQTT로 발행 (ROS 2 연동 전 단계) |
 | `web/` | 실시간 관제 대시보드 (공장 지도, 로봇 마커, 작업/장애 로그) |
-| `infra/` | docker-compose (PostgreSQL, Mosquitto) |
+| `infra/` | docker-compose (PostgreSQL, Mosquitto, Redis) |
 | `docs/` | MQTT 토픽 계약, 백로그 |
+
+**저장소 분리:** Postgres = 이벤트 로그(SSOT) + 마스터(로봇 id/code/name, 작업).
+Redis = 로봇 라이브 상태(위치·배터리·상태, `fleet:robot:{code}`) — tick마다 나가던
+Postgres UPDATE 제거. WebSocket 브로드캐스트도 Redis Pub/Sub(`fleet:realtime:*`)로
+팬아웃 → control-service 다중 인스턴스 확장 대비.
 
 ## 절대 원칙
 
@@ -66,9 +71,10 @@
 
 ## 개발 환경
 
-- Java 17 (Gradle toolchain), Spring Boot 3.3, PostgreSQL 16, Gradle wrapper 사용
-- 로컬: `infra/docker-compose.yml`로 Postgres + Mosquitto 기동 후
+- Java 17 (Gradle toolchain), Spring Boot 3.3, PostgreSQL 16, Redis 7, Gradle wrapper 사용
+- 로컬: `infra/docker-compose.yml`로 Postgres + Mosquitto + Redis 기동 후
   `services/control-service`에서 `.\gradlew.bat bootRun` (포트 8082)
+- **빌드는 PowerShell `.\gradlew.bat`로.** bash `./gradlew`는 Windows에서 `-Xmx` 파싱이 깨짐.
 - 데모 계정: `admin` / `dispatcher` / `operator`, 비밀번호 `password`
 - `fleet_events`는 계속 쌓이는 테이블 — 시뮬레이터 발행 주기와 보존 정책을 함께 고려한다.
 

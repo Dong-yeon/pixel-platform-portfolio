@@ -1,7 +1,7 @@
 package com.pixelfleet.task.dispatch;
 
 import com.pixelfleet.location.LocationRegistry;
-import com.pixelfleet.robot.domain.Robot;
+import com.pixelfleet.robot.dto.RobotResponse;
 import com.pixelfleet.task.domain.TransportTask;
 import java.util.Comparator;
 import java.util.List;
@@ -31,18 +31,18 @@ public class NearestBatteryAwareAssignmentPolicy implements AssignmentPolicy {
     }
 
     @Override
-    public Optional<Robot> selectRobot(TransportTask task, List<Robot> candidates) {
+    public Optional<RobotResponse> selectRobot(TransportTask task, List<RobotResponse> candidates) {
         double[] origin = locations.resolve(task.getOriginNode());
         return candidates.stream()
-                .filter(robot -> robot.getBatteryPercent() >= MIN_BATTERY_PERCENT)
+                .filter(robot -> robot.batteryPercent() >= MIN_BATTERY_PERCENT)
                 .min(Comparator
-                        .comparingDouble((Robot robot) -> distanceSquared(robot, origin))
-                        .thenComparing(Comparator.comparingInt(Robot::getBatteryPercent).reversed()));
+                        .comparingDouble((RobotResponse robot) -> distanceSquared(robot, origin))
+                        .thenComparing(Comparator.comparingInt(RobotResponse::batteryPercent).reversed()));
     }
 
-    private double distanceSquared(Robot robot, double[] point) {
-        double dx = robot.getPosX() - point[0];
-        double dy = robot.getPosY() - point[1];
+    private double distanceSquared(RobotResponse robot, double[] point) {
+        double dx = robot.posX() - point[0];
+        double dy = robot.posY() - point[1];
         return dx * dx + dy * dy;
     }
 }

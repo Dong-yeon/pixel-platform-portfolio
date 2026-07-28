@@ -8,8 +8,8 @@ import com.pixelfleet.event.domain.FleetEventType;
 import com.pixelfleet.event.domain.SourceType;
 import com.pixelfleet.event.domain.TargetType;
 import com.pixelfleet.event.service.FleetEventService;
-import com.pixelfleet.robot.domain.Robot;
 import com.pixelfleet.robot.domain.RobotStatus;
+import com.pixelfleet.robot.dto.RobotResponse;
 import com.pixelfleet.robot.service.RobotService;
 import com.pixelfleet.task.dispatch.AssignmentPolicy;
 import com.pixelfleet.task.domain.TaskPriority;
@@ -103,26 +103,26 @@ public class TaskService {
                         .thenComparingLong(TransportTask::getId))
                 .orElseThrow();
 
-        List<Robot> available = robotService.findAvailable();
-        Robot robot = assignmentPolicy.selectRobot(next, available).orElse(null);
+        List<RobotResponse> available = robotService.findAvailable();
+        RobotResponse robot = assignmentPolicy.selectRobot(next, available).orElse(null);
         if (robot == null) {
             return null;
         }
 
-        next.assignTo(robot.getId());
+        next.assignTo(robot.id());
         // Mark the robot busy immediately so the next dispatch pass can't double-assign it.
         // The robot's real MOVING/IDLE lifecycle is then driven by its own telemetry.
-        robotService.changeStatus(robot.getRobotCode(), RobotStatus.MOVING, null);
+        robotService.changeStatus(robot.robotCode(), RobotStatus.MOVING, null);
         fleetEventService.record(
                 FleetEventType.TASK_ASSIGNED,
                 SourceType.SYSTEM, null,
                 TargetType.TASK, next.getId(),
                 next.getId(), EventSeverity.INFO,
-                "Task " + next.getTaskCode() + " assigned to robot " + robot.getRobotCode(), null);
+                "Task " + next.getTaskCode() + " assigned to robot " + robot.robotCode(), null);
 
         // Downlink: tell the robot to execute the task (no-op if the publisher is disabled/offline).
         robotCommandPublisher.sendGoto(
-                robot.getRobotCode(), next.getTaskCode(), next.getOriginNode(), next.getDestinationNode());
+                robot.robotCode(), next.getTaskCode(), next.getOriginNode(), next.getDestinationNode());
         return next;
     }
 

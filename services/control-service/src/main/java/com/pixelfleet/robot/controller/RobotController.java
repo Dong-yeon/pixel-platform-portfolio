@@ -21,14 +21,11 @@ public class RobotController {
 
     @GetMapping
     public ApiResponse<List<RobotResponse>> list() {
-        List<RobotResponse> robots = robotService.findAll().stream()
-                .map(RobotResponse::from)
-                .toList();
-        return ApiResponse.ok(robots);
+        return ApiResponse.ok(robotService.findAll());
     }
 
     @GetMapping("/{id}")
     public ApiResponse<RobotResponse> get(@PathVariable Long id) {
-        return ApiResponse.ok(RobotResponse.from(robotService.getById(id)));
+        return ApiResponse.ok(robotService.getById(id));
     }
 }
