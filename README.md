@@ -27,7 +27,7 @@ Happyeon SmartFactory Pixel Project — 여러 제조 도메인 모듈을 **API 
 | 경로 | 역할 | 상태 |
 |---|---|---|
 | `platform/gateway/` | Spring Cloud Gateway — 라우팅·CORS 집약 | 완료 |
-| `platform/dashboard/` | 통합 React 대시보드 (OEE + AMR + KPI) | 예정 (P4) |
+| `platform/dashboard/` | 통합 React 대시보드 (OEE + AMR + KPI) | 완료 |
 | `modules/pixel-factory/` | 가공라인 **OEE 모니터링** (MQTT·이벤트 소싱) | 이식 완료 |
 | `modules/pixel-fleet/` | AMR **군집 관제(FMS)** (MQTT·Redis·WebSocket) | 이식 완료 |
 | `shared/` | 공통 코어(common·auth·user) — 모듈 공유 | 예정 (P5) |
@@ -62,7 +62,11 @@ cd modules\pixel-fleet\services\control-service   ; .\gradlew.bat bootRun   # :9
 cd modules\pixel-fleet\robot-sim                  ; .\gradlew.bat bootRun
 ```
 
-게이트웨이가 뜨면 모든 호출은 9000으로 한다.
+```bash
+cd platform/dashboard && npm install && npm run dev   # http://localhost:9100
+```
+
+게이트웨이가 뜨면 모든 호출은 9000으로 한다. 대시보드도 9000만 바라본다.
 
 ```bash
 curl http://localhost:9000/api/factory/health   # → :9001
