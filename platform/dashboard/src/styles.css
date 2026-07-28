@@ -194,7 +194,8 @@ button.mini { padding: 3px 10px; font-size: 12px; margin-left: auto; }
 .umap-bg { fill: #fbfcfe; }
 .umap-node { fill: #d7dfec; }
 .umap-node-label { font-size: 0.85px; fill: #8a95a5; }
-.umap-route { stroke: #2d7ff9; stroke-width: 0.18; stroke-dasharray: 0.7 0.5; opacity: 0.55; }
+.umap-route { fill: none; stroke: #2d7ff9; stroke-width: 0.16; stroke-dasharray: 0.7 0.5; opacity: 0.5; }
+.umap-route-target { fill: none; stroke: #2d7ff9; stroke-width: 0.14; opacity: 0.45; }
 .umap-equip { stroke: #fff; stroke-width: 0.15; }
 .umap-equip-label { font-size: 1.05px; fill: #fff; font-weight: 700; }
 /* 로봇 위치는 1초마다 도착한다 — 전환을 그보다 약간 길게 잡아야 끊기지 않는다(FactoryMap과 동일). */

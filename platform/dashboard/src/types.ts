@@ -77,6 +77,24 @@ export const NODES: Record<string, [number, number]> = {
 }
 
 /**
+ * AMR이 다니는 가로 주통로의 y좌표. robot-sim NodeMap.AISLE_Y와 같아야 한다.
+ * 로봇은 열린 바닥을 대각선으로 가로지르지 않고 이 통로를 따라 이동하므로,
+ * 지도에 그리는 경로선도 같은 규칙을 따라야 실제 주행과 일치한다.
+ */
+export const AISLE_Y = 12
+
+/** 두 지점 사이의 주행 경로(통로 경유)를 폴리라인 좌표로 만든다. */
+export function routePoints(
+  from: [number, number],
+  to: [number, number],
+): [number, number][] {
+  if (Math.abs(from[0] - to[0]) < 0.6) {
+    return [from, to]
+  }
+  return [from, [from[0], AISLE_Y], [to[0], AISLE_Y], to]
+}
+
+/**
  * 설비가 놓인 자리. 같은 평면도에 설비(PixelFactory)와 AMR(PixelFleet)을 함께 그리기 위한
  * 매핑이다 — 각 설비는 자기 자재 하역 지점(스테이션) 옆에 선다.
  *

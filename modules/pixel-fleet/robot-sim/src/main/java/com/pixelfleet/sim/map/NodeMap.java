@@ -77,4 +77,30 @@ public class NodeMap {
     public String randomRoamNode(java.util.random.RandomGenerator rng) {
         return ROAM_NODES.get(rng.nextInt(ROAM_NODES.size()));
     }
+
+    /** 로봇이 다니는 가로 주통로의 y좌표. 라인 사이 빈 공간이다. */
+    public static final double AISLE_Y = 12.0;
+
+    /**
+     * 두 지점 사이의 실제 주행 경로를 웨이포인트로 만든다.
+     *
+     * <p>현장 AMR은 열린 바닥을 가로질러 대각선으로 가지 않는다 — 정해진 통로를 따라
+     * 다닌다. 그래서 직선으로 잇지 않고 <b>통로까지 내려온 뒤 → 통로를 따라 이동 →
+     * 목표로 올라가는</b> 경로를 만든다. 이렇게 해야 설비를 관통하지 않는다.
+     *
+     * <pre>
+     *   (11,5.5) ──┐                     ┌── (25,18.5)
+     *              └──── y=12 통로 ──────┘
+     * </pre>
+     */
+    public java.util.List<double[]> route(double[] from, double[] to) {
+        // 세로로 거의 같은 줄이면 통로를 경유할 필요가 없다(바로 위/아래).
+        if (Math.abs(from[0] - to[0]) < 0.6) {
+            return java.util.List.of(to.clone());
+        }
+        return java.util.List.of(
+                new double[]{from[0], AISLE_Y},
+                new double[]{to[0], AISLE_Y},
+                to.clone());
+    }
 }

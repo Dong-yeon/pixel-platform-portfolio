@@ -1,5 +1,5 @@
 import {
-  EQUIPMENT_POSITIONS, MAP_H, MAP_W, NODES,
+  EQUIPMENT_POSITIONS, MAP_H, MAP_W, NODES, routePoints,
   type Equipment, type EquipmentStatus, type Robot, type RobotStatus, type Task,
 } from '../types'
 
@@ -40,22 +40,31 @@ export function UnifiedMap({
   tasks: Task[]
 }) {
   const activeTasks = tasks.filter((t) => ACTIVE_TASK.has(t.status))
+  const robotById = new Map(robots.map((r) => [r.id, r]))
 
   return (
     <svg className="umap" viewBox={`0 0 ${MAP_W} ${MAP_H}`} preserveAspectRatio="xMidYMid meet">
       <rect x={0} y={0} width={MAP_W} height={MAP_H} className="umap-bg" />
 
-      {/* 운송 흐름 — 설비/로봇보다 아래에 깔린다 */}
+      {/* AMR 이동 경로 — 설비/로봇보다 아래에 깔린다.
+          배정된 로봇이 있으면 "그 로봇의 현재 위치 → 목적지"를 그려 실제로 남은 경로를
+          보여준다(로봇이 움직이면 선도 따라 줄어든다). 아직 배정 전이면 출발지에서 그린다. */}
       {activeTasks.map((t) => {
-        const from = NODES[t.originNode]
         const to = NODES[t.destinationNode]
-        if (!from || !to) return null
+        if (!to) return null
+        const robot = t.assignedRobotId ? robotById.get(t.assignedRobotId) : undefined
+        const from: [number, number] | undefined = robot
+          ? [robot.posX, robot.posY]
+          : NODES[t.originNode]
+        if (!from) return null
+        // 실제 주행과 같은 통로 경유 경로로 그린다(직선으로 그리면 설비를 관통하는 것처럼 보인다).
+        const pts = routePoints(from, to)
         return (
-          <line
-            key={`route-${t.id}`}
-            x1={from[0]} y1={from[1]} x2={to[0]} y2={to[1]}
-            className="umap-route"
-          />
+          <g key={`route-${t.id}`}>
+            <polyline points={pts.map((p) => `${p[0]},${p[1]}`).join(' ')} className="umap-route" />
+            {/* 목적지 표시 — 여러 경로가 겹쳐도 어디로 가는지 구분된다 */}
+            <circle cx={to[0]} cy={to[1]} r={1.5} className="umap-route-target" />
+          </g>
         )
       })}
 

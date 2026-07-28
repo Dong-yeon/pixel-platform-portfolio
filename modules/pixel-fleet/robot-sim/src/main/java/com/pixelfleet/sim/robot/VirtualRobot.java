@@ -2,6 +2,7 @@ package com.pixelfleet.sim.robot;
 
 import java.util.ArrayDeque;
 import java.util.Deque;
+import java.util.List;
 
 /**
  * Mutable state and 2D kinematics of one simulated robot. Holds no MQTT/decision logic;
@@ -48,26 +49,30 @@ public class VirtualRobot {
         return false;
     }
 
-    public void assignTask(String taskCode, double[] origin, double[] destination) {
+    /**
+     * 경로를 웨이포인트 목록으로 받는다. 통로를 따라 꺾어 가는 경로라 중간 지점이 여럿이다
+     * (NodeMap#route 참고) — 직선 한 번이 아니라 실제 주행처럼 움직인다.
+     */
+    public void assignTask(String taskCode, List<double[]> toOrigin, List<double[]> toDestination) {
         path.clear();
-        path.add(origin);
-        path.add(destination);
+        path.addAll(toOrigin);
+        path.addAll(toDestination);
         this.currentTaskCode = taskCode;
         this.chargingIntent = false;
         this.state = RobotState.MOVING;
     }
 
-    public void startRoam(double[] destination) {
+    public void startRoam(List<double[]> route) {
         path.clear();
-        path.add(destination);
+        path.addAll(route);
         this.currentTaskCode = null;
         this.chargingIntent = false;
         this.state = RobotState.MOVING;
     }
 
-    public void startChargeRun(double[] dock) {
+    public void startChargeRun(List<double[]> route) {
         path.clear();
-        path.add(dock);
+        path.addAll(route);
         this.currentTaskCode = null;
         this.chargingIntent = true;
         this.state = RobotState.MOVING;
@@ -85,6 +90,11 @@ public class VirtualRobot {
 
     public void charge(double amount) {
         this.battery = Math.min(100.0, battery + amount);
+    }
+
+    /** 현재 위치. 경로를 계산할 때 출발점으로 쓴다. */
+    public double[] position() {
+        return new double[]{x, y};
     }
 
     public boolean hasPath() {

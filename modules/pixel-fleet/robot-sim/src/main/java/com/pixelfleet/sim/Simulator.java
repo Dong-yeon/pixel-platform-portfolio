@@ -32,6 +32,8 @@ public class Simulator {
 
     private static final Logger log = LoggerFactory.getLogger(Simulator.class);
     private static final double ROAM_PROBABILITY = 0.15;
+    /** 노드 중심에서 이만큼 떨어진 자리에 정차한다(로봇끼리 포개지지 않도록). */
+    private static final double PARK_RADIUS = 1.1;
     private static final String[] FAILURE_REASONS = {
             "obstacle timeout", "localization lost", "path blocked", "estop triggered"
     };
@@ -57,7 +59,7 @@ public class Simulator {
     public void start() {
         synchronized (lock) {
             for (SimProperties.RobotDef def : properties.getRobots()) {
-                double[] home = nodeMap.resolve(def.getHome());
+                double[] home = spot(def.getHome(), robots.size());
                 VirtualRobot robot = new VirtualRobot(def.getCode(), def.getName(), home[0], home[1]);
                 robots.add(robot);
                 byCode.put(def.getCode(), robot);
@@ -135,12 +137,31 @@ public class Simulator {
     private void tickIdle(VirtualRobot robot) {
         if (robot.getBattery() < properties.getLowBatteryThreshold()) {
             String dock = nodeMap.nearestDock(robot.getX(), robot.getY());
-            robot.startChargeRun(nodeMap.resolve(dock));
+            robot.startChargeRun(nodeMap.route(robot.position(), spot(dock, indexOf(robot))));
             publishStatus(robot); // now MOVING toward the dock
         } else if (properties.isRoam() && ThreadLocalRandom.current().nextDouble() < ROAM_PROBABILITY) {
-            robot.startRoam(nodeMap.resolve(nodeMap.randomRoamNode(ThreadLocalRandom.current())));
+            String node = nodeMap.randomRoamNode(ThreadLocalRandom.current());
+            robot.startRoam(nodeMap.route(robot.position(), spot(node, indexOf(robot))));
             publishStatus(robot); // now MOVING to a roam target
         }
+    }
+
+    /**
+     * 노드 안에서 로봇마다 다른 정차 자리를 준다.
+     *
+     * <p>노드 좌표를 그대로 목적지로 삼으면 같은 노드를 고른 로봇들이 <b>정확히 같은 점</b>에
+     * 멈춰 지도에서 완전히 포개진다. 실제 현장에서도 여러 대가 한 지점에 겹쳐 서지 않으므로,
+     * 인덱스에 따라 노드 주변에 원형으로 흩어 놓는다(항상 같은 자리 = 재현 가능).
+     */
+    private double[] spot(String node, int robotIndex) {
+        double[] p = nodeMap.resolve(node);
+        int n = Math.max(1, properties.getRobots().size());
+        double angle = 2 * Math.PI * robotIndex / n;
+        return new double[]{p[0] + PARK_RADIUS * Math.cos(angle), p[1] + PARK_RADIUS * Math.sin(angle)};
+    }
+
+    private int indexOf(VirtualRobot robot) {
+        return Math.max(0, robots.indexOf(robot));
     }
 
     /** Handle a downlink command: {@code fleet/{robotCode}/command} with a GOTO payload. */
@@ -176,10 +197,14 @@ public class Simulator {
                         robotCode, robot.getState(), robot.hasTask(), taskCode);
                 return;
             }
-            double[] origin = nodeMap.resolve(json.path("origin").asText());
-            double[] destination = nodeMap.resolve(json.path("destination").asText());
+            int idx = indexOf(robot);
+            double[] origin = spot(json.path("origin").asText(), idx);
+            double[] destination = spot(json.path("destination").asText(), idx);
 
-            robot.assignTask(taskCode, origin, destination); // overrides any in-progress roam
+            // 픽업까지, 그리고 픽업에서 하역까지 — 각 구간을 통로 경유 경로로 만든다.
+            robot.assignTask(taskCode,
+                    nodeMap.route(robot.position(), origin),
+                    nodeMap.route(origin, destination)); // overrides any in-progress roam
             publishStatus(robot);           // now MOVING
             publishTask(robot, "started", null);
             log.info("Robot {} accepted task {} ({} -> {})",
