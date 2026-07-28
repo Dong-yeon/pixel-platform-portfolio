@@ -37,6 +37,13 @@ mqtt:
   client-id: control-service
   topic-filter: "fleet/#"
 
+demo:
+  task-generator:
+    # 데모용 운송 작업 자동 생성. 교통 통제 도입으로 로봇 자율 순찰을 껐기 때문에,
+    # 이게 없으면 작업이 없을 때 로봇이 멈춰 있다.
+    enabled: ${DEMO_TASK_GENERATOR_ENABLED:true}
+    interval-ms: ${DEMO_TASK_GENERATOR_INTERVAL_MS:15000}
+
 dispatch:
   # Automatic dispatch: drains pending tasks to available robots on a fixed delay.
   # Set enabled=false to dispatch only via POST /api/tasks/dispatch.

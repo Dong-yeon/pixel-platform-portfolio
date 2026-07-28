@@ -62,6 +62,10 @@ export function UnifiedMap({
         return (
           <g key={`route-${t.id}`}>
             <polyline points={pts.map((p) => `${p[0]},${p[1]}`).join(' ')} className="umap-route" />
+            {/* 웨이포인트 — 경로가 꺾이는 지점(중간 점들). 출발점·도착점은 제외한다. */}
+            {pts.slice(1, -1).map((p, i) => (
+              <circle key={`wp-${t.id}-${i}`} cx={p[0]} cy={p[1]} r={0.35} className="umap-waypoint" />
+            ))}
             {/* 목적지 표시 — 여러 경로가 겹쳐도 어디로 가는지 구분된다 */}
             <circle cx={to[0]} cy={to[1]} r={1.5} className="umap-route-target" />
           </g>

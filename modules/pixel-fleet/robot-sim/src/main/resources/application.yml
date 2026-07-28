@@ -13,7 +13,9 @@ sim:
   charge-per-tick: 2.0          # % recovered per charging tick
   low-battery-threshold: 20     # below this, an idle robot returns to a dock
   failure-rate: 0.02            # per-moving-tick chance a task fails (demonstrates retry)
-  roam: true                    # idle robots wander between nodes to keep the map lively
+  # 유휴 순찰은 기본으로 끈다. 서버가 구간 점유로 교통을 통제하는데, 로봇이 제멋대로
+  # 돌아다니면 통제 밖 이동이 생겨 충돌 회피 보장이 깨진다.
+  roam: false
   robots:
     - code: AMR-01
       name: 1호기

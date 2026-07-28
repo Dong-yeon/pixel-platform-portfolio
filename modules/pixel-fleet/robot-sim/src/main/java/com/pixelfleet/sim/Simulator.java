@@ -34,6 +34,8 @@ public class Simulator {
     private static final double ROAM_PROBABILITY = 0.15;
     /** 노드 중심에서 이만큼 떨어진 자리에 정차한다(로봇끼리 포개지지 않도록). */
     private static final double PARK_RADIUS = 1.1;
+    /** 이 tick 수마다 상태를 다시 발행한다(서버와의 상태 불일치 자가 복구). */
+    private static final int HEARTBEAT_TICKS = 10;
     private static final String[] FAILURE_REASONS = {
             "obstacle timeout", "localization lost", "path blocked", "estop triggered"
     };
@@ -47,6 +49,8 @@ public class Simulator {
     private final List<VirtualRobot> robots = new ArrayList<>();
     private final Map<String, VirtualRobot> byCode = new HashMap<>();
     private final Map<String, Integer> lastBatteryPercent = new HashMap<>();
+    /** 하트비트 카운터 — 주기적으로 상태를 다시 알린다(아래 tick 참고). */
+    private int tickCount = 0;
 
     public Simulator(SimProperties properties, NodeMap nodeMap, SimMqttClient mqtt, ObjectMapper objectMapper) {
         this.properties = properties;
@@ -80,6 +84,25 @@ public class Simulator {
     @Scheduled(fixedRateString = "${sim.tick-interval-ms}")
     public void tick() {
         synchronized (lock) {
+            // 텔레메트리 하트비트.
+            //
+            // 상태·배터리는 "바뀔 때만" 발행하는데, 그것만으로는 서버와 한 번 어긋나면 영원히
+            // 복구되지 않는다. 실제로 두 가지가 터졌다:
+            //   1) 서버가 배차하며 MOVING으로 찍었으나 로봇이 그 작업을 받지 않은 경우 —
+            //      로봇은 IDLE 그대로라 다시 알리지 않고, 그 로봇은 영영 배차 대상에서 빠진다.
+            //   2) 시뮬레이터가 서버보다 먼저 떠서 초기 텔레메트리가 유실된 경우 —
+            //      서버는 배터리를 0으로 알고, 정지 상태에서는 값이 안 바뀌어 재발행도 없어
+            //      모든 로봇이 저배터리로 간주돼 배차가 전부 막힌다.
+            //
+            // 실제 로봇처럼 주기적으로 현재 상태를 통째로 다시 알려 스스로 맞춘다.
+            if (++tickCount % HEARTBEAT_TICKS == 0) {
+                for (VirtualRobot robot : robots) {
+                    publishStatus(robot);
+                    publishBattery(robot, true);
+                    publishPosition(robot);
+                }
+            }
+
             for (VirtualRobot robot : robots) {
                 switch (robot.getState()) {
                     case CHARGING -> tickCharging(robot);
@@ -160,6 +183,21 @@ public class Simulator {
         return new double[]{p[0] + PARK_RADIUS * Math.cos(angle), p[1] + PARK_RADIUS * Math.sin(angle)};
     }
 
+    /** 서버가 보낸 waypoints 배열을 읽는다. 없거나 형식이 다르면 빈 목록. */
+    private List<double[]> readWaypoints(JsonNode json) {
+        JsonNode arr = json.path("waypoints");
+        if (!arr.isArray()) {
+            return List.of();
+        }
+        List<double[]> out = new ArrayList<>();
+        for (JsonNode p : arr) {
+            if (p.isArray() && p.size() >= 2) {
+                out.add(new double[]{p.get(0).asDouble(), p.get(1).asDouble()});
+            }
+        }
+        return out;
+    }
+
     private int indexOf(VirtualRobot robot) {
         return Math.max(0, robots.indexOf(robot));
     }
@@ -197,14 +235,19 @@ public class Simulator {
                         robotCode, robot.getState(), robot.hasTask(), taskCode);
                 return;
             }
-            int idx = indexOf(robot);
-            double[] origin = spot(json.path("origin").asText(), idx);
-            double[] destination = spot(json.path("destination").asText(), idx);
-
-            // 픽업까지, 그리고 픽업에서 하역까지 — 각 구간을 통로 경유 경로로 만든다.
-            robot.assignTask(taskCode,
-                    nodeMap.route(robot.position(), origin),
-                    nodeMap.route(origin, destination)); // overrides any in-progress roam
+            // 경로는 서버가 정해서 보낸다(구간 점유 통제 때문). 로봇은 그대로 따라갈 뿐이다.
+            List<double[]> waypoints = readWaypoints(json);
+            if (waypoints.isEmpty()) {
+                // 하위 호환: 웨이포인트 없이 온 GOTO는 로봇이 직접 경로를 만든다.
+                int idx = indexOf(robot);
+                double[] origin = spot(json.path("origin").asText(), idx);
+                double[] destination = spot(json.path("destination").asText(), idx);
+                robot.assignTask(taskCode,
+                        nodeMap.route(robot.position(), origin),
+                        nodeMap.route(origin, destination));
+            } else {
+                robot.assignTask(taskCode, waypoints, List.of());
+            }
             publishStatus(robot);           // now MOVING
             publishTask(robot, "started", null);
             log.info("Robot {} accepted task {} ({} -> {})",

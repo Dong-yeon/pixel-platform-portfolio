@@ -55,7 +55,12 @@ public class MqttRobotCommandPublisher implements RobotCommandPublisher {
     }
 
     @Override
-    public void sendGoto(String robotCode, String taskCode, String origin, String destination) {
+    public void sendGoto(
+            String robotCode,
+            String taskCode,
+            String origin,
+            String destination,
+            java.util.List<double[]> waypoints) {
         if (client == null || !client.isConnected()) {
             log.warn("Downlink not connected; skipping GOTO for robot {} (task {}).", robotCode, taskCode);
             return;
@@ -66,7 +71,9 @@ public class MqttRobotCommandPublisher implements RobotCommandPublisher {
                     "command", "GOTO",
                     "taskCode", taskCode,
                     "origin", origin,
-                    "destination", destination));
+                    "destination", destination,
+                    // 서버가 정한 경로. 로봇은 이 점들을 순서대로 지난다(구간 점유 통제를 위해).
+                    "waypoints", waypoints));
             MqttMessage message = new MqttMessage(payload);
             message.setQos(1);
             client.publish(topic, message);
