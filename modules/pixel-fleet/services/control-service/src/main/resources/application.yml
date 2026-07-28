@@ -49,6 +49,13 @@ dispatch:
   # Set enabled=false to dispatch only via POST /api/tasks/dispatch.
   enabled: ${DISPATCH_ENABLED:true}
   interval-ms: ${DISPATCH_INTERVAL_MS:2000}
+  watchdog:
+    # 진행이 멈춘 작업을 걷어낸다. 없으면 로봇이 놓친 지시 하나가 레인 구간을 영원히
+    # 점유해 함대 전체가 멈춘다(배포 중 실제로 발생).
+    enabled: ${DISPATCH_WATCHDOG_ENABLED:true}
+    interval-ms: ${DISPATCH_WATCHDOG_INTERVAL_MS:10000}
+    ack-timeout-seconds: ${DISPATCH_WATCHDOG_ACK_TIMEOUT:30}
+    run-timeout-seconds: ${DISPATCH_WATCHDOG_RUN_TIMEOUT:300}
 
 ---
 spring:
