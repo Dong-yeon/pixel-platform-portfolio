@@ -1,5 +1,6 @@
 import type { Equipment, ModuleKey, Robot, Task, TimelineEvent, WorkOrder } from '../types'
 import { EventTimeline } from './EventTimeline'
+import { UnifiedMap } from './UnifiedMap'
 
 function Stat({ label, value, sub, tone }: { label: string; value: string; sub?: string; tone?: string }) {
   return (
@@ -55,8 +56,30 @@ export function OverviewView({
     .sort((a, b) => (a.occurredAt < b.occurredAt ? 1 : -1))
     .slice(0, 60)
 
+  const activeRoutes = tasks.filter((t) => t.status === 'ASSIGNED' || t.status === 'IN_PROGRESS').length
+
   return (
     <div className="overview">
+      <section className="card">
+        <div className="module-head">
+          <h2>공장 현황</h2>
+          <span className="muted small">
+            설비 {equipments.length} · AMR {robots.length}
+            {activeRoutes > 0 && ` · 운송 중 ${activeRoutes}`}
+          </span>
+        </div>
+        <UnifiedMap equipments={equipments} robots={robots} tasks={tasks} />
+        <div className="umap-legend">
+          <span><i className="lg-swatch" style={{ background: '#27ae60' }} />설비 가동</span>
+          <span><i className="lg-swatch" style={{ background: '#9aa5b4' }} />설비 대기</span>
+          <span><i className="lg-swatch" style={{ background: '#e0392b' }} />설비 고장</span>
+          <span><i className="lg-dot" style={{ background: '#2d7ff9' }} />AMR 이동</span>
+          <span><i className="lg-dot" style={{ background: '#27ae60' }} />AMR 대기</span>
+          <span><i className="lg-dot" style={{ background: '#e08a00' }} />AMR 충전</span>
+          <span style={{ color: '#2d7ff9' }}>┈ 운송 경로</span>
+        </div>
+      </section>
+
       <section className="card module-card" onClick={() => onGo('factory')} role="button" tabIndex={0}>
         <div className="module-head">
           <h2>PixelFactory — OEE</h2>

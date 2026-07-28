@@ -44,6 +44,13 @@ async function request<T>(realm: Realm, path: string, options: RequestInit = {})
       ...(options.headers ?? {}),
     },
   })
+  // 토큰 만료(JWT 2시간)면 모든 조회가 조용히 실패해 화면이 텅 빈 채로 남는다.
+  // 사용자가 이유를 알 수 없으므로 토큰을 지우고 로그인 화면으로 되돌린다.
+  if (res.status === 401 && getToken(realm)) {
+    clearTokens()
+    window.location.reload()
+  }
+
   const body = await res.json().catch(() => null)
   if (!res.ok) {
     throw new ApiError(body?.error?.message ?? res.statusText, res.status)
