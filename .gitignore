@@ -25,3 +25,4 @@ dist/
 # /.claude/skills 는 scripts/sync-skills.ps1 이 /skills 에서 만들어내는 사본이므로 제외
 # (같은 repo 안에 원본과 사본을 두 벌 두지 않기 위함)
 /.claude/skills/
+**/.claude/skills/
