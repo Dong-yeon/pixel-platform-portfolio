@@ -28,14 +28,37 @@ public class DemoTaskGenerator {
 
     private static final Logger log = LoggerFactory.getLogger(DemoTaskGenerator.class);
 
-    /** 자재를 주고받는 지점들. 창고·출하와 각 라인의 하역 지점. */
-    private static final List<String> NODES = List.of(
-            "WAREHOUSE", "SHIPPING",
-            "STATION-A1", "STATION-A2", "STATION-A3", "STATION-A4",
-            "STATION-B1", "STATION-B2", "STATION-B3", "STATION-B4");
+    /**
+     * 실제 공장의 자재 흐름을 따른다: <b>창고 → 가공(A열) → 조립·검사(B열) → 출하.</b>
+     *
+     * <p>처음에는 아무 두 지점이나 이었는데, 그러면 한 작업이 공장을 가로질러 경로가 길어지고
+     * 서로 겹쳐 동시 주행이 1대로 묶였다(실측). 흐름대로 만들면 경로가 짧아지고, 특히
+     * A열↔B열 이송은 같은 세로 연결로만 쓰므로 열이 다르면 <b>서로 전혀 간섭하지 않는다.</b>
+     */
+    private record Flow(String origin, String destination) {}
 
-    /** 대기 작업이 이 수를 넘으면 새로 만들지 않는다. */
-    private static final int MAX_PENDING = 3;
+    private static final List<Flow> FLOWS = List.of(
+            // 자재 투입: 창고 → 가공 라인
+            new Flow("WAREHOUSE", "STATION-A1"),
+            new Flow("WAREHOUSE", "STATION-A2"),
+            new Flow("WAREHOUSE", "STATION-A3"),
+            new Flow("WAREHOUSE", "STATION-A4"),
+            // 공정 이송: 가공 → 바로 아래 조립·검사 (같은 열 = 서로 간섭 없음)
+            new Flow("STATION-A1", "STATION-B1"),
+            new Flow("STATION-A2", "STATION-B2"),
+            new Flow("STATION-A3", "STATION-B3"),
+            new Flow("STATION-A4", "STATION-B4"),
+            // 출하: 조립·검사 → 출하장
+            new Flow("STATION-B1", "SHIPPING"),
+            new Flow("STATION-B2", "SHIPPING"),
+            new Flow("STATION-B3", "SHIPPING"),
+            new Flow("STATION-B4", "SHIPPING"));
+
+    /**
+     * 대기 작업이 이 수를 넘으면 새로 만들지 않는다.
+     * 통로를 둘로 나눠 동시 주행이 늘었으므로, 큐가 마르지 않도록 함께 올렸다.
+     */
+    private static final int MAX_PENDING = 6;
 
     private final TaskService taskService;
     private final TransportTaskRepository taskRepository;
@@ -52,16 +75,12 @@ public class DemoTaskGenerator {
         }
 
         ThreadLocalRandom rnd = ThreadLocalRandom.current();
-        String origin = NODES.get(rnd.nextInt(NODES.size()));
-        String destination;
-        do {
-            destination = NODES.get(rnd.nextInt(NODES.size()));
-        } while (destination.equals(origin));
+        Flow flow = FLOWS.get(rnd.nextInt(FLOWS.size()));
 
         String code = "T-" + System.currentTimeMillis() % 1_000_000;
         try {
-            taskService.create(code, origin, destination, randomPriority(rnd));
-            log.debug("Demo task {} created: {} -> {}", code, origin, destination);
+            taskService.create(code, flow.origin(), flow.destination(), randomPriority(rnd));
+            log.debug("Demo task {} created: {} -> {}", code, flow.origin(), flow.destination());
         } catch (Exception e) {
             log.debug("Skipped demo task creation: {}", e.getMessage());
         }

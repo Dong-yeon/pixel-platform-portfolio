@@ -5,13 +5,14 @@ import java.util.Map;
 import org.springframework.stereotype.Component;
 
 /**
- * 공장 평면도(44 × 24). 상단이 LINE-1 가공, 하단이 LINE-2 조립·검사이고
- * 가운데 통로로 AMR이 오간다.
+ * 공장 평면도(44 × 24). 통로는 둘이다 — 라인마다 하나씩.
  *
  * <pre>
  *   [CNC-01][CNC-02][CNC-03][MCT-01]      ← LINE-1 설비(대시보드가 그린다)
  *     ○A1     ○A2     ○A3     ○A4         ← 하역 지점
- *   [창고]          (통로)          [출하]
+ *   ══════════ 상단 통로 (y=8.5) ══════════
+ *   [창고]                        [출하]
+ *   ══════════ 하단 통로 (y=15.5) ═════════
  *     ○B1     ○B2     ○B3     ○B4
  *   [ASM-01][ASM-02][INS-01][PKG-01]      ← LINE-2 설비
  * </pre>
@@ -78,29 +79,30 @@ public class NodeMap {
         return ROAM_NODES.get(rng.nextInt(ROAM_NODES.size()));
     }
 
-    /** 로봇이 다니는 가로 주통로의 y좌표. 라인 사이 빈 공간이다. */
-    public static final double AISLE_Y = 12.0;
+    /** 상단 통로 — LINE-1(A열) 담당. control-service LaneGraph와 같아야 한다. */
+    public static final double UPPER_AISLE_Y = 8.5;
+    /** 하단 통로 — LINE-2(B열) 담당. */
+    public static final double LOWER_AISLE_Y = 15.5;
+    private static final double MID_Y = (UPPER_AISLE_Y + LOWER_AISLE_Y) / 2;
 
     /**
-     * 두 지점 사이의 실제 주행 경로를 웨이포인트로 만든다.
+     * 두 지점 사이의 주행 경로를 웨이포인트로 만든다.
      *
-     * <p>현장 AMR은 열린 바닥을 가로질러 대각선으로 가지 않는다 — 정해진 통로를 따라
-     * 다닌다. 그래서 직선으로 잇지 않고 <b>통로까지 내려온 뒤 → 통로를 따라 이동 →
-     * 목표로 올라가는</b> 경로를 만든다. 이렇게 해야 설비를 관통하지 않는다.
+     * <p>운송 작업의 경로는 <b>서버가 계산해서 내려준다</b>(구간 점유 통제 때문).
+     * 이 메서드는 서버 지시가 없는 이동 — 충전 복귀나 하위 호환 GOTO — 에만 쓰인다.
+     * 그래도 통로를 따라야 설비를 관통하지 않으므로 서버와 같은 규칙을 유지한다.
      *
-     * <pre>
-     *   (11,5.5) ──┐                     ┌── (25,18.5)
-     *              └──── y=12 통로 ──────┘
-     * </pre>
+     * <p>목적지가 속한 쪽 통로를 탄다: 위쪽이면 상단 통로, 아래쪽이면 하단 통로.
      */
     public java.util.List<double[]> route(double[] from, double[] to) {
-        // 세로로 거의 같은 줄이면 통로를 경유할 필요가 없다(바로 위/아래).
+        // 세로로 거의 같은 줄이면 통로를 경유할 필요가 없다.
         if (Math.abs(from[0] - to[0]) < 0.6) {
             return java.util.List.of(to.clone());
         }
+        double aisleY = to[1] < MID_Y ? UPPER_AISLE_Y : LOWER_AISLE_Y;
         return java.util.List.of(
-                new double[]{from[0], AISLE_Y},
-                new double[]{to[0], AISLE_Y},
+                new double[]{from[0], aisleY},
+                new double[]{to[0], aisleY},
                 to.clone());
     }
 }

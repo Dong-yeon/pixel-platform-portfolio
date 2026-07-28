@@ -193,6 +193,8 @@ button.mini { padding: 3px 10px; font-size: 12px; margin-left: auto; }
 .umap { width: 100%; height: auto; background: #fff; border: 1px solid var(--line); border-radius: 10px; }
 .umap-bg { fill: #fbfcfe; }
 .umap-node { fill: #d7dfec; }
+/* 통로 — 로봇이 다니는 레인을 옅게 깔아 공장 구조가 읽히게 한다. */
+.umap-aisle { stroke: #e8edf5; stroke-width: 1.6; stroke-linecap: round; }
 .umap-node-label { font-size: 0.85px; fill: #8a95a5; }
 /* 이동 경로 — 점선을 또렷하게. 옅으면 지도에서 잘 안 보인다. */
 .umap-route { fill: none; stroke: #2d7ff9; stroke-width: 0.26; stroke-dasharray: 0.9 0.6; opacity: 0.85; }

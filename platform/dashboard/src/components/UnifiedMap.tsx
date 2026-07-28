@@ -1,5 +1,5 @@
 import {
-  EQUIPMENT_POSITIONS, MAP_H, MAP_W, NODES, routePoints,
+  EQUIPMENT_POSITIONS, LOWER_AISLE_Y, MAP_H, MAP_W, NODES, routePoints, UPPER_AISLE_Y,
   type Equipment, type EquipmentStatus, type Robot, type RobotStatus, type Task,
 } from '../types'
 
@@ -45,6 +45,11 @@ export function UnifiedMap({
   return (
     <svg className="umap" viewBox={`0 0 ${MAP_W} ${MAP_H}`} preserveAspectRatio="xMidYMid meet">
       <rect x={0} y={0} width={MAP_W} height={MAP_H} className="umap-bg" />
+
+      {/* AMR 통로 — 라인마다 하나씩. 로봇은 이 위로만 다닌다. */}
+      {[UPPER_AISLE_Y, LOWER_AISLE_Y].map((y) => (
+        <line key={`aisle-${y}`} x1={2} y1={y} x2={MAP_W - 2} y2={y} className="umap-aisle" />
+      ))}
 
       {/* AMR 이동 경로 — 설비/로봇보다 아래에 깔린다.
           배정된 로봇이 있으면 "그 로봇의 현재 위치 → 목적지"를 그려 실제로 남은 경로를

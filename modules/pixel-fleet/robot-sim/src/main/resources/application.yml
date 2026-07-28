@@ -12,7 +12,9 @@ sim:
   battery-drain-per-tick: 0.4   # % drained per moving tick
   charge-per-tick: 2.0          # % recovered per charging tick
   low-battery-threshold: 20     # below this, an idle robot returns to a dock
-  failure-rate: 0.02            # per-moving-tick chance a task fails (demonstrates retry)
+  # 이동 tick마다의 실패 확률. 한 작업이 40여 tick이라 0.02면 절반 넘게 실패해
+  # 재시도 churn이 심하고 로봇이 계속 멈춘다. 재시도 경로는 여전히 보여주되 드물게.
+  failure-rate: 0.003
   # 유휴 순찰은 기본으로 끈다. 서버가 구간 점유로 교통을 통제하는데, 로봇이 제멋대로
   # 돌아다니면 통제 밖 이동이 생겨 충돌 회피 보장이 깨진다.
   roam: false

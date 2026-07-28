@@ -77,11 +77,12 @@ export const NODES: Record<string, [number, number]> = {
 }
 
 /**
- * AMR이 다니는 가로 주통로의 y좌표. robot-sim NodeMap.AISLE_Y와 같아야 한다.
- * 로봇은 열린 바닥을 대각선으로 가로지르지 않고 이 통로를 따라 이동하므로,
- * 지도에 그리는 경로선도 같은 규칙을 따라야 실제 주행과 일치한다.
+ * AMR 통로 — 라인마다 하나씩 둘. robot-sim NodeMap, control-service LaneGraph와 같아야 한다.
+ * 통로가 하나였을 때는 거의 모든 경로가 겹쳐 사실상 한 대씩만 움직였다.
  */
-export const AISLE_Y = 12
+export const UPPER_AISLE_Y = 8.5
+export const LOWER_AISLE_Y = 15.5
+const MID_Y = (UPPER_AISLE_Y + LOWER_AISLE_Y) / 2
 
 /** 두 지점 사이의 주행 경로(통로 경유)를 폴리라인 좌표로 만든다. */
 export function routePoints(
@@ -91,7 +92,8 @@ export function routePoints(
   if (Math.abs(from[0] - to[0]) < 0.6) {
     return [from, to]
   }
-  return [from, [from[0], AISLE_Y], [to[0], AISLE_Y], to]
+  const aisleY = to[1] < MID_Y ? UPPER_AISLE_Y : LOWER_AISLE_Y
+  return [from, [from[0], aisleY], [to[0], aisleY], to]
 }
 
 /**
