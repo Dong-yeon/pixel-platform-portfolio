@@ -72,6 +72,7 @@ factory는 플러그인이 준 기본 DB를 그대로 쓴다.
 ```
 SPRING_PROFILES_ACTIVE=dev
 SERVER_ADDRESS=::
+PORT=9001
 SPRING_DATASOURCE_URL=jdbc:postgresql://${{Postgres.PGHOST}}:${{Postgres.PGPORT}}/${{Postgres.PGDATABASE}}
 SPRING_DATASOURCE_USERNAME=${{Postgres.PGUSER}}
 SPRING_DATASOURCE_PASSWORD=${{Postgres.PGPASSWORD}}
@@ -89,6 +90,7 @@ JWT_SECRET=<32바이트 이상 랜덤 문자열>
 ```
 SPRING_PROFILES_ACTIVE=dev
 SERVER_ADDRESS=::
+PORT=9002
 SPRING_DATASOURCE_URL=jdbc:postgresql://${{Postgres.PGHOST}}:${{Postgres.PGPORT}}/pixelfleet
 SPRING_DATASOURCE_USERNAME=fleet
 SPRING_DATASOURCE_PASSWORD=<1단계에서 정한 비밀번호>
@@ -127,10 +129,16 @@ Root Directory가 `platform`인 이유: 이미지 빌드에 `dashboard/`와 `gat
 
 ```
 SERVER_ADDRESS=::
-MODULE_FACTORY_URI=http://pixel-factory.railway.internal:${{pixel-factory.PORT}}
-MODULE_FLEET_URI=http://pixel-fleet.railway.internal:${{pixel-fleet.PORT}}
-MODULE_FLEET_WS_URI=http://pixel-fleet.railway.internal:${{pixel-fleet.PORT}}
+MODULE_FACTORY_URI=http://pixel-factory.railway.internal:9001
+MODULE_FLEET_URI=http://pixel-fleet.railway.internal:9002
+MODULE_FLEET_WS_URI=http://pixel-fleet.railway.internal:9002
 ```
+
+> **포트는 참조하지 말고 고정한다.** `${{pixel-factory.PORT}}` 같은 참조는 **빈 값으로
+>풀린다**(PORT는 Railway가 런타임에 주입하는 값이라 다른 서비스에서 참조할 수 없다).
+> 그러면 URI가 `http://pixel-factory.railway.internal:` 로 깨져서 모든 라우팅이 **500**이
+> 된다. 서비스 그래프에 화살표가 그려지더라도 값이 있다는 뜻은 아니니 속지 말 것.
+> 그래서 모듈 쪽에 `PORT=9001`/`PORT=9002`를 명시하고, 여기서는 그 숫자를 그대로 쓴다.
 
 > `MODULE_FLEET_WS_URI`도 **http://** 로 둔다. 게이트웨이가 `Upgrade` 헤더를 보고
 > 자동으로 ws로 바꾼다. `ws://`로 두면 SockJS의 `/ws/info`(일반 HTTP)가 400이 된다.

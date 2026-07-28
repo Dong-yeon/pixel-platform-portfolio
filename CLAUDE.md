@@ -1,7 +1,7 @@
 # pixel-platform
 
 PixelFactory(OEE) + PixelFleet(AMR)을 게이트웨이 + 통합 대시보드 아래 묶은 **모노레포**.
-포트: gateway 8080 · factory 8081 · fleet 8082 · dashboard(dev) 5173.
+포트: gateway **9000** · factory 9001 · fleet 9002 · dashboard(dev) 9100.
 
 로드맵·단계별 계획: `docs/` 재구성 계획서.
 
@@ -10,7 +10,7 @@ PixelFactory(OEE) + PixelFleet(AMR)을 게이트웨이 + 통합 대시보드 아
 1. **모노레포 ≠ 모놀리스** — 모듈은 자체 빌드·DB·포트로 독립 배포 가능. 루트 통합 Gradle 빌드 없음.
 2. **컴포저블** — 모듈 간 직접 코드/DB 참조 금지. 게이트웨이·REST·MQTT 계약으로만 통신.
 3. **DB per module** — Postgres 인스턴스 공유, DB 분리.
-4. **게이트웨이가 단일 진입점** — 외부·대시보드는 8080만.
+4. **게이트웨이가 단일 진입점** — 외부·대시보드는 9000만.
 
 ## 스택
 

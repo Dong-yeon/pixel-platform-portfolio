@@ -64,7 +64,11 @@ input, select {
 .map-bg { fill: #fbfcfe; }
 .node { fill: #dbe3ef; }
 .node-label { font-size: 1.1px; fill: #6b7688; }
-.robot-dot { transition: transform 0.45s linear; }
+/* 시뮬레이터는 위치를 1초마다 보낸다(sim.tick-interval-ms). 전환 시간을 그보다 짧게 두면
+   "이동 → 정지 → 점프"가 반복돼 끊겨 보인다. 주기보다 약간 길게 잡아 다음 좌표가 도착할
+   때까지 계속 움직이게 한다(실제 위치보다 아주 조금 뒤처지지만 끊김이 사라진다).
+   시뮬레이터 tick을 바꾸면 이 값도 함께 조정할 것. */
+.robot-dot { transition: transform 1.1s linear; }
 .robot-label { font-size: 1.2px; fill: #fff; font-weight: 700; }
 .robot-batt { font-size: 1px; fill: #45505f; }
 

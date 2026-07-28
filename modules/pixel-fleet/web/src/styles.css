@@ -64,7 +64,8 @@ input, select {
 .map-bg { fill: #fbfcfe; }
 .node { fill: #dbe3ef; }
 .node-label { font-size: 1.1px; fill: #6b7688; }
-.robot-dot { transition: transform 0.45s linear; }
+/* 위치 발행 주기(1s)보다 약간 길게 — 짧으면 "이동→정지→점프"로 끊겨 보인다. */
+.robot-dot { transition: transform 1.1s linear; }
 .robot-label { font-size: 1.2px; fill: #fff; font-weight: 700; }
 .robot-batt { font-size: 1px; fill: #45505f; }
 
