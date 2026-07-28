@@ -88,6 +88,7 @@ curl http://localhost:9000/api/fleet/health     # → :9002
 - [modules/pixel-factory/CLAUDE.md](modules/pixel-factory/CLAUDE.md) — OEE 모니터링
 - [modules/pixel-fleet/CLAUDE.md](modules/pixel-fleet/CLAUDE.md) — AMR 군집 관제
 - [docs/pixel-platform-plan.md](docs/pixel-platform-plan.md) — 플랫폼 재구성 계획서
+- [docs/deploy-railway.md](docs/deploy-railway.md) — Railway 배포 가이드
 
 ## 개발 환경
 

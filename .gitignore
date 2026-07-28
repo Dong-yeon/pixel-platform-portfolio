@@ -26,3 +26,6 @@ dist/
 # (같은 repo 안에 원본과 사본을 두 벌 두지 않기 위함)
 /.claude/skills/
 **/.claude/skills/
+
+# 대시보드 빌드 산출물은 Docker 빌드가 게이트웨이에 넣는다(소스로 커밋하지 않음)
+/platform/gateway/src/main/resources/static/
