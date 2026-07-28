@@ -122,6 +122,28 @@ public class LaneGraph {
         return new ArrayList<>(new java.util.LinkedHashSet<>(segments));
     }
 
+    /**
+     * 지금 이 좌표가 속한 구간. 로봇 위치 텔레메트리로 "어디까지 지나갔는지" 알아내
+     * 지나간 구간을 반납하는 데 쓴다.
+     *
+     * @return 구간 ID. 레인 밖(정차 자리 등)이면 null.
+     */
+    public String segmentAt(double x, double y) {
+        if (Math.abs(y - AISLE_Y) < 1.5) {
+            for (int i = 0; i < CONNECTOR_X.length - 1; i++) {
+                if (x >= CONNECTOR_X[i] - 1.5 && x <= CONNECTOR_X[i + 1] + 1.5) {
+                    return String.format("A:%.0f-%.0f", CONNECTOR_X[i], CONNECTOR_X[i + 1]);
+                }
+            }
+            return null;
+        }
+        double lane = nearestConnector(x);
+        if (Math.abs(lane - x) > 2.0) {
+            return null; // 레인에서 많이 벗어난 위치(정차 스팟 등)
+        }
+        return String.format("V:%.0f:%s", lane, y < AISLE_Y ? "up" : "down");
+    }
+
     /** 디버깅·로그용. */
     public String describe(List<String> segments) {
         return Arrays.toString(segments.toArray());

@@ -1,0 +1,509 @@
+# Pixel Platform — 데모 완성 로드맵 (P8 ~ P15)
+
+> **목적:** MES · QMS · WMS · 로봇관제 4개 시스템이 **하나의 공장으로 맞물려 돌아가는**
+> 포트폴리오 데모 사이트를 완성한다.
+>
+> **이 문서의 사용법:** Claude Code가 단계 단위로 집어 실행한다. 각 단계는
+> `목표 → 작업 → 완료 기준 → 주의` 순서이며, **완료 기준을 통과하지 못하면 다음 단계로 넘어가지 않는다.**
+> 한 단계 = 한 커밋(또는 소수의 커밋)을 원칙으로 한다.
+>
+> 선행 문서: [`pixel-platform-plan.md`](./pixel-platform-plan.md) (P0~P7 재구성 계획).
+> 이 문서는 그 뒤를 잇는다.
+
+---
+
+## 0. 현재 상태 스냅샷 (2026-07-28 기준, 코드 확인)
+
+### 완료된 것
+
+| 항목 | 근거 |
+|---|---|
+| 모노레포 재구성 (P1~P4) | `platform/`, `modules/`, `infra/` 배치 완료 |
+| 게이트웨이 | `platform/gateway/src/main/resources/application.yml` — RewritePath, DedupeResponseHeader, `/ws` 프록시 |
+| 통합 대시보드 | `platform/dashboard/` — Overview / Factory / Fleet 3탭, `UnifiedMap` |
+| **공통 코어 추출 (P5)** | `shared/src/main/java/com/pixelplatform/core/` — common·auth·user **이미 완료됨** |
+| pixel-fleet 전체 | 배차 정책, 교통정리, Redis 라이브 상태 + Pub/Sub, STOMP push, robot-sim |
+| pixel-factory 골격 | 설비/라인 마스터, MQTT 수집, 작업지시 상태머신, 이벤트 영속화 |
+
+> ⚠️ **루트 `README.md`의 구성 표에 `shared/`가 "예정 (P5)"으로 남아 있다. 실제로는 완료됐다.**
+> P8 착수 시 함께 수정할 것. `modules/pixel-factory/.../com/pixelfactory/auth/` 패키지도
+> 남아 있는데 `UserDataInitializer`는 `com.pixelplatform.core`를 import 한다 — 이식 잔재인지 확인 후 정리.
+
+### 확인된 결함 (근거 포함)
+
+| # | 결함 | 근거 | 영향 |
+|---|---|---|---|
+| D1 | **대시보드가 factory 데이터를 최초 1회만 조회.** 폴링도 WebSocket도 없음 | `platform/dashboard/src/Dashboard.tsx` — `useEffect` 1회 실행, `useFleetSocket`은 fleet 전용 | 지도의 설비 색이 절대 안 변함. Factory KPI 4개 전부 정지 |
+| D2 | **사이클 이벤트가 작업지시 실적에 반영되지 않음** | `MqttMessageHandler.handleCycle()` — `workOrderId`/`lotNo` 를 null로 기록, `WorkOrder`를 건드리지 않음 | Overview 품질률이 항상 "생산 실적 없음" |
+| D3 | **이벤트 발생시각 컬럼 없음** | `FactoryEvent`에 `occurredAt` 없음. 시뮬레이터가 보내는 `ts`를 핸들러가 무시 | 브로커 지연·재처리 시 OEE 구간 길이가 틀어짐 |
+| D4 | **설비별 기간 조회 인덱스 없음** | `V1__init.sql` — `idx_factory_events_created_at` 만 존재 | 설비 단위 OEE 집계가 풀스캔 |
+| D5 | **계획가동시간 정의 불가** | 시프트 캘린더 테이블 없음. `EquipmentStatus`에 `SETUP`/`PLANNED_STOP` 없음 | Availability 분모를 만들 수 없음 |
+| D6 | **표준CT가 설비 고정값** | `equipments.ideal_cycle_time_ms`. `items`/`processes` 테이블 자체가 없고 `WorkOrder.itemId`는 FK 없는 raw bigint | 품종 전환 시 Performance 왜곡 |
+| D7 | **좌표계 3중 하드코딩** | `LocationRegistry.java` / robot-sim `NodeMap` / dashboard `types.ts` (본인 주석에 이미 명시) | 모듈 추가할수록 배수로 증가 |
+| D8 | **MQTT 유실 설계** | `infra/mosquitto/mosquitto.conf` — `persistence false`, 구독자 `cleanSession=true` | 서비스 다운 중 이벤트 소실 → OEE 구간에 구멍 |
+| D9 | **LWT / retained 미사용** | `FactorySimulator` 접속 시 LWT 미설정, status 발행에 retained 없음 | 시뮬레이터 죽어도 설비가 RUNNING으로 남아 Availability 부풀려짐. 서비스 재기동 시 현재 상태 모름 |
+| D10 | **모듈별 개별 인증 (P6 미완)** | `platform/dashboard/src/api.ts` — `loginAll()`이 두 모듈에 각각 로그인, 토큰 2개를 localStorage에 저장 | 모듈 4개가 되면 토큰 4개 |
+| D11 | **게이트웨이 `/ws` 라우트가 fleet 전용** | gateway `application.yml`의 `pixel-fleet-ws` 라우트 = `Path=/ws/**` → 9002 | factory가 WebSocket을 열면 경로 충돌 |
+| D12 | **미사용 enum 값** | `FactoryEventType.NOTIFICATION_SENT`, `INSPECTION_*` 4종이 정의만 되고 미사용 | P14에서 실제로 채운다 |
+| D13 | **설비 8대 중 3대만 시뮬레이션됨** | `V3__expand_factory_floor.sql`이 8대로 늘렸으나 `FactorySimulator.EQUIPMENTS`는 CNC-01·CNC-02·MCT-01 3대뿐 | CNC-03·ASM-01·ASM-02·INS-01·PKG-01 5대가 지도에서 영원히 회색(IDLE). 실시간을 붙여도 절반 이상이 죽어 보인다 |
+
+### 4종 세트 대비 실제 커버리지
+
+| 표방 | 실제 상태 |
+|---|---|
+| 로봇관제 | ✅ 완성도 높음 (유일하게 "제품"처럼 보임) |
+| MES | ⚠️ 골격만 — OEE 미구현, POP 없음, 품목 마스터 없음 |
+| QMS | ❌ enum 껍데기만 |
+| WMS | ❌ `WAREHOUSE` 노드 좌표 1개뿐 |
+
+---
+
+## 1. 절대 원칙 (전 단계 공통 — 어길 거면 먼저 이 문서를 고칠 것)
+
+각 모듈 `CLAUDE.md`의 원칙을 그대로 승계한다. 이 로드맵에서 특히 자주 걸리는 것:
+
+1. **이벤트가 단일 진실 공급원.** 화면에 그리는 모든 것은 실제 이벤트/마스터에서 파생돼야 한다.
+   **없는 데이터를 시각 효과로 지어내지 않는다.** (→ 사람이 지도 위를 걸어다니는 애니메이션 금지)
+2. **컴포저블.** 모듈 간 코드/DB 직접 참조 금지. 게이트웨이·REST·MQTT 계약으로만.
+3. **DB per module.** 새 모듈은 자기 DB를 갖는다.
+4. **스키마는 Flyway 마이그레이션으로.** `ddl-auto` 의존 금지.
+5. **게임 메커닉 금지.** 점수·레벨·보상 없음. 단, "조작하면 실시간 반응"은 핵심 경험이므로 유지.
+6. **빌드는 PowerShell `.\gradlew.bat`.** bash `./gradlew`는 Windows에서 `-Xmx` 파싱이 깨진다.
+7. **파일 삭제·대규모 이동은 사전 계획 제시 후 승인받고 진행.**
+
+### 지도 시각 규칙 (P11 이후 계속 적용)
+
+한 평면도(44 × 24) 위에 여러 시스템이 겹치므로 표현 규칙을 고정한다.
+
+| 대상 | 모양 | 출처 |
+|---|---|---|
+| 설비 | 사각형, 상태별 색 | `equipments.status` |
+| AMR | 원형, 실시간 이동 | Redis 라이브 상태 |
+| 하역 지점 | 작은 사각 + 라벨 | 노드 마스터 |
+| **POP 단말** | 세로 직사각(키오스크), 사용 중이면 배지 | `pop_terminals` + 최근 조작 이벤트 |
+| **작업자/검사원** | **독립 마커 금지.** 단말/설비 마커에 붙는 배지로만 | 최근 POP 조작 이벤트 |
+| 물류 흐름 | 파란 점선 (기존 `umap-route`) | 진행 중 운송 작업 |
+| **정보 흐름** | 다른 색 점선 (현장 → 사무실) | 부적합 등록 이벤트 |
+| 사무실(QMS) | 평면도 **바깥** 별도 박스 + 대기건수 배지 | MRB 대기 건수 |
+
+**이동을 그리지 않는다.** 사람 위치는 "마지막으로 POP를 조작한 단말"이며 그 이상을 주장하지 않는다.
+
+---
+
+## P8. factory 이벤트 정합성 + 실적 반영
+
+> **왜 먼저인가:** D2·D3·D4가 남아 있으면 그 위에 얹는 OEE 숫자가 전부 틀린다.
+> 계산기를 만들기 전에 입력을 고친다.
+
+### 작업
+
+1. **`occurred_at` 도입 (D3)**
+   - Flyway **`V4__factory_event_occurred_at.sql`** (V3까지 이미 사용 중): `factory_events`에
+     `occurred_at timestamp` 추가, 기존 행은 `created_at`으로 백필 후 `not null`.
+   - `FactoryEvent`에 필드 추가, `FactoryEventService.record(...)`가 받도록 시그니처 확장.
+   - `MqttMessageHandler`가 payload의 `ts`를 파싱해 전달. **파싱 실패 시에만** `now()` 폴백 + WARN 로그.
+   - `FactoryEventResponse`/대시보드 `FactoryEventRaw`를 `occurredAt`으로 통일
+     → `api.ts`의 `toTimeline()` 변환 함수 제거 가능.
+
+2. **사이클 → 작업지시 실적 반영 (D2)**
+   - 시뮬레이터가 어느 작업지시를 수행 중인지 알아야 한다. **간접 방식을 쓴다:**
+     `handleCycle()`에서 해당 `equipmentId`의 `IN_PROGRESS` 작업지시를 조회해 붙인다.
+     (시뮬레이터에 작업지시 개념을 넣지 않는다 — 시뮬레이터는 설비만 흉내내는 게 맞다.)
+   - 찾으면 `producedQty` +1, `defect=true`면 `defectQty` +1, 이벤트에 `workOrderId`/`lotNo` 기록.
+   - 못 찾으면 지금처럼 설비 단위로만 기록 (계획 외 생산으로 취급, WARN 없이 조용히).
+   - `WorkOrder`에 `recordCycle(boolean defect)` 도메인 메서드 추가 — 서비스에서 setter 남발 금지.
+
+3. **인덱스 추가 (D4)**
+   - `create index idx_factory_events_target_type_time on factory_events (target_type, target_id, event_type, occurred_at desc);`
+
+4. **시뮬레이터를 설비 8대로 확장 (D13)**
+   - `FactorySimulator.EQUIPMENTS`에 `CNC-03`·`ASM-01`·`ASM-02`·`INS-01`·`PKG-01` 추가.
+     표준CT는 V3 시드값과 맞춘다 (30000 / 25000 / 25000 / 20000 / 15000).
+   - `lineCode`는 ASM·INS·PKG가 `LINE-2`다. 토픽이 `factory/{lineCode}/{equipmentCode}/{kind}` 이므로 틀리면 안 된다.
+
+5. **MQTT 유실·상태 정합성 (D8, D9)**
+   - `mosquitto.conf`: `persistence true` + `persistence_location`, docker volume 연결.
+   - `MqttEventSubscriber`: `options.setCleanSession(true)` → `false`.
+     (clientId는 이미 `mqtt.client-id: oee-service`로 고정돼 있어 그대로 두면 된다.)
+   - `FactorySimulator`: 접속 시 LWT 설정
+     → 토픽 `factory/{line}/{eq}/status`, payload `{"status":"DOWN","reason":"DISCONNECTED"}`.
+   - `FactorySimulator.publishStatus()`: `message.setRetained(true)`.
+     (cycle은 retained 금지 — 재접속마다 유령 사이클이 한 개 더 잡힌다.)
+
+### 완료 기준
+
+- [ ] 설비 8대 전부에서 cycle/status 이벤트가 들어온다 (`select target_id, count(*) from factory_events group by 1`)
+- [ ] 시뮬레이터를 5분 돌린 뒤 `work_orders.produced_qty > 0`, `defect_qty > 0`
+- [ ] `factory_events.occurred_at`이 payload의 `ts`와 일치 (created_at과 다른 행이 존재)
+- [ ] oee-service를 죽였다 살린 뒤, 다운타임 동안 발행된 사이클이 DB에 들어와 있다
+- [ ] 시뮬레이터를 강제 종료하면 해당 설비가 몇 초 내 `DOWN`으로 바뀐다
+- [ ] oee-service만 재기동해도 설비 상태가 즉시 복원된다 (retained)
+
+### 주의
+
+- `occurred_at` 추가는 **기존 이벤트 조회 API의 응답 필드가 바뀌는 변경**이다. 대시보드를 같은 커밋에서 함께 고칠 것.
+- 고정 clientId를 쓰면 같은 id로 두 인스턴스를 띄울 수 없다. 로컬 다중 기동 시 환경변수로 suffix를 받게 할 것.
+
+---
+
+## P9. OEE 계산 엔진
+
+> pixel-factory `CLAUDE.md`의 **Phase 2**에 해당. 새 패키지 `com.pixelfactory.oee`.
+
+### 작업
+
+1. **계획가동시간 정의 (D5)**
+   - `EquipmentStatus`에 `SETUP`, `PLANNED_STOP` 추가.
+     → `mqtt-topics.md`의 status 허용값도 함께 갱신 (계약 문서와 코드가 어긋나면 안 된다).
+   - `shift_calendars` 테이블: `line_id`, `shift_code`, `start_time`, `end_time`, `break_minutes`.
+     시드는 2교대(주간 08:00–17:00 / 야간 20:00–05:00, 휴식 60분) 정도면 충분.
+   - **계획정지 정의를 문서로 못박는다:** `PLANNED_STOP`·휴식은 계획가동시간에서 제외,
+     `SETUP`·`DOWN`은 포함(=비계획 정지로 A를 깎음). `IDLE`은 **비계획 유휴**로 간주.
+
+2. **구간(interval) 변환기**
+   - `EquipmentStateInterval` — 상태 이벤트 스트림을 `(equipmentId, status, from, to)` 구간으로 변환.
+   - **캐리인 필수:** 조회 시작 시각 이전의 마지막 `EQUIPMENT_STATUS_CHANGED`를 1건 끌어와
+     첫 구간의 시작으로 삼는다. 이걸 빼먹으면 조회 구간 앞부분이 통째로 비어 A가 부풀려진다.
+   - 시프트 경계에 걸친 구간은 잘라서 양쪽에 배분한다.
+
+3. **계산기**
+   ```
+   A = 실가동시간 / 계획가동시간
+   P = (표준CT × 총생산수) / 실가동시간
+   Q = 양품수 / 총생산수
+   OEE = A × P × Q
+   ```
+   - `P > 1.0`이면 **클램프하지 말고** 결과에 `performanceAnomaly=true` 플래그를 실어 올린다.
+     (표준CT가 틀렸다는 신호를 숨기면 안 된다.)
+   - 집계 단위: 설비 / 라인 / 시프트. **라인 OEE는 설비 OEE의 평균이 아니다** —
+     라인 단위 카운트로 다시 계산하거나 병목 설비 기준으로 잡고, 어느 쪽인지 코드 주석에 남긴다.
+
+4. **API**
+   - `GET /api/oee/equipments/{code}?from=&to=`
+   - `GET /api/oee/lines/{code}?from=&to=`
+   - `GET /api/oee/current` — 현재 시프트 기준 전 설비 요약 (대시보드용)
+
+### 완료 기준
+
+- [ ] 단위 테스트: 아래 케이스가 손계산과 일치
+      (계획가동 450분 / 실가동 403분 / 표준CT 1.0분 / 생산 373 / 불량 12 → **A 89.6%, P 92.6%, Q 96.8%, OEE 80.2%**)
+- [ ] 캐리인 테스트: 조회 구간 이전에 시작된 DOWN 구간이 A에 반영된다
+- [ ] 시프트 경계 분할 테스트
+- [ ] `P > 1.0` 상황에서 값이 잘리지 않고 플래그가 선다
+
+### 주의
+
+- **표준CT는 품번 단위가 맞다(D6).** 다만 `items` 테이블 신설은 P13(WMS)에서 품목 마스터를 만들 때 함께 한다.
+  P9에서는 설비 고정값을 쓰되, **계산기 인터페이스는 `idealCycleTimeMs(equipmentId, itemId)` 형태로 받아두어**
+  나중에 구현만 갈아끼우면 되게 한다.
+
+---
+
+## P10. factory 실시간 push + 대시보드 연결
+
+> **D1 해소.** 데모에서 가장 먼저 눈에 띄는 결함이 여기서 사라진다.
+
+### 작업
+
+1. **factory에 WebSocket 추가** — fleet의 `realtime` 패키지를 참고하되 **복사하지 말 것.**
+   - fleet은 Redis Pub/Sub로 팬아웃한다(다중 인스턴스 대비). factory는 Redis를 안 쓰므로
+     `@TransactionalEventListener(AFTER_COMMIT)` + `SimpMessagingTemplate` 직접 발행으로 충분하다.
+     **왜 다르게 했는지 클래스 주석에 남긴다.**
+   - 토픽: `/topic/factory/equipments`, `/topic/factory/events`, `/topic/factory/oee`
+
+2. **게이트웨이 경로 분리 (D11)** — 지금 `/ws/**`가 통째로 fleet으로 간다.
+   ```
+   pixel-fleet-ws    : Path=/ws/fleet/**    → 9002
+   pixel-factory-ws  : Path=/ws/factory/**  → 9001
+   ```
+   - fleet `WebSocketConfig`의 엔드포인트를 `/ws/fleet`으로, factory는 `/ws/factory`로.
+   - 대시보드 `useFleetSocket`의 `new SockJS('/ws')`도 함께 수정.
+   - **SockJS는 `/info`·XHR 폴백까지 같은 prefix로 나가므로 라우트가 하위 경로 전체를 잡아야 한다.**
+     `uri`는 계속 `http://`로 둘 것 (기존 주석의 이유 그대로).
+
+3. **대시보드 훅 정리**
+   - `useFleetSocket` → `usePlatformSocket`으로 일반화하거나, `useFactorySocket`을 나란히 추가.
+     연결 상태 표시(`실시간 연결됨` pill)는 **두 연결을 AND로** 판단하도록 수정.
+   - `Dashboard.tsx`에서 설비/이벤트/OEE를 push로 갱신.
+
+4. **Overview KPI를 OEE로 교체**
+   - `OverviewView`의 PixelFactory 패널을 `가동 설비 / OEE / A·P·Q / 고장`으로.
+   - 품질률 자체 계산 로직 제거하고 P9 API 값을 쓴다.
+
+### 완료 기준
+
+- [ ] 시뮬레이터가 고장을 내면 **새로고침 없이** 지도 설비가 빨강으로 바뀐다
+- [ ] Overview의 OEE 숫자가 시간에 따라 움직인다
+- [ ] 게이트웨이 경유(9000)로 factory·fleet **두 WebSocket이 동시에** 살아 있다
+- [ ] 한쪽 서비스를 죽여도 다른 쪽 실시간이 유지된다
+
+### 주의
+
+- `/ws` 경로를 바꾸는 순간 기존 fleet 대시보드가 조용히 끊긴다. **양쪽을 같은 커밋에서 바꿀 것.**
+- 시뮬레이터 파라미터가 지금 그대로면 OEE가 86% 근처에 붙어 거의 안 움직인다
+  (`DEFECT_RATE 0.03`, `BREAKDOWN_RATE 0.02`, CT 편차 0.9~1.3배 → A≈98% · P≈91% · Q≈97%).
+  P10 검증 시 `BREAKDOWN_RATE`를 일시적으로 올려 변화를 확인하고, 정식 시나리오는 P15에서 잡는다.
+
+---
+
+## P11. 레이아웃 서버화
+
+> **D7 해소.** POP 단말·사무실을 얹기 전에 반드시 끝내야 한다. 안 하면 좌표 중복이 5종류가 된다.
+
+### 작업
+
+1. **좌표를 마스터로 승격**
+   - `equipments`에 `pos_x`, `pos_y` 추가 (`types.ts`의 `EQUIPMENT_POSITIONS` 값을 그대로 시드).
+   - `layout_nodes` 테이블 (`node_code`, `name`, `node_type`, `pos_x`, `pos_y`) —
+     `LocationRegistry`의 12개 노드를 옮긴다.
+   - **소유권 결정:** 평면도는 공장의 것이지 물류만의 것이 아니다.
+     → **factory가 레이아웃 마스터를 소유**하고, fleet은 필요한 노드 좌표를 REST로 받아 캐시한다.
+     (원칙 3 DB per module을 지키면서 중복을 없애는 유일한 방법)
+
+2. **API** — `GET /api/factory/layout`
+   ```json
+   { "width": 44, "height": 24, "aisleY": 12,
+     "nodes": [...], "equipments": [...], "terminals": [] }
+   ```
+
+3. **소비처 3곳 정리**
+   - dashboard `types.ts`: 하드코딩 상수 제거, 부팅 시 layout API 조회.
+   - control-service `LocationRegistry`: 기동 시 factory에서 받아 캐시 + 실패 시 폴백 로그.
+   - robot-sim `NodeMap`: **여기는 그대로 둔다.** 시뮬레이터는 물리 세계를 흉내내는 쪽이라
+     서버 마스터에 의존하면 안 된다. 대신 **불일치 검증 테스트**를 붙여 값이 어긋나면 빌드가 깨지게 한다.
+
+4. `LocationRegistry` / `types.ts`의 "중복은 BACKLOG" 주석 제거.
+
+### 완료 기준
+
+- [ ] `types.ts`에 좌표 상수가 남아 있지 않다
+- [ ] layout API 응답만 바꿔서 설비 위치를 옮길 수 있다 (프론트 재빌드 없이)
+- [ ] robot-sim ↔ 서버 좌표 불일치 시 테스트가 실패한다
+
+---
+
+## P12. 중앙 인증(P6) + POP 단말 + 역할별 뷰
+
+> **D10 해소 + MES가 MES다워지는 단계.** 모듈을 늘리기 전에 인증을 합친다.
+
+### 12-1. 게이트웨이 중앙 인증 (기존 계획서 P6)
+
+- JWT 검증을 게이트웨이 필터로 이동. 검증 결과를 신뢰 헤더(`X-User-Id`, `X-User-Role`)로 전달.
+- 모듈은 헤더를 신뢰하고 자체 JWT 필터 제거. **게이트웨이를 우회한 직접 호출을 막을 것**
+  (네트워크 격리 또는 공유 시크릿 헤더 — 어느 쪽인지 문서에 남긴다).
+- `api.ts`의 `loginAll()`/토큰 2벌 제거 → 단일 토큰.
+
+### 12-2. POP 단말
+
+- `SourceType`·`TargetType`에 `TERMINAL` 추가.
+- 테이블:
+  ```sql
+  create table pop_terminals (
+      id bigserial primary key,
+      terminal_code varchar(30) not null unique,   -- POP-A1
+      name          varchar(50) not null,
+      line_id       bigint not null references production_lines (id),
+      pos_x numeric(6,2) not null,
+      pos_y numeric(6,2) not null,
+      created_at timestamp not null,
+      updated_at timestamp not null
+  );
+  ```
+  시드: LINE-1에 `POP-A1`, LINE-2에 `POP-B1` (설비 여러 대당 단말 1대가 현실적).
+- **POP 화면** — 대시보드 안의 별도 라우트(`/pop/{terminalCode}`), 터치 친화적 큰 버튼.
+  기능은 최소로: 로그인 → 내 작업지시 목록 → 착수 → 실적/불량 입력 → 종료.
+- 착수 시 `WORK_ORDER_STARTED` 이벤트에 `sourceType=TERMINAL, sourceId=terminalId` 기록.
+- **사용자 현재 위치 = 그 사람의 가장 최근 TERMINAL 소스 이벤트의 단말.** 파생값이며 저장하지 않는다.
+- **stale 처리 (빼먹지 말 것):**
+  - 작업지시 종료 시 배지 제거
+  - 마지막 조작 후 N분(기본 30분) 경과 시 흐리게 → 이후 제거
+  - `pop.presence.timeout-minutes` 로 설정화
+
+### 12-3. 지도 표현
+
+- 키오스크 마커(세로 직사각) + 사용 중이면 하단에 `담당자명 · WO번호` 배지.
+- **사람 독립 마커·이동 애니메이션 금지** (§1 지도 시각 규칙).
+- **레이어 토글 추가** — `설비 / AMR / 운송경로 / POP·작업자`. 지도 밀도가 이미 빠듯하다.
+
+### 12-4. 역할별 뷰
+
+`UserRole`에 `ADMIN`/`OPERATOR`/`INSPECTOR`/`DISPATCHER`가 이미 있다(`shared/.../UserRole.java`).
+
+| 역할 | 진입 화면 | 보이는 것 |
+|---|---|---|
+| ADMIN | 통합 현황 | 전체 |
+| OPERATOR | POP | 내 작업지시만 |
+| INSPECTOR | 검사 대기 목록 | 내 검사 건만 (P15에서 채워짐) |
+| DISPATCHER | Fleet 관제 | 로봇·운송작업 |
+
+### 완료 기준
+
+- [ ] 로그인 1회로 factory·fleet 양쪽 API가 통과한다 (localStorage 토큰 1개)
+- [ ] 게이트웨이를 우회한 모듈 직접 호출이 거부된다
+- [ ] POP에서 착수하면 통합 지도의 해당 키오스크에 담당자 배지가 뜬다
+- [ ] 작업 종료 또는 타임아웃 후 배지가 사라진다
+- [ ] `operator` 계정으로 로그인하면 관제 화면에 접근할 수 없다
+
+### 주의
+
+- 12-1은 **잘못하면 전 API가 막힌다.** 게이트웨이 필터를 먼저 붙이고 모듈 JWT 필터는
+  양쪽이 동시에 통과하는 걸 확인한 뒤 제거한다. 한 커밋에 다 하지 말 것.
+
+---
+
+## P13. WMS 모듈 (pixel-wms, :9003)
+
+> **목표: 로봇이 왜 움직이는지에 답을 준다.** 지금은 `DemoTaskGenerator`가 랜덤으로 작업을 만든다.
+
+### 작업
+
+1. 모듈 스캐폴딩 — `modules/pixel-wms/services/wms-service/`, `shared/` 의존, 자체 DB `pixelwms`,
+   Flyway, 포트 9003. 게이트웨이 라우트 `/api/wms/**`.
+2. 도메인
+   - `items` — **품목 마스터. 표준CT(품번×공정)를 여기서 관리한다(D6 해소).**
+   - `locations` — 창고 로케이션 (`WAREHOUSE`, `SHIPPING` 등 layout_nodes와 코드 정합)
+   - `stocks` — 로케이션 × 품목 × 수량
+   - `inbound_orders` / `outbound_orders` — 입출고 지시
+   - `stock_movements` — 이동 이력 (이벤트 소싱)
+3. **fleet 연동** — WMS가 출고지시를 만들면 fleet에 운송 작업을 요청한다.
+   `POST /api/fleet/tasks` (게이트웨이 경유, REST). 운송 완료 이벤트를 받아 재고를 차감한다.
+   - 완료 통지 수신 방식은 **MQTT 구독**을 권한다 (fleet이 WMS를 몰라야 하므로).
+   - `DemoTaskGenerator`에는 이미 `@ConditionalOnProperty("demo.task-generator.enabled")`가 붙어 있다.
+     **코드를 지우지 말고** WMS를 함께 띄우는 구성에서만 `false`로 둔다 — fleet 단독 데모를 살려두기 위해서다.
+4. **factory 연동** — 작업지시 착수 시 필요한 자재를 WMS에 요청.
+
+### 완료 기준
+
+- [ ] WMS에서 출고지시를 만들면 fleet에 운송 작업이 생기고 AMR이 실제로 움직인다
+- [ ] 운송 완료 후 WMS 재고가 차감된다
+- [ ] `items` 기반 표준CT가 P9 OEE 계산기에 주입된다 (설비 고정값 제거)
+- [ ] WMS를 내려도 fleet·factory는 정상 동작한다 (컴포저블 검증)
+
+---
+
+## P14. QMS 모듈 (pixel-qms, :9004) + MRB + Outbox
+
+> **컴포저블 아키텍처를 화면으로 증명하는 단계.**
+
+### 작업
+
+1. 모듈 스캐폴딩 — 포트 9004, 자체 DB `pixelqms`, 라우트 `/api/qms/**`.
+2. 도메인
+   - `inspections` — 검사 (수입/공정/최종), 검사원, 로트, 판정
+   - `defect_types` — 불량 유형 마스터
+   - `nonconformances` (NCR) — 부적합
+   - `mrb_reviews` — 심의. **상태머신:**
+     ```
+     RAISED → UNDER_REVIEW → DECIDED → CLOSED
+     판정: USE_AS_IS(특채) / REWORK(재작업) / SCRAP(폐기) / RETURN(반품)
+     ```
+3. **factory 연동 (여기가 핵심)**
+   - factory가 불량 임계 초과 시 `INSPECTION_REQUESTED` 발행 → QMS가 검사 생성
+   - QMS가 MRB를 열면 → factory의 해당 설비를 `QUALITY_HOLD`, 작업지시를 `ON_HOLD`로
+   - MRB 판정 완료 → 홀드 해제
+   - **결과: 지도의 설비가 주황으로 변했다가 돌아온다. 별개 서비스·별개 DB가 계약만으로 연동되는 게 눈에 보인다.**
+   - `EquipmentStatus.QUALITY_HOLD`와 `WorkOrderStatus.ON_HOLD`가 이미 있는데 지금 아무도 안 쓴다. 여기서 채운다.
+4. **사무실 + 정보 흐름 (지도)**
+   - 평면도 바깥 우측 상단에 "품질관리실" 박스, MRB 대기 건수 배지.
+   - 부적합 발생 시 현장 설비 → 사무실로 점선(운송 경로선과 **다른 색**). 기존 `umap-route` 표현 재사용.
+   - 레이어 토글에 `품질 흐름` 추가.
+5. **Outbox (메일 UI)**
+   - **실제 SMTP를 붙이지 않는다.** Railway에서 포트가 막히고, 스팸 처리되고, 데모에서 재현이 안 된다.
+   - `notifications` 테이블 + 미사용이던 `FactoryEventType.NOTIFICATION_SENT` 를 여기서 사용(D12).
+   - 대시보드에 "발송함" 뷰 — 수신자/제목/본문/발송시각을 메일 카드로 렌더.
+   - **확장점 설계:** `NotificationSender` 인터페이스 + `OutboxSender`(기본) / `SmtpSender`(프로필 전환).
+     실제 발송보다 이 설계가 더 나은 시그널이다.
+   - MRB 등록 시 자동 발송 예시:
+     ```
+     수신: 품질관리팀 <quality@…>
+     제목: [MRB] LOT-2026-0712 부적합 심의 요청
+     본문: 설비 CNC-01 / 불량 12EA / 유형: 치수불량 / 요청자: …
+     ```
+6. `INSPECTION_STARTED/PASSED/FAILED` enum 3종을 실제로 사용(D12).
+
+### 완료 기준
+
+- [ ] 불량이 임계를 넘으면 QMS에 검사가 자동 생성된다
+- [ ] MRB를 열면 통합 지도의 해당 설비가 `QUALITY_HOLD`(주황)로 바뀐다
+- [ ] 판정 완료 시 홀드가 풀리고 색이 복귀한다
+- [ ] 발송함에 메일 카드가 쌓이고 클릭해서 본문을 볼 수 있다
+- [ ] `inspector` 계정으로 로그인하면 검사 대기 목록이 진입 화면이다
+- [ ] QMS를 내려도 factory는 정상 생산한다 (홀드 요청만 안 올 뿐)
+
+---
+
+## P15. 통합 시나리오 + 배포
+
+> **네 시스템을 한 바퀴로 엮어 "공장이 돌아간다"를 보여준다.**
+
+### 목표 사이클
+
+```
+WMS 출고지시 → AMR 자재 운송 → POP에서 작업자 착수 → 설비 가공(OEE 집계)
+     ↑                                                        ↓
+WMS 재고 반영 ← AMR이 출하장으로 ← QMS 합격 판정 ← 불량 감지 → NCR → MRB → 메일 → 설비 홀드
+```
+
+### 작업
+
+1. **데모 시나리오 러너** — 위 사이클이 자동으로 순환하도록 오케스트레이션.
+   시연 중 특정 이벤트(고장·부적합)를 **버튼으로 주입**할 수 있게 한다(면접 시연용).
+2. **시뮬레이터 파라미터 재조정** — 지금은 OEE가 86% 근처에 고정이라 그래프가 평평하다.
+   `SETUP`/`PLANNED_STOP` 구간을 시나리오에 넣어 A가 실제로 움직이게 만든다.
+   교대 시작 SETUP → RUNNING → 계획정지 → 고장 → 복귀.
+3. **랜딩 페이지** — 4개 시스템 소개 + 데모 계정 안내 + 아키텍처 다이어그램.
+   포트폴리오 방문자는 로그인 화면부터 만나면 안 된다.
+4. **Railway 배포** — gateway + factory + fleet + wms + qms + Postgres + Redis + Mosquitto.
+   - `FactoryEvent`/`FleetEvent`는 계속 쌓인다. **이벤트 보존 정책(예: 7일 이후 삭제)을 반드시 넣을 것** — Railway 사용량 이슈.
+   - `mosquitto.conf`의 `allow_anonymous true`를 계정 인증으로 교체 (파일의 TODO).
+   - 게이트웨이 CORS `allowedOriginPatterns: "*"` 를 실제 오리진으로 제한 (yml의 TODO).
+5. **README 갱신** — 구성 표, 포트 규약(9003·9004 추가), 모듈별 문서 링크.
+
+### 완료 기준
+
+- [ ] 배포 URL에서 데모 계정으로 전체 사이클이 관찰된다
+- [ ] 시연용 이벤트 주입 버튼이 동작한다
+- [ ] 24시간 방치 후에도 DB 용량이 통제된다
+- [ ] 익명 MQTT 접속이 거부된다
+
+---
+
+## 부록 A. 단계 의존 관계
+
+```
+P8 (이벤트 정합성)
+ └─ P9 (OEE 계산)
+     └─ P10 (실시간 push)          ← 여기까지가 "지금 화면 살리기"
+P11 (레이아웃 서버화)               ← P12 이전 필수
+ └─ P12 (중앙인증 + POP + 역할뷰)   ← 모듈 추가 이전 필수
+     ├─ P13 (WMS)
+     │   └─ P9 표준CT 주입 (D6 최종 해소)
+     └─ P14 (QMS + MRB)
+         └─ P15 (통합 시나리오 + 배포)
+```
+
+P11은 P8~P10과 독립이므로 병행 가능하다. **P12는 반드시 P13·P14보다 먼저.**
+
+## 부록 B. 자주 밟는 함정
+
+| 함정 | 대응 |
+|---|---|
+| bash `./gradlew` | Windows에서 `-Xmx` 파싱 깨짐 → PowerShell `.\gradlew.bat` |
+| 게이트웨이 WS 라우트 `uri`를 `ws://`로 | 업그레이드 아닌 요청이 400 → `http://` 유지 |
+| CORS 헤더 중복 | 모듈이 자체 CORS를 붙이면 브라우저가 거부 → `DedupeResponseHeader` 유지 |
+| 상태 구간 계산 시 캐리인 누락 | 조회 시작 이전 마지막 상태 이벤트 1건을 반드시 끌어온다 |
+| cycle 메시지에 retained 설정 | 재접속마다 유령 사이클 → status만 retained |
+| 모듈 간 DB 직접 조회 | 원칙 2 위반 → REST/MQTT 계약으로만 |
+| 지도에 없는 데이터를 그림 | 원칙 1 위반 → 사람 이동 애니메이션 금지, 배지로만 |
+
+## 부록 C. 포트 규약 (갱신)
+
+| 포트 | 서비스 |
+|---|---|
+| 9000 | API Gateway |
+| 9001 | pixel-factory (MES) |
+| 9002 | pixel-fleet (로봇관제) |
+| 9003 | pixel-wms (WMS) |
+| 9004 | pixel-qms (QMS) |
+| 9100 | 통합 대시보드 (dev) |
+| 5432 / 1883 / 6379 | Postgres / Mosquitto / Redis |

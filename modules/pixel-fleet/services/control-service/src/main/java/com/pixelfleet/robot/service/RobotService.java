@@ -8,6 +8,8 @@ import com.pixelfleet.event.domain.SourceType;
 import com.pixelfleet.event.domain.TargetType;
 import com.pixelfleet.event.service.FleetEventService;
 import com.pixelfleet.realtime.RealtimePublisher;
+import com.pixelfleet.traffic.LaneGraph;
+import com.pixelfleet.traffic.TrafficController;
 import com.pixelfleet.robot.domain.Robot;
 import com.pixelfleet.robot.domain.RobotLiveState;
 import com.pixelfleet.robot.domain.RobotStatus;
@@ -41,6 +43,8 @@ public class RobotService {
     private final RobotLiveStateStore liveStateStore;
     private final FleetEventService fleetEventService;
     private final RealtimePublisher realtimePublisher;
+    private final LaneGraph laneGraph;
+    private final TrafficController trafficController;
 
     private volatile Map<String, Robot> masterCache;
 
@@ -48,12 +52,16 @@ public class RobotService {
             RobotRepository robotRepository,
             RobotLiveStateStore liveStateStore,
             FleetEventService fleetEventService,
-            RealtimePublisher realtimePublisher
+            RealtimePublisher realtimePublisher,
+            LaneGraph laneGraph,
+            TrafficController trafficController
     ) {
         this.robotRepository = robotRepository;
         this.liveStateStore = liveStateStore;
         this.fleetEventService = fleetEventService;
         this.realtimePublisher = realtimePublisher;
+        this.laneGraph = laneGraph;
+        this.trafficController = trafficController;
     }
 
     public List<RobotResponse> findAll() {
@@ -107,6 +115,11 @@ public class RobotService {
         Robot master = master(robotCode);
         RobotLiveState updated = liveStateStore.findOrOffline(robotCode).withPosition(posX, posY, LocalDateTime.now());
         liveStateStore.save(updated); // Redis only — no per-tick Postgres write.
+
+        // 지나온 레인 구간을 곧바로 반납한다 — 뒤따르는 로봇이 바로 쓸 수 있어야 통로 하나로도
+        // 여러 대가 줄지어 다닌다. 위치 보고가 곧 주행 진척 보고다.
+        trafficController.progress(master.getId(), laneGraph.segmentAt(posX, posY));
+
         realtimePublisher.publishRobot(RobotResponse.of(master, updated));
     }
 
