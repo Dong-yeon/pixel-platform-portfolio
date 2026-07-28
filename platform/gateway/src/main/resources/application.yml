@@ -1,0 +1,61 @@
+spring:
+  application:
+    name: gateway
+  cloud:
+    gateway:
+      # 하위 모듈도 CORS 헤더를 붙이는 경우가 있어(fleet의 WebSocketConfig 등)
+      # 게이트웨이 것과 합쳐지면 헤더가 중복된다. 브라우저는 Access-Control-Allow-Origin이
+      # 두 개면 요청을 거부하므로(curl은 통과) 응답 헤더를 하나로 정리한다.
+      default-filters:
+        - DedupeResponseHeader=Access-Control-Allow-Origin Access-Control-Allow-Credentials, RETAIN_FIRST
+
+      # 모듈은 자기 경로(/api/robots …)만 알고, 플랫폼 접두사(/api/fleet/…)는 모른다.
+      # 따라서 게이트웨이가 접두사를 떼고 전달한다(RewritePath).
+      routes:
+        - id: pixel-factory
+          uri: ${MODULE_FACTORY_URI:http://localhost:9001}
+          predicates:
+            - Path=/api/factory/**
+          filters:
+            - RewritePath=/api/factory/(?<segment>.*), /api/$\{segment}
+
+        - id: pixel-fleet
+          uri: ${MODULE_FLEET_URI:http://localhost:9002}
+          predicates:
+            - Path=/api/fleet/**
+          filters:
+            - RewritePath=/api/fleet/(?<segment>.*), /api/$\{segment}
+
+        # 실시간 push(STOMP over SockJS). 경로 재작성 없이 그대로 넘긴다.
+        # uri는 반드시 http:// 로 둔다 — 게이트웨이가 Upgrade 헤더를 보고 자동으로
+        # ws 로 전환하며, SockJS의 /ws/info 와 XHR 폴백(일반 HTTP)도 같은 라우트로
+        # 통과시킨다. ws:// 로 두면 업그레이드가 아닌 요청이 400으로 거부된다.
+        - id: pixel-fleet-ws
+          uri: ${MODULE_FLEET_WS_URI:http://localhost:9002}
+          predicates:
+            - Path=/ws/**
+
+      # 대시보드(9100)는 다른 오리진이므로 게이트웨이에서 CORS를 한 곳에 모아 처리한다.
+      globalcors:
+        cors-configurations:
+          '[/**]':
+            allowedOriginPatterns: "*"   # TODO: 배포 전 실제 대시보드 오리진으로 제한
+            allowedMethods: "*"
+            allowedHeaders: "*"
+            allowCredentials: true
+
+server:
+  port: ${PORT:9000}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,gateway
+  endpoint:
+    health:
+      show-details: always
+
+logging:
+  level:
+    org.springframework.cloud.gateway: info

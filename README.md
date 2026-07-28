@@ -26,7 +26,7 @@ Happyeon SmartFactory Pixel Project — 여러 제조 도메인 모듈을 **API 
 
 | 경로 | 역할 | 상태 |
 |---|---|---|
-| `platform/gateway/` | Spring Cloud Gateway — 라우팅·인증 집약 | 예정 (P3) |
+| `platform/gateway/` | Spring Cloud Gateway — 라우팅·CORS 집약 | 완료 |
 | `platform/dashboard/` | 통합 React 대시보드 (OEE + AMR + KPI) | 예정 (P4) |
 | `modules/pixel-factory/` | 가공라인 **OEE 모니터링** (MQTT·이벤트 소싱) | 이식 완료 |
 | `modules/pixel-fleet/` | AMR **군집 관제(FMS)** (MQTT·Redis·WebSocket) | 이식 완료 |
@@ -56,9 +56,17 @@ Happyeon SmartFactory Pixel Project — 여러 제조 도메인 모듈을 **API 
 cd infra && docker compose up -d          # Postgres + Mosquitto + Redis
 ```
 ```powershell
+cd platform\gateway                               ; .\gradlew.bat bootRun   # :9000
 cd modules\pixel-factory\services\oee-service     ; .\gradlew.bat bootRun   # :9001
 cd modules\pixel-fleet\services\control-service   ; .\gradlew.bat bootRun   # :9002
 cd modules\pixel-fleet\robot-sim                  ; .\gradlew.bat bootRun
+```
+
+게이트웨이가 뜨면 모든 호출은 9000으로 한다.
+
+```bash
+curl http://localhost:9000/api/factory/health   # → :9001
+curl http://localhost:9000/api/fleet/health     # → :9002
 ```
 
 ## 원칙
