@@ -1,0 +1,30 @@
+spring:
+  application:
+    name: robot-sim
+  main:
+    web-application-type: none
+
+sim:
+  broker-url: ${MQTT_BROKER_URL:tcp://localhost:1883}
+  client-id: ${MQTT_CLIENT_ID:robot-sim}
+  tick-interval-ms: 1000
+  speed: 1.5                 # map units advanced per tick while moving
+  battery-drain-per-tick: 0.4   # % drained per moving tick
+  charge-per-tick: 2.0          # % recovered per charging tick
+  low-battery-threshold: 20     # below this, an idle robot returns to a dock
+  failure-rate: 0.02            # per-moving-tick chance a task fails (demonstrates retry)
+  roam: true                    # idle robots wander between nodes to keep the map lively
+  robots:
+    - code: AMR-01
+      name: 1호기
+      home: DOCK-1
+    - code: AMR-02
+      name: 2호기
+      home: DOCK-2
+    - code: AMR-03
+      name: 3호기
+      home: DOCK-1
+
+logging:
+  level:
+    com.pixelfleet.sim: info
