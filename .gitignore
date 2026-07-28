@@ -1,0 +1,27 @@
+# ---- build ----
+build/
+out/
+bin/
+.gradle/
+target/
+node_modules/
+dist/
+*.log
+
+# ---- IDE ----
+.idea/
+*.iml
+.vscode/
+
+# ---- env / secrets ----
+.env
+.env.*
+!.env.example
+*.local.properties
+
+# ---- Claude ----
+# .claude 를 통째로 무시하지 않는다. skills 원본은 /skills 에 커밋된다.
+.claude/settings.local.json
+# /.claude/skills 는 scripts/sync-skills.ps1 이 /skills 에서 만들어내는 사본이므로 제외
+# (같은 repo 안에 원본과 사본을 두 벌 두지 않기 위함)
+/.claude/skills/
