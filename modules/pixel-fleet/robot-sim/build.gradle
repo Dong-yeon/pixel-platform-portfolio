@@ -13,6 +13,14 @@ java {
     }
 }
 
+// 소스는 UTF-8이지만 javac는 플랫폼 기본 인코딩(한국어 Windows면 cp949)으로 읽는다.
+// 지정하지 않으면 한글 문자열 리터럴이 **컴파일 시점에** 깨진다 — 파일은 멀쩡한데
+// 실행하면 응답·로그의 한글이 모지바케가 된다(실제로 그렇게 나갔다).
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = 'UTF-8'
+}
+
+
 dependencies {
     // No web/JPA: the simulator only needs lifecycle, scheduling, config binding and MQTT.
     implementation 'org.springframework.boot:spring-boot-starter'
