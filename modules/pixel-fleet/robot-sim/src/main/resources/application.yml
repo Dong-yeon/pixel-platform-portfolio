@@ -11,7 +11,11 @@ sim:
   speed: 1.5                 # map units advanced per tick while moving
   battery-drain-per-tick: 0.4   # % drained per moving tick
   charge-per-tick: 2.0          # % recovered per charging tick
-  low-battery-threshold: 20     # below this, an idle robot returns to a dock
+  # 이 값 아래로 떨어지면 유휴 로봇이 도크로 복귀한다.
+  # **관제 서버의 배차 최소 배터리(NearestBatteryAwareAssignmentPolicy.MIN_BATTERY_PERCENT=25)보다
+  # 높아야 한다.** 낮으면 그 사이 구간에 빠진 로봇이 영원히 멈춘다 — 배차받기엔 낮고,
+  # 충전 가기엔 높고, IDLE에선 배터리가 닳지도 않아 스스로 빠져나올 수 없다.
+  low-battery-threshold: 30
   # 이동 tick마다의 실패 확률. 한 작업이 40여 tick이라 0.02면 절반 넘게 실패해
   # 재시도 churn이 심하고 로봇이 계속 멈춘다. 재시도 경로는 여전히 보여주되 드물게.
   failure-rate: 0.003

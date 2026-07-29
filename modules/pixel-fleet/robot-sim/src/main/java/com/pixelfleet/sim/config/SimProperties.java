@@ -13,7 +13,8 @@ public class SimProperties {
     private double speed = 1.5;
     private double batteryDrainPerTick = 0.4;
     private double chargePerTick = 2.0;
-    private int lowBatteryThreshold = 20;
+    // 관제 서버의 배차 최소 배터리(25%)보다 높아야 한다. 자세한 이유는 application.yml 주석.
+    private int lowBatteryThreshold = 30;
     private double failureRate = 0.02;
     private boolean roam = true;
     private List<RobotDef> robots = new ArrayList<>();

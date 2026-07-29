@@ -12,7 +12,7 @@
 
 ---
 
-## 0. 현재 상태 스냅샷 (2026-07-28 기준, 코드 확인)
+## 0. 현재 상태 스냅샷 (최종 갱신 2026-07-29, 코드 재확인)
 
 ### 완료된 것
 
@@ -21,31 +21,40 @@
 | 모노레포 재구성 (P1~P4) | `platform/`, `modules/`, `infra/` 배치 완료 |
 | 게이트웨이 | `platform/gateway/src/main/resources/application.yml` — RewritePath, DedupeResponseHeader, `/ws` 프록시 |
 | 통합 대시보드 | `platform/dashboard/` — Overview / Factory / Fleet 3탭, `UnifiedMap` |
-| **공통 코어 추출 (P5)** | `shared/src/main/java/com/pixelplatform/core/` — common·auth·user **이미 완료됨** |
-| pixel-fleet 전체 | 배차 정책, 교통정리, Redis 라이브 상태 + Pub/Sub, STOMP push, robot-sim |
-| pixel-factory 골격 | 설비/라인 마스터, MQTT 수집, 작업지시 상태머신, 이벤트 영속화 |
-
-> ⚠️ **루트 `README.md`의 구성 표에 `shared/`가 "예정 (P5)"으로 남아 있다. 실제로는 완료됐다.**
-> P8 착수 시 함께 수정할 것. `modules/pixel-factory/.../com/pixelfactory/auth/` 패키지도
-> 남아 있는데 `UserDataInitializer`는 `com.pixelplatform.core`를 import 한다 — 이식 잔재인지 확인 후 정리.
+| **공통 코어 추출 (P5)** | `shared/src/main/java/com/pixelplatform/core/` — common·auth·user |
+| **중앙 인증 (P6 = 아래 P12-1)** | `platform/gateway/.../auth/AuthenticationGlobalFilter` — **P12보다 먼저 끝냈다** |
+| pixel-fleet 전체 | 배차 정책, 교통정리(leg 단위 예약), Redis 라이브 상태 + Pub/Sub, STOMP push, robot-sim |
+| pixel-factory 골격 | 설비/라인 마스터, MQTT 수집, 작업지시 상태머신, 이벤트 영속화, 설비 8대 시뮬레이터 |
 
 ### 확인된 결함 (근거 포함)
 
-| # | 결함 | 근거 | 영향 |
-|---|---|---|---|
-| D1 | **대시보드가 factory 데이터를 최초 1회만 조회.** 폴링도 WebSocket도 없음 | `platform/dashboard/src/Dashboard.tsx` — `useEffect` 1회 실행, `useFleetSocket`은 fleet 전용 | 지도의 설비 색이 절대 안 변함. Factory KPI 4개 전부 정지 |
-| D2 | **사이클 이벤트가 작업지시 실적에 반영되지 않음** | `MqttMessageHandler.handleCycle()` — `workOrderId`/`lotNo` 를 null로 기록, `WorkOrder`를 건드리지 않음 | Overview 품질률이 항상 "생산 실적 없음" |
-| D3 | **이벤트 발생시각 컬럼 없음** | `FactoryEvent`에 `occurredAt` 없음. 시뮬레이터가 보내는 `ts`를 핸들러가 무시 | 브로커 지연·재처리 시 OEE 구간 길이가 틀어짐 |
-| D4 | **설비별 기간 조회 인덱스 없음** | `V1__init.sql` — `idx_factory_events_created_at` 만 존재 | 설비 단위 OEE 집계가 풀스캔 |
-| D5 | **계획가동시간 정의 불가** | 시프트 캘린더 테이블 없음. `EquipmentStatus`에 `SETUP`/`PLANNED_STOP` 없음 | Availability 분모를 만들 수 없음 |
-| D6 | **표준CT가 설비 고정값** | `equipments.ideal_cycle_time_ms`. `items`/`processes` 테이블 자체가 없고 `WorkOrder.itemId`는 FK 없는 raw bigint | 품종 전환 시 Performance 왜곡 |
-| D7 | **좌표계 3중 하드코딩** | `LocationRegistry.java` / robot-sim `NodeMap` / dashboard `types.ts` (본인 주석에 이미 명시) | 모듈 추가할수록 배수로 증가 |
-| D8 | **MQTT 유실 설계** | `infra/mosquitto/mosquitto.conf` — `persistence false`, 구독자 `cleanSession=true` | 서비스 다운 중 이벤트 소실 → OEE 구간에 구멍 |
-| D9 | **LWT / retained 미사용** | `FactorySimulator` 접속 시 LWT 미설정, status 발행에 retained 없음 | 시뮬레이터 죽어도 설비가 RUNNING으로 남아 Availability 부풀려짐. 서비스 재기동 시 현재 상태 모름 |
-| D10 | **모듈별 개별 인증 (P6 미완)** | `platform/dashboard/src/api.ts` — `loginAll()`이 두 모듈에 각각 로그인, 토큰 2개를 localStorage에 저장 | 모듈 4개가 되면 토큰 4개 |
-| D11 | **게이트웨이 `/ws` 라우트가 fleet 전용** | gateway `application.yml`의 `pixel-fleet-ws` 라우트 = `Path=/ws/**` → 9002 | factory가 WebSocket을 열면 경로 충돌 |
-| D12 | **미사용 enum 값** | `FactoryEventType.NOTIFICATION_SENT`, `INSPECTION_*` 4종이 정의만 되고 미사용 | P14에서 실제로 채운다 |
-| D13 | **설비 8대 중 3대만 시뮬레이션됨** | `V3__expand_factory_floor.sql`이 8대로 늘렸으나 `FactorySimulator.EQUIPMENTS`는 CNC-01·CNC-02·MCT-01 3대뿐 | CNC-03·ASM-01·ASM-02·INS-01·PKG-01 5대가 지도에서 영원히 회색(IDLE). 실시간을 붙여도 절반 이상이 죽어 보인다 |
+> 상태는 2026-07-29에 코드로 재확인했다. ✅는 이 로드맵 작성 이후 해결된 것.
+
+| # | 결함 | 상태 | 근거 | 영향 |
+|---|---|---|---|---|
+| D1 | **대시보드가 factory 데이터를 최초 1회만 조회.** 폴링도 WebSocket도 없음 | ❌ | `platform/dashboard/src/Dashboard.tsx` — `useEffect` 1회 실행, `useFleetSocket`은 fleet 전용 | 지도의 설비 색이 절대 안 변함. Factory KPI 4개 전부 정지 |
+| D2 | **사이클 이벤트가 작업지시 실적에 반영되지 않음** | ✅ **해결** | `MqttMessageHandler.handleCycle()`이 `IN_PROGRESS` 작업지시를 찾아 `workOrder.recordCycle(defect)` 호출, `workOrderId` 기록 | — |
+| D3 | **이벤트 발생시각 컬럼 없음** | ❌ | `FactoryEvent`에 `occurredAt` 없음(마이그레이션 V3까지). 시뮬레이터의 `ts`를 핸들러가 무시 | 브로커 지연·재처리 시 OEE 구간 길이가 틀어짐 |
+| D4 | **설비별 기간 조회 인덱스 없음** | ❌ | `V1__init.sql` — `idx_factory_events_created_at` 만 존재 | 설비 단위 OEE 집계가 풀스캔 |
+| D5 | **계획가동시간 정의 불가** | ❌ | 시프트 캘린더 테이블 없음. `EquipmentStatus`는 `IDLE/RUNNING/DOWN/QUALITY_HOLD` 4개뿐 | Availability 분모를 만들 수 없음 |
+| D6 | **표준CT가 설비 고정값** | ❌ | `equipments.ideal_cycle_time_ms`. `items`/`processes` 테이블 없음, `WorkOrder.itemId`는 FK 없는 raw bigint | 품종 전환 시 Performance 왜곡 |
+| D7 | **좌표계 3중 하드코딩** | ❌ | `LocationRegistry.java` / robot-sim `NodeMap` / dashboard `types.ts` | 모듈 추가할수록 배수로 증가 |
+| D8 | **MQTT 유실 설계** | ❌ | `mosquitto.conf` `persistence false`, 구독자 `cleanSession=true` (5곳) | 서비스 다운 중 이벤트 소실 → OEE 구간에 구멍 |
+| D9 | **LWT / retained 미사용** | ❌ | `FactorySimulator`에 `setWill`·`setRetained` 없음 | 시뮬레이터가 죽어도 설비가 RUNNING으로 남아 Availability 부풀려짐 |
+| D10 | **모듈별 개별 인증 (P6 미완)** | ✅ **해결** | P6에서 게이트웨이 중앙 인증. 토큰 1개(`pp_token`), `loginAll()` 제거 | — |
+| D11 | **게이트웨이 `/ws` 라우트가 fleet 전용** | ❌ | `pixel-fleet-ws` 라우트 = `Path=/ws/**` → 9002 | factory가 WebSocket을 열면 경로 충돌 |
+| D12 | **미사용 enum 값** | ❌ | `FactoryEventType.NOTIFICATION_SENT`, `INSPECTION_*` 4종 | P14에서 실제로 채운다 |
+| D13 | **설비 8대 중 3대만 시뮬레이션됨** | ✅ **해결** | `FactorySimulator.EQUIPMENTS`가 8대 전부 | — |
+
+### 이 로드맵에 없던 항목 (진행 중 발견 — `docs/BACKLOG.md`에 상세)
+
+| 항목 | 상태 |
+|---|---|
+| AMR 교통정리 (레인 그래프·구간 점유·leg 단위 예약·고아 작업 워치독) | ✅ 완료 |
+| 배터리 20~24% 사각지대 — 함대 전체가 멈춤 | ✅ 수정 |
+| `/ws/**`가 인증 없이 열려 있음 (SockJS 핸드셰이크 제약) | ❌ |
+| 동시 주행이 1~2대 — 가로 구간이 통짜라 뒤차가 못 들어옴 | ❌ |
+| 충전 주행이 서버 통제 밖 | ❌ |
 
 ### 4종 세트 대비 실제 커버리지
 
@@ -282,16 +291,33 @@
 
 ---
 
-## P12. 중앙 인증(P6) + POP 단말 + 역할별 뷰
+## P12. ~~중앙 인증(P6)~~ + POP 단말 + 역할별 뷰
 
-> **D10 해소 + MES가 MES다워지는 단계.** 모듈을 늘리기 전에 인증을 합친다.
+> **MES가 MES다워지는 단계.** D10(인증)은 12-1에서 이미 해소됐다.
 
-### 12-1. 게이트웨이 중앙 인증 (기존 계획서 P6)
+### 12-1. 게이트웨이 중앙 인증 (기존 계획서 P6) ✅ 완료 — 순서를 앞당겨 먼저 했다
 
-- JWT 검증을 게이트웨이 필터로 이동. 검증 결과를 신뢰 헤더(`X-User-Id`, `X-User-Role`)로 전달.
-- 모듈은 헤더를 신뢰하고 자체 JWT 필터 제거. **게이트웨이를 우회한 직접 호출을 막을 것**
-  (네트워크 격리 또는 공유 시크릿 헤더 — 어느 쪽인지 문서에 남긴다).
-- `api.ts`의 `loginAll()`/토큰 2벌 제거 → 단일 토큰.
+구현은 `platform/gateway/.../auth/AuthenticationGlobalFilter`. 상세는
+[platform/gateway/README.md](../platform/gateway/README.md).
+
+- JWT 검증을 게이트웨이 필터로 이동. 검증 결과를 `X-Auth-User`/`X-Auth-Role`로 전달하고,
+  **클라이언트가 보낸 `X-Auth-*`는 항상 제거**한다(스푸핑 차단).
+- `api.ts`의 `loginAll()`/토큰 2벌 제거 → 단일 토큰(`pp_token`). 세 서비스가 같은
+  `PLATFORM_JWT_SECRET`을 쓴다.
+
+> **원안과 달라진 점 — 모듈의 자체 JWT 필터를 제거하지 않고 유지했다.**
+> 원안은 "모듈은 헤더를 신뢰하고 자체 필터 제거 + 네트워크 격리/공유 시크릿으로 우회 차단"이었다.
+> 대신 모듈이 계속 JWT를 검증하게 두면(방어 심층) **추가 장치 없이** 우회 차단이 성립한다 —
+> 9002에 직접 붙어도, `X-Auth-Role: ADMIN`을 위조해도 401이다(실측 확인).
+> 게이트웨이 필터를 붙였다가 모듈 필터를 떼는 2단계 위험(§주의)도 사라진다.
+>
+> 발급은 여전히 모듈이 한다. 게이트웨이는 사용자 저장소가 없어 토큰을 만들 수 없어서,
+> `/api/auth/**`를 `AUTH_MODULE_URI`(현재 pixel-factory)로 넘긴다.
+> 전용 인증 서비스를 만들면 이 변수만 돌리면 된다.
+
+**남은 것:** `/ws/**`는 아직 인증 없이 통과한다(SockJS 핸드셰이크에 Authorization 헤더를
+실을 수 없어서). 토큰을 STOMP CONNECT 프레임에 담아 검증해야 한다. 권한(Role) 기반
+접근 제어도 아직 모듈 몫이다 — 게이트웨이는 "인증됐는가"만 본다.
 
 ### 12-2. POP 단말
 
@@ -338,16 +364,17 @@
 
 ### 완료 기준
 
-- [ ] 로그인 1회로 factory·fleet 양쪽 API가 통과한다 (localStorage 토큰 1개)
-- [ ] 게이트웨이를 우회한 모듈 직접 호출이 거부된다
+- [x] 로그인 1회로 factory·fleet 양쪽 API가 통과한다 (localStorage 토큰 1개)
+- [x] 게이트웨이를 우회한 모듈 직접 호출이 거부된다
 - [ ] POP에서 착수하면 통합 지도의 해당 키오스크에 담당자 배지가 뜬다
 - [ ] 작업 종료 또는 타임아웃 후 배지가 사라진다
 - [ ] `operator` 계정으로 로그인하면 관제 화면에 접근할 수 없다
 
 ### 주의
 
-- 12-1은 **잘못하면 전 API가 막힌다.** 게이트웨이 필터를 먼저 붙이고 모듈 JWT 필터는
-  양쪽이 동시에 통과하는 걸 확인한 뒤 제거한다. 한 커밋에 다 하지 말 것.
+- ~~12-1은 잘못하면 전 API가 막힌다~~ → 모듈 필터를 유지하는 방식으로 갈아서 이 위험은 사라졌다.
+  대신 **`PLATFORM_JWT_SECRET`이 세 서비스에 같은 값이어야 한다.** 다르면 로그인은 되는데
+  이후 전부 401이라 증상이 "로그인이 안 된다"로 보여 원인을 찾기 어렵다.
 
 ---
 
@@ -471,11 +498,13 @@ WMS 재고 반영 ← AMR이 출하장으로 ← QMS 합격 판정 ← 불량 �
 ## 부록 A. 단계 의존 관계
 
 ```
+P12-1 (중앙 인증) ✅ 완료 — 순서를 앞당겨 먼저 했다
+
 P8 (이벤트 정합성)
  └─ P9 (OEE 계산)
      └─ P10 (실시간 push)          ← 여기까지가 "지금 화면 살리기"
 P11 (레이아웃 서버화)               ← P12 이전 필수
- └─ P12 (중앙인증 + POP + 역할뷰)   ← 모듈 추가 이전 필수
+ └─ P12 (POP + 역할뷰)             ← 모듈 추가 이전 필수
      ├─ P13 (WMS)
      │   └─ P9 표준CT 주입 (D6 최종 해소)
      └─ P14 (QMS + MRB)
@@ -483,6 +512,7 @@ P11 (레이아웃 서버화)               ← P12 이전 필수
 ```
 
 P11은 P8~P10과 독립이므로 병행 가능하다. **P12는 반드시 P13·P14보다 먼저.**
+인증(12-1)이 이미 끝났으므로 P12에 남은 것은 POP 단말과 역할별 뷰다.
 
 ## 부록 B. 자주 밟는 함정
 
@@ -495,6 +525,9 @@ P11은 P8~P10과 독립이므로 병행 가능하다. **P12는 반드시 P13·P1
 | cycle 메시지에 retained 설정 | 재접속마다 유령 사이클 → status만 retained |
 | 모듈 간 DB 직접 조회 | 원칙 2 위반 → REST/MQTT 계약으로만 |
 | 지도에 없는 데이터를 그림 | 원칙 1 위반 → 사람 이동 애니메이션 금지, 배지로만 |
+| **두 서비스에 나뉜 임계값이 어긋남** | 배차 최소 배터리(서버 25%) > 충전 복귀 기준(로봇 20%)이면 그 사이에 빠진 로봇이 영원히 멈춘다. 임계값이 서비스 경계를 넘으면 **불변식을 양쪽 주석에 박아둘 것** |
+| `PLATFORM_JWT_SECRET`이 서비스마다 다름 | 로그인은 되는데 이후 전부 401 → 증상이 "로그인이 안 된다"로 보인다 |
+| 함대가 멈췄을 때 원인 혼동 | 교통 교착과 배터리 사각지대는 증상이 같다(전원 IDLE). `GET /api/traffic/reservations`가 **비어 있으면** 교통이 아니라 배터리 쪽 |
 
 ## 부록 C. 포트 규약 (갱신)
 
