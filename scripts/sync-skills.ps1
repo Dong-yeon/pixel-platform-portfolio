@@ -7,6 +7,12 @@
   전부 이 스크립트가 만들어내는 사본이며, 직접 편집하지 않는다.
   (편집은 skills/ 에서 하고 이 스크립트를 다시 돌린다)
 
+  매핑은 scripts/skill-targets.tsv 하나만 본다 (bash 판과 공유).
+  예전엔 이 파일에 $Targets 를 하드코딩했는데, TSV 와 조용히 어긋나
+  PowerShell 로 돌릴 때만 일부 skill 이 배포되지 않았다. 매핑을 두 벌 두지 않는다.
+
+  happyeon 루트는 이 repo 위치에서 역산하므로(..\..) 경로를 하드코딩하지 않는다.
+
 .EXAMPLE
   .\scripts\sync-skills.ps1 -Check     # 차이만 보고, 쓰지 않음
   .\scripts\sync-skills.ps1            # 실제 배포
@@ -16,23 +22,15 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
-$RepoRoot   = Split-Path -Parent $PSScriptRoot
-$SkillsRoot = Join-Path $RepoRoot 'skills'
+$RepoRoot     = Split-Path -Parent $PSScriptRoot
+$SkillsRoot   = Join-Path $RepoRoot 'skills'
+$MapFile      = Join-Path $PSScriptRoot 'skill-targets.tsv'
+# .../99.Happyeon/pixel-platform -> .../  (bash 판과 동일한 역산)
+$HappyeonRoot = (Resolve-Path (Join-Path $RepoRoot '..\..')).Path
 
-# 프로젝트 경로 -> 배포할 skill 목록
-$Targets = [ordered]@{
-    'D:\happyeon\06.[CUSTOMER]\customer_mes'        = @('mes-analysis','customer-mes')
-    'D:\happyeon\04.[CUSTOMER]\customer'           = @('mes-analysis','customer-mes')
-    'D:\happyeon\02.[CUSTOMER]\customer'            = @('mes-analysis','customer-mes')
-    'D:\happyeon\07.[CUSTOMER]\[CUSTOMER]'               = @('mes-analysis','customer-mes')
-    'D:\happyeon\05.[CUSTOMER]\customer_erp'              = @('mes-analysis','customer-mes')
-    'D:\happyeon\01.[CUSTOMER]\customer_boot_v1'       = @('customer-mes')
-    'D:\happyeon\03.[CUSTOMER]\customer_web'         = @('customer-web')
-    'D:\happyeon\03.[CUSTOMER]\customer_inout_final' = @('customer-inout-pda')
-    'D:\happyeon\99.Happyeon\PixelFleet'       = @('pixelfleet')
-    'D:\happyeon\99.Happyeon\PixelFactory'     = @('pixelfactory')
-    # 이 repo 자신 — 플랫폼 작업 세션에서 자동 로드되는 것만
-    'D:\happyeon\99.Happyeon\pixel-platform'   = @('pixelfleet','pixelfactory')
+if (-not (Test-Path $MapFile)) {
+    Write-Host "[FAIL] 매핑 파일 없음: $MapFile" -ForegroundColor Red
+    exit 1
 }
 
 function Get-DirHash([string]$Path) {
@@ -48,18 +46,34 @@ function Get-DirHash([string]$Path) {
     return [BitConverter]::ToString($md5.ComputeHash($bytes)).Replace('-','')
 }
 
-$changed = 0; $ok = 0; $skipped = 0
+$changed = 0; $ok = 0; $skipped = 0; $missing = 0
 
-foreach ($proj in $Targets.Keys) {
+# TSV 를 한 줄씩 흘려 처리한다(bash 판과 동일). 형식: <99.Happyeon 상위 기준 상대경로>\t<skill,쉼표구분>
+foreach ($line in (Get-Content -LiteralPath $MapFile -Encoding UTF8)) {
+    $trimmed = $line.Trim()
+    if ($trimmed -eq '' -or $trimmed.StartsWith('#')) { continue }
+
+    $parts = $trimmed -split "`t", 2
+    if ($parts.Count -lt 2) {
+        Write-Host "[WARN] 탭 구분이 아님 — 건너뜀: $trimmed" -ForegroundColor DarkYellow
+        continue
+    }
+
+    $rel   = $parts[0].Trim()
+    $proj  = Join-Path $HappyeonRoot $rel
+    $names = $parts[1].Split(',') | ForEach-Object { $_.Trim() } | Where-Object { $_ -ne '' }
+
     if (-not (Test-Path $proj)) {
-        Write-Host "[SKIP] $proj  (폴더 없음)" -ForegroundColor DarkYellow
+        Write-Host "[SKIP] $rel  (폴더 없음)" -ForegroundColor DarkYellow
         $skipped++
         continue
     }
-    foreach ($name in $Targets[$proj]) {
+
+    foreach ($name in $names) {
         $src = Join-Path $SkillsRoot $name
         if (-not (Test-Path $src)) {
             Write-Host "[MISS] skills\$name  원본 없음 — 확인 필요" -ForegroundColor Red
+            $missing++
             continue
         }
         $dst = Join-Path $proj ".claude\skills\$name"
@@ -70,8 +84,8 @@ foreach ($proj in $Targets.Keys) {
         }
 
         $changed++
-        $state = if (Test-Path $dst) { 'DIFF' } else { 'NEW ' }
-        Write-Host "[$state] $name  ->  $proj" -ForegroundColor Cyan
+        if (Test-Path $dst) { $state = 'DIFF' } else { $state = 'NEW ' }
+        Write-Host "[$state] $name  ->  $rel" -ForegroundColor Cyan
         if (-not $Check) {
             $parent = Split-Path -Parent $dst
             if (-not (Test-Path $parent)) { New-Item -ItemType Directory -Path $parent -Force | Out-Null }
@@ -83,12 +97,14 @@ foreach ($proj in $Targets.Keys) {
 
 Write-Host ""
 if ($Check) {
-    if ($changed -eq 0) {
+    if ($changed -eq 0 -and $missing -eq 0) {
         Write-Host "동기화 상태 정상 — 일치 $ok, 스킵 $skipped" -ForegroundColor Green
     } else {
-        Write-Host "차이 $changed 건 (쓰지 않음). 반영하려면 -Check 없이 실행." -ForegroundColor Yellow
+        Write-Host "차이 $changed 건, 원본누락 $missing 건 (쓰지 않음). 반영하려면 -Check 없이 실행." -ForegroundColor Yellow
         exit 1
     }
 } else {
-    Write-Host "배포 완료 — 갱신 $changed, 이미일치 $ok, 스킵 $skipped" -ForegroundColor Green
+    Write-Host "배포 완료 — 갱신 $changed, 이미일치 $ok, 스킵 $skipped, 원본누락 $missing" -ForegroundColor Green
+    if ($missing -gt 0) { exit 1 }
 }
+exit 0
