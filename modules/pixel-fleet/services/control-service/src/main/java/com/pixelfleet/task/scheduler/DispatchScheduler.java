@@ -36,6 +36,10 @@ public class DispatchScheduler {
 
     @Scheduled(fixedDelayString = "${dispatch.interval-ms:2000}")
     public void dispatchPending() {
+        // 픽업에서 leg2를 기다리는 로봇들을 먼저 풀어 준다 — 이미 절반을 온 작업이
+        // 새 작업보다 우선이고, 구간을 빨리 비워 줘야 뒤차도 움직인다.
+        taskService.grantPendingSecondLegs();
+
         int assigned = 0;
         while (assigned < MAX_ASSIGNMENTS_PER_PASS) {
             TransportTask task = taskService.dispatchOnce();

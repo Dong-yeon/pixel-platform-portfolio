@@ -83,6 +83,8 @@ public class MqttMessageHandler {
         String event = json.path("event").asText();
         switch (event) {
             case "started" -> taskService.markStarted(taskCode);
+            // 픽업 도착 — 서버가 이때 두 번째 구간을 예약해 내준다(traffic 패키지 참고).
+            case "picked" -> taskService.markPickedUp(taskCode);
             case "completed" -> taskService.markCompleted(taskCode);
             case "failed" -> taskService.markFailed(taskCode, json.path("reason").asText("unknown"));
             default -> log.debug("Ignoring unsupported task event '{}' for {}", event, taskCode);

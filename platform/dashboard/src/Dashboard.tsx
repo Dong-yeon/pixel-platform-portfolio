@@ -122,7 +122,13 @@ export function Dashboard({ user, onLogout }: { user: AuthUser; onLogout: () => 
           />
         )}
         {tab === 'fleet' && (
-          <FleetView robots={robots} tasks={tasks} events={fleetEvents} onTaskChanged={loadTasks} />
+          <FleetView
+            robots={robots}
+            tasks={tasks}
+            equipments={equipments}
+            events={fleetEvents}
+            onTaskChanged={loadTasks}
+          />
         )}
       </main>
     </div>

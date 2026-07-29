@@ -21,6 +21,8 @@ public class VirtualRobot {
     private final Deque<double[]> path = new ArrayDeque<>();
     private String currentTaskCode;
     private boolean chargingIntent;
+    /** 픽업 지점을 지났는지. leg1 완료와 leg2 완료를 구분한다. */
+    private boolean pickedUp;
 
     public VirtualRobot(String code, String name, double x, double y) {
         this.code = code;
@@ -59,7 +61,42 @@ public class VirtualRobot {
         path.addAll(toDestination);
         this.currentTaskCode = taskCode;
         this.chargingIntent = false;
+        this.pickedUp = false;
         this.state = RobotState.MOVING;
+    }
+
+    /**
+     * 픽업까지(leg1)만 받는다. 하역까지의 경로(leg2)는 픽업 도착을 보고한 뒤 서버가 따로 준다.
+     *
+     * <p>이렇게 나누는 이유: 서버가 "현재 위치 → 픽업 → 하역"을 통째로 예약하면 픽업이 먼
+     * 로봇은 공장을 가로지르는 구간 전체를 한 번에 요구해 다른 로봇이 거의 못 움직인다.
+     */
+    public void assignFirstLeg(String taskCode, List<double[]> toPickup) {
+        path.clear();
+        path.addAll(toPickup);
+        this.currentTaskCode = taskCode;
+        this.chargingIntent = false;
+        this.pickedUp = false;
+        this.state = RobotState.MOVING;
+    }
+
+    /** 픽업에서 대기하던 로봇에게 하역까지의 경로를 이어 준다. */
+    public void appendSecondLeg(List<double[]> toDestination) {
+        path.addAll(toDestination);
+        this.state = RobotState.MOVING;
+    }
+
+    /** 픽업 지점에 도착해 leg2를 기다리는 중인지. */
+    public boolean isAwaitingSecondLeg() {
+        return currentTaskCode != null && pickedUp && path.isEmpty();
+    }
+
+    public void markPickedUp() {
+        this.pickedUp = true;
+    }
+
+    public boolean isPickedUp() {
+        return pickedUp;
     }
 
     public void startRoam(List<double[]> route) {
@@ -82,6 +119,7 @@ public class VirtualRobot {
         path.clear();
         this.currentTaskCode = null;
         this.chargingIntent = false;
+        this.pickedUp = false;
     }
 
     public void drain(double amount) {

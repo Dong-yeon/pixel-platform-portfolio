@@ -146,6 +146,13 @@ public class Simulator {
         }
         // Final arrival.
         if (robot.hasTask()) {
+            if (!robot.isPickedUp()) {
+                // leg1 완료 — 픽업 도착을 알리고 서버가 leg2 경로를 줄 때까지 기다린다.
+                // IDLE로 내리지 않는다(다른 작업이 배차되면 안 되므로). 경로만 빈 채 MOVING 유지.
+                robot.markPickedUp();
+                publishTask(robot, "picked", null);
+                return;
+            }
             publishTask(robot, "completed", null);
             robot.abortTask();
             setState(robot, RobotState.IDLE);
@@ -227,6 +234,17 @@ public class Simulator {
                 return;
             }
             String taskCode = json.path("taskCode").asText();
+
+            // 같은 작업의 두 번째 구간(leg2)이면 이어 붙인다 — 픽업에서 기다리던 로봇이 출발한다.
+            if (taskCode.equals(robot.getCurrentTaskCode()) && robot.isAwaitingSecondLeg()) {
+                List<double[]> leg2 = readWaypoints(json);
+                if (!leg2.isEmpty()) {
+                    robot.appendSecondLeg(leg2);
+                    log.info("Robot {} got second leg for {} ({} waypoints)", robotCode, taskCode, leg2.size());
+                }
+                return;
+            }
+
             // Accept unless the robot is already executing a task or charging. In particular a
             // roaming robot (MOVING with no task) must yield: roaming is cosmetic idle motion, and
             // rejecting the GOTO here would orphan the task the server already marked ASSIGNED.
@@ -246,7 +264,8 @@ public class Simulator {
                         nodeMap.route(robot.position(), origin),
                         nodeMap.route(origin, destination));
             } else {
-                robot.assignTask(taskCode, waypoints, List.of());
+                // 서버가 준 경로는 픽업까지(leg1)다. 하역까지는 픽업 도착 후 따로 받는다.
+                robot.assignFirstLeg(taskCode, waypoints);
             }
             publishStatus(robot);           // now MOVING
             publishTask(robot, "started", null);
