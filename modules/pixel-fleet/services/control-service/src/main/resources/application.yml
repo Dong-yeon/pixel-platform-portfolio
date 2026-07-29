@@ -27,8 +27,9 @@ springdoc:
     path: /v3/api-docs
 
 jwt:
-  # TODO: Move this value to an environment variable or Secret Manager outside local development.
-  secret: "pixel-fleet-local-jwt-secret-key-must-be-at-least-32-bytes"
+  # 플랫폼 단일 서명 키 — gateway / pixel-factory / pixel-fleet이 같은 값을 써야
+  # 한 번 로그인한 토큰이 플랫폼 전체에서 통한다(모듈별 키면 모듈마다 로그인해야 한다).
+  secret: ${PLATFORM_JWT_SECRET:pixel-platform-local-jwt-secret-key-must-be-at-least-32-bytes}
   access-token-expiration-minutes: 120
 
 mqtt:
@@ -104,7 +105,8 @@ spring:
     show-sql: false
 
 jwt:
-  secret: ${JWT_SECRET:pixel-fleet-dev-jwt-secret-key-must-be-at-least-32-bytes}
+  # 배포 환경에서는 gateway·factory·fleet 세 서비스에 같은 PLATFORM_JWT_SECRET을 넣는다.
+  secret: ${PLATFORM_JWT_SECRET:pixel-platform-dev-jwt-secret-key-must-be-at-least-32-bytes}
   access-token-expiration-minutes: ${JWT_ACCESS_TOKEN_EXPIRATION_MINUTES:120}
 
 mqtt:

@@ -4,27 +4,28 @@ import type {
 } from './types'
 
 // 모든 호출은 게이트웨이(9000)로 나가고, 접두사로 모듈이 정해진다.
+//   /api/auth/**     → 인증 담당 모듈 (플랫폼 로그인 창구)
 //   /api/factory/**  → pixel-factory
 //   /api/fleet/**    → pixel-fleet
+const AUTH = '/api/auth'
 const FACTORY = '/api/factory'
 const FLEET = '/api/fleet'
 
-// 모듈마다 자체 JWT를 발급한다(현재는 모듈이 각자 인증).
-// P6에서 게이트웨이 중앙 인증으로 바뀌면 토큰 하나로 합쳐진다.
-const TOKEN_KEYS = { factory: 'pp_token_factory', fleet: 'pp_token_fleet' } as const
-type Realm = keyof typeof TOKEN_KEYS
+// 게이트웨이 중앙 인증(P6) — 토큰 하나로 모든 모듈에 접근한다.
+// 모듈들이 같은 서명 키를 쓰므로 로그인은 한 번이면 되고, 게이트웨이가 관문에서 검증한다.
+const TOKEN_KEY = 'pp_token'
 
-export function getToken(realm: Realm): string | null {
-  return localStorage.getItem(TOKEN_KEYS[realm])
+export function getToken(): string | null {
+  return localStorage.getItem(TOKEN_KEY)
 }
 
-export function setToken(realm: Realm, token: string | null): void {
-  if (token) localStorage.setItem(TOKEN_KEYS[realm], token)
-  else localStorage.removeItem(TOKEN_KEYS[realm])
+export function setToken(token: string | null): void {
+  if (token) localStorage.setItem(TOKEN_KEY, token)
+  else localStorage.removeItem(TOKEN_KEY)
 }
 
 export function clearTokens(): void {
-  (Object.keys(TOKEN_KEYS) as Realm[]).forEach((r) => setToken(r, null))
+  setToken(null)
 }
 
 export class ApiError extends Error {
@@ -33,9 +34,8 @@ export class ApiError extends Error {
   }
 }
 
-async function request<T>(realm: Realm, path: string, options: RequestInit = {}): Promise<T> {
-  const base = realm === 'factory' ? FACTORY : FLEET
-  const token = getToken(realm)
+async function request<T>(base: string, path: string, options: RequestInit = {}): Promise<T> {
+  const token = getToken()
   const res = await fetch(base + path, {
     ...options,
     headers: {
@@ -46,7 +46,7 @@ async function request<T>(realm: Realm, path: string, options: RequestInit = {})
   })
   // 토큰 만료(JWT 2시간)면 모든 조회가 조용히 실패해 화면이 텅 빈 채로 남는다.
   // 사용자가 이유를 알 수 없으므로 토큰을 지우고 로그인 화면으로 되돌린다.
-  if (res.status === 401 && getToken(realm)) {
+  if (res.status === 401 && token) {
     clearTokens()
     window.location.reload()
   }
@@ -56,15 +56,6 @@ async function request<T>(realm: Realm, path: string, options: RequestInit = {})
     throw new ApiError(body?.error?.message ?? res.statusText, res.status)
   }
   return body.data as T
-}
-
-async function login(realm: Realm, username: string, password: string): Promise<AuthUser> {
-  const user = await request<AuthUser>(realm, '/auth/login', {
-    method: 'POST',
-    body: JSON.stringify({ username, password }),
-  })
-  setToken(realm, user.accessToken)
-  return user
 }
 
 /** factory 이벤트(createdAt)를 공통 타임라인 형태(occurredAt)로 맞춘다. */
@@ -79,31 +70,32 @@ function toTimeline(e: FactoryEventRaw): TimelineEvent {
 }
 
 export const api = {
-  /** 두 모듈에 각각 로그인한다. 데모 계정(admin/password)은 양쪽에 모두 존재한다. */
-  async loginAll(username: string, password: string): Promise<AuthUser> {
-    const [fleetUser] = await Promise.all([
-      login('fleet', username, password),
-      login('factory', username, password),
-    ])
-    return fleetUser
+  /** 플랫폼 로그인 — 한 번으로 모든 모듈에 통하는 토큰을 받는다. */
+  async login(username: string, password: string): Promise<AuthUser> {
+    const user = await request<AuthUser>(AUTH, '/login', {
+      method: 'POST',
+      body: JSON.stringify({ username, password }),
+    })
+    setToken(user.accessToken)
+    return user
   },
 
   fleet: {
-    robots: () => request<Robot[]>('fleet', '/robots'),
-    tasks: () => request<Task[]>('fleet', '/tasks'),
-    events: () => request<FleetEvent[]>('fleet', '/events'),
+    robots: () => request<Robot[]>(FLEET, '/robots'),
+    tasks: () => request<Task[]>(FLEET, '/tasks'),
+    events: () => request<FleetEvent[]>(FLEET, '/events'),
     createTask: (input: {
       taskCode: string; originNode: string; destinationNode: string; priority: TaskPriority
-    }) => request<Task>('fleet', '/tasks', { method: 'POST', body: JSON.stringify(input) }),
+    }) => request<Task>(FLEET, '/tasks', { method: 'POST', body: JSON.stringify(input) }),
   },
 
   factory: {
-    equipments: () => request<Equipment[]>('factory', '/equipments'),
-    lines: () => request<ProductionLine[]>('factory', '/lines'),
-    workOrders: () => request<WorkOrder[]>('factory', '/work-orders'),
+    equipments: () => request<Equipment[]>(FACTORY, '/equipments'),
+    lines: () => request<ProductionLine[]>(FACTORY, '/lines'),
+    workOrders: () => request<WorkOrder[]>(FACTORY, '/work-orders'),
     events: async (): Promise<TimelineEvent[]> =>
-      (await request<FactoryEventRaw[]>('factory', '/events/recent')).map(toTimeline),
+      (await request<FactoryEventRaw[]>(FACTORY, '/events/recent')).map(toTimeline),
     startWorkOrder: (id: number) =>
-      request<WorkOrder>('factory', `/work-orders/${id}/start`, { method: 'PATCH' }),
+      request<WorkOrder>(FACTORY, `/work-orders/${id}/start`, { method: 'PATCH' }),
   },
 }

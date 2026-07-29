@@ -12,10 +12,8 @@ function loadUser(): AuthUser | null {
 }
 
 export function App() {
-  // 두 모듈 토큰이 모두 있어야 로그인 상태로 본다(하나만 남았으면 다시 로그인).
-  const [user, setUser] = useState<AuthUser | null>(() =>
-    getToken('fleet') && getToken('factory') ? loadUser() : null,
-  )
+  // 플랫폼 토큰 하나 — 게이트웨이가 모든 모듈 앞에서 이 토큰을 검증한다.
+  const [user, setUser] = useState<AuthUser | null>(() => (getToken() ? loadUser() : null))
 
   function handleLogin(authUser: AuthUser) {
     localStorage.setItem(USER_KEY, JSON.stringify(authUser))

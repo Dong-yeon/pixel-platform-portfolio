@@ -73,12 +73,28 @@ curl http://localhost:9000/api/factory/health   # → :9001
 curl http://localhost:9000/api/fleet/health     # → :9002
 ```
 
+## 인증
+
+**로그인 한 번, 토큰 하나.** `/api/auth/login`으로 받은 토큰이 모든 모듈에서 통하고,
+게이트웨이가 모듈 앞에서 관문 역할을 한다 — 미인증 요청은 모듈에 닿지 않는다.
+발급은 모듈(사용자 저장소를 가진 쪽), 검증은 게이트웨이가 맡는다.
+구조와 함정은 [platform/gateway/README.md](platform/gateway/README.md).
+
+```bash
+TOKEN=$(curl -s -X POST http://localhost:9000/api/auth/login \
+  -H 'Content-Type: application/json' \
+  -d '{"username":"admin","password":"password"}' | jq -r .data.accessToken)
+curl -H "Authorization: Bearer $TOKEN" http://localhost:9000/api/fleet/robots
+```
+
+게이트웨이·factory·fleet은 **같은 `PLATFORM_JWT_SECRET`**을 써야 한다(로컬은 기본값 공유).
+
 ## 원칙
 
 1. **모노레포 ≠ 모놀리스.** 각 모듈은 자체 빌드·DB·포트·배포 단위를 갖는 독립 서비스다.
 2. **컴포저블.** 모듈 간 코드/DB 직접 참조 금지. 게이트웨이·REST·MQTT 계약으로만 통신한다.
 3. **DB per module.** 모듈마다 own 스키마. 공유가 필요하면 계약(이벤트/REST)으로 푼다.
-4. **게이트웨이가 단일 진입점.** 대시보드·외부는 게이트웨이만 바라본다.
+4. **게이트웨이가 단일 진입점.** 대시보드·외부는 게이트웨이만 바라본다. 인증도 여기서 막는다.
 5. **이벤트가 단일 진실 공급원.** 각 모듈의 상태 변화는 이벤트로 기록되고 지표는 거기서 파생된다.
 
 ## 모듈별 문서

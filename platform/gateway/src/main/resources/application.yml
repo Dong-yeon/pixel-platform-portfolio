@@ -12,6 +12,14 @@ spring:
       # 모듈은 자기 경로(/api/robots …)만 알고, 플랫폼 접두사(/api/fleet/…)는 모른다.
       # 따라서 게이트웨이가 접두사를 떼고 전달한다(RewritePath).
       routes:
+        # 플랫폼 인증 창구. 로그인은 여기 하나뿐이고, 발급된 토큰은 모든 모듈에서 통한다
+        # (서명 키를 공유하므로). 게이트웨이는 사용자 저장소가 없어 발급을 못 하므로
+        # 신원 담당 모듈에 위임한다 — 어느 모듈이 담당인지는 설정으로 드러낸다.
+        - id: platform-auth
+          uri: ${AUTH_MODULE_URI:http://localhost:9001}
+          predicates:
+            - Path=/api/auth/**
+
         - id: pixel-factory
           uri: ${MODULE_FACTORY_URI:http://localhost:9001}
           predicates:
@@ -43,6 +51,11 @@ spring:
             allowedMethods: "*"
             allowedHeaders: "*"
             allowCredentials: true
+
+# 플랫폼 단일 서명 키 — gateway / pixel-factory / pixel-fleet이 **같은 값**을 써야 한다.
+# 하나라도 다르면 게이트웨이가 통과시킨 토큰을 모듈이 거부해 전 화면이 401이 된다.
+jwt:
+  secret: ${PLATFORM_JWT_SECRET:pixel-platform-local-jwt-secret-key-must-be-at-least-32-bytes}
 
 server:
   port: ${PORT:9000}

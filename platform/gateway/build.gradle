@@ -29,8 +29,14 @@ ext {
 dependencies {
     // Gateway는 WebFlux(리액티브) 기반이다. spring-boot-starter-web(서블릿)을 넣으면
     // 서블릿 스택으로 뜨면서 게이트웨이가 동작하지 않으니 추가하지 말 것.
+    // 같은 이유로 `shared`(공통 코어)도 의존할 수 없다 — starter-web을 api로 노출한다.
+    // 그래서 토큰 검증에 필요한 만큼만 jjwt를 직접 가져온다(서명 키는 모듈과 공유).
     implementation 'org.springframework.cloud:spring-cloud-starter-gateway'
     implementation 'org.springframework.boot:spring-boot-starter-actuator'
+
+    implementation 'io.jsonwebtoken:jjwt-api:0.12.6'
+    runtimeOnly 'io.jsonwebtoken:jjwt-impl:0.12.6'
+    runtimeOnly 'io.jsonwebtoken:jjwt-jackson:0.12.6'
 
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'

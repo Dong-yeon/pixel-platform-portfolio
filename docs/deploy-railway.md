@@ -87,7 +87,7 @@ SPRING_DATASOURCE_USERNAME=${{Postgres.PGUSER}}
 SPRING_DATASOURCE_PASSWORD=${{Postgres.PGPASSWORD}}
 MQTT_BROKER_URL=tcp://mosquitto.railway.internal:1883
 MQTT_CLIENT_ID=oee-service
-JWT_SECRET=<32바이트 이상 랜덤 문자열>
+PLATFORM_JWT_SECRET=<32바이트 이상 랜덤 문자열>   ← 세 서비스가 같은 값
 ```
 
 ### 2-3. pixel-fleet (프라이빗)
@@ -108,7 +108,7 @@ SPRING_DATASOURCE_PASSWORD=<1단계에서 정한 비밀번호>
 REDIS_URL=${{Redis.REDIS_URL}}
 MQTT_BROKER_URL=tcp://mosquitto.railway.internal:1883
 MQTT_CLIENT_ID=control-service
-JWT_SECRET=<32바이트 이상 랜덤 문자열>
+PLATFORM_JWT_SECRET=<32바이트 이상 랜덤 문자열>   ← 세 서비스가 같은 값
 DISPATCH_ENABLED=true
 ```
 
@@ -156,9 +156,11 @@ Root Directory가 `platform`인 이유: 이미지 빌드에 `dashboard/`와 `gat
 
 ```
 SERVER_ADDRESS=::
+AUTH_MODULE_URI=http://pixel-factory.railway.internal:9001
 MODULE_FACTORY_URI=http://pixel-factory.railway.internal:9001
 MODULE_FLEET_URI=http://pixel-fleet.railway.internal:9002
 MODULE_FLEET_WS_URI=http://pixel-fleet.railway.internal:9002
+PLATFORM_JWT_SECRET=<32바이트 이상 랜덤 문자열>   ← 세 서비스가 같은 값
 ```
 
 > **포트는 참조하지 말고 고정한다.** `${{pixel-factory.PORT}}` 같은 참조는 **빈 값으로
@@ -196,8 +198,13 @@ Mosquitto도 같은 이유로 배포용 설정(`mosquitto.railway.conf`)에서 b
 **4. 이벤트 테이블 증가** — `fleet_events`/`factory_events`는 계속 쌓인다. 시뮬레이터를
 오래 켜 두면 DB 사용량이 늘어난다. 보존 정책을 넣기 전까지는 필요할 때만 켜는 것을 권한다.
 
-**5. JWT_SECRET** — 모듈마다 자체 검증이므로 지금은 서로 달라도 되지만, P6에서 게이트웨이
-중앙 인증으로 바꾸면 **같은 값**을 공유해야 한다.
+**5. PLATFORM_JWT_SECRET은 세 서비스에 같은 값** — gateway·pixel-factory·pixel-fleet이
+같은 키로 서명·검증한다. 하나라도 다르면 로그인은 되는데 이후 모든 조회가 **401**이 되고,
+대시보드는 로그인 화면으로 되튕긴다(증상이 "로그인이 안 된다"로 보여 원인을 찾기 어렵다).
+P6 이전의 `JWT_SECRET`을 쓰고 있었다면 변수명을 바꾸고 값을 통일해야 한다.
+
+**6. `/ws/**`는 아직 인증 없이 열려 있다** — SockJS 핸드셰이크에 Authorization 헤더를
+실을 수 없어서다. 퍼블릭 도메인에서는 누구나 실시간 스트림을 구독할 수 있다(읽기 전용).
 
 ## 비용 감각
 

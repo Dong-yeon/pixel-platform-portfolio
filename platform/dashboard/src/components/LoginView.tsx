@@ -13,7 +13,7 @@ export function LoginView({ onLogin }: { onLogin: (user: AuthUser) => void }) {
     setBusy(true)
     setError(null)
     try {
-      onLogin(await api.loginAll(username, password))
+      onLogin(await api.login(username, password))
     } catch (err) {
       setError(err instanceof Error ? err.message : '로그인 실패')
     } finally {

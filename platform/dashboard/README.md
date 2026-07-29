@@ -39,11 +39,14 @@ npm run typecheck
 | `src/components/fleet/*` | 지도·로봇·작업 패널 (pixel-fleet/web에서 흡수) |
 | `src/components/EventTimeline.tsx` | 두 모듈 공용 타임라인 |
 
-## 인증 (임시)
+## 인증
 
-모듈이 각자 JWT를 발급하므로 로그인 시 **두 모듈에 각각 인증**하고 토큰 2개를 보관한다
-(`pp_token_factory`, `pp_token_fleet`). 데모 계정은 양쪽에 모두 존재한다.
-**P6에서 게이트웨이 중앙 인증으로 바뀌면 토큰 하나로 합쳐진다.**
+**로그인 한 번, 토큰 하나**(`pp_token`). `/api/auth/login`으로 받은 토큰이 모든 모듈에서
+통한다 — 게이트웨이가 모듈 앞에서 이 토큰을 검증하고, 모듈들이 같은 서명 키를 쓴다.
+자세한 구조는 `platform/gateway/README.md` 참고.
+
+401이 오면 토큰을 지우고 로그인 화면으로 되돌린다. 그러지 않으면 토큰 만료(2시간) 시
+모든 조회가 조용히 실패해 화면이 텅 빈 채로 남는다.
 
 ## 알려진 제약
 
