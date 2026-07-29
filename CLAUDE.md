@@ -1,7 +1,7 @@
 # pixel-platform
 
 PixelFactory(OEE) + PixelFleet(AMR)을 게이트웨이 + 통합 대시보드 아래 묶은 **모노레포**.
-포트: gateway **9000** · factory 9001 · fleet 9002 · dashboard(dev) 9100.
+포트: gateway **9000** · factory 9001 · fleet 9002 · dashboard(dev) 9200.
 
 로드맵·단계별 계획: `docs/` 재구성 계획서.
 

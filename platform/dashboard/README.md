@@ -1,4 +1,4 @@
-# dashboard — 통합 관제 대시보드 (:9100)
+# dashboard — 통합 관제 대시보드 (:9200)
 
 React + TypeScript + Vite. **게이트웨이(9000)만 바라본다** — 모듈(9001/9002)에 직접 붙지 않는다.
 
@@ -16,7 +16,7 @@ React + TypeScript + Vite. **게이트웨이(9000)만 바라본다** — 모듈(
 
 ```bash
 npm install
-npm run dev        # http://localhost:9100
+npm run dev        # http://localhost:9200
 ```
 
 dev 서버가 `/api`·`/ws`를 게이트웨이(9000)로 프록시하므로 브라우저에는 단일 오리진으로 보인다.

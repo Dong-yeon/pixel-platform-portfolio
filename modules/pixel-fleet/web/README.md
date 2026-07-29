@@ -19,7 +19,7 @@ React + TypeScript + Vite. 관제 서버(control-service)와 **REST + STOMP/WebS
 ```bash
 cd web
 npm install
-npm run dev        # http://localhost:9100
+npm run dev        # http://localhost:9200
 ```
 
 Vite dev 서버가 `/api`·`/ws`를 :9002로 프록시하므로 CORS 설정이 필요 없다.

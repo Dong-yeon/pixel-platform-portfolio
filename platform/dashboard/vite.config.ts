@@ -7,7 +7,7 @@ export default defineConfig({
   plugins: [react()],
   define: { global: 'globalThis' }, // sockjs-client가 `global`을 참조한다
   server: {
-    port: 9100,
+    port: 9200,
     proxy: {
       '/api': 'http://localhost:9000',
       '/ws': { target: 'http://localhost:9000', ws: true },

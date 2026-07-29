@@ -29,7 +29,7 @@ pixel-platform/                     (레포 1개 · GitHub: Dong-yeon/pixel-plat
 └── .gitignore
 ```
 
-포트: gateway **9000** · factory **9001** · fleet **9002** · dashboard(dev) **9100**(prod는 게이트웨이가 서빙).
+포트: gateway **9000** · factory **9001** · fleet **9002** · dashboard(dev) **9200**(prod는 게이트웨이가 서빙).
 
 ---
 

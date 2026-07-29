@@ -45,7 +45,7 @@ Happyeon SmartFactory Pixel Project — 여러 제조 도메인 모듈을 **API 
 | 9000 | API Gateway |
 | 9001 | pixel-factory |
 | 9002 | pixel-fleet |
-| 9100 | 통합 대시보드 (dev) |
+| 9200 | 통합 대시보드 (dev) |
 | 5432 / 1883 / 6379 | Postgres / Mosquitto / Redis |
 
 새 모듈은 9003(vision), 9004(quality) … 순으로 이어간다.
@@ -63,7 +63,7 @@ cd modules\pixel-fleet\robot-sim                  ; .\gradlew.bat bootRun
 ```
 
 ```bash
-cd platform/dashboard && npm install && npm run dev   # http://localhost:9100
+cd platform/dashboard && npm install && npm run dev   # http://localhost:9200
 ```
 
 게이트웨이가 뜨면 모든 호출은 9000으로 한다. 대시보드도 9000만 바라본다.

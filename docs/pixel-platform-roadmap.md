@@ -505,5 +505,5 @@ P11은 P8~P10과 독립이므로 병행 가능하다. **P12는 반드시 P13·P1
 | 9002 | pixel-fleet (로봇관제) |
 | 9003 | pixel-wms (WMS) |
 | 9004 | pixel-qms (QMS) |
-| 9100 | 통합 대시보드 (dev) |
+| 9200 | 통합 대시보드 (dev) |
 | 5432 / 1883 / 6379 | Postgres / Mosquitto / Redis |

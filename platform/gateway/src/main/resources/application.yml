@@ -35,7 +35,7 @@ spring:
           predicates:
             - Path=/ws/**
 
-      # 대시보드(9100)는 다른 오리진이므로 게이트웨이에서 CORS를 한 곳에 모아 처리한다.
+      # 대시보드(9200)는 다른 오리진이므로 게이트웨이에서 CORS를 한 곳에 모아 처리한다.
       globalcors:
         cors-configurations:
           '[/**]':
