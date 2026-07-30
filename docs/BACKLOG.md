@@ -26,19 +26,36 @@
 3. **설비와 노드의 관계 정의** — STATION-A가 곧 CNC-01이 있는 자리인지, 인접한 적재
    지점인지. 서사를 정하면 좌표 배치가 자연스러워진다.
 
-> **(b)로 1차 구현 완료** — `platform/dashboard/src/components/UnifiedMap.tsx`,
-> 좌표는 `types.ts`의 `EQUIPMENT_POSITIONS`. 남은 것은 (a) 정식화:
-> `equipments`에 `pos_x`/`pos_y`를 추가하고 서버가 내려주도록 바꾸면 설비를 늘려도
-> 대시보드를 고칠 필요가 없어진다. 지금은 설비를 추가하면 좌표 매핑도 함께 넣어야 한다.
+> **(a) 정식화까지 완료 (P11).** `equipments.pos_x/pos_y` + `layout_nodes` + `layout_settings`.
+> 설비를 늘리거나 옮겨도 대시보드를 고칠 필요가 없다(실측: DB에서 좌표만 바꿔 지도가 이동).
 
-## 좌표 정의 단일화
+## 좌표 정의 단일화 ✅ 완료 (P11)
 
-노드 좌표가 세 곳에 중복돼 있어 반드시 함께 고쳐야 한다.
-- `modules/pixel-fleet/services/control-service/.../location/LocationRegistry.java`
-- `modules/pixel-fleet/robot-sim/.../map/NodeMap.java`
-- `platform/dashboard/src/types.ts`
+**pixel-factory가 평면도 마스터를 소유한다.** 평면도는 공장의 것이지 물류만의 것이 아니고,
+설비·하역 지점·(P12의) POP 단말이 모두 같은 바닥 위에 있다.
 
-서버가 소유하고 API로 내려주거나(모듈 공용 계약), `shared/`로 올리는 방안.
+| 소비처 | 방식 |
+|---|---|
+| 대시보드 | `GET /api/factory/layout` + 설비 좌표는 `Equipment`에 실려 온다. **하드코딩 좌표 0** |
+| control-service `LocationRegistry` | 기동 시 + 5분 주기로 factory에서 받아 캐시. 실패 시 하드코딩 폴백 + WARN |
+| robot-sim `NodeMap` | **그대로 둔다.** 시뮬레이터는 물리 세계를 흉내내는 쪽이라 서버가 알려주는 대로 위치를 바꾸면 안 되고, 서버가 죽어도 돌아야 한다. 대신 `NodeMapLayoutConsistencyTest`가 마이그레이션 SQL과 대조해 **어긋나면 빌드를 깨뜨린다**(좌표 하나를 틀리게 만들어 실제로 실패하는지 확인했다) |
+
+### 남은 것 — `LaneGraph`의 통로 y·연결로 x
+
+`traffic/LaneGraph`는 통로 y와 세로 연결로 x를 `static final`로 갖고 있고, 그 값으로 구간
+이름(`AU:11-18` 등)까지 만든다. 동적으로 바꾸려면 교통 통제 전체를 건드려야 해서 P11 범위에
+넣지 않았다. 대신 `LocationRegistry`가 서버 평면도를 받을 때 **통로 y가 다르면 ERROR 로그**를
+남긴다 — 조용히 어긋나면 그린 선과 실제 주행이 갈리고 구간 점유가 엉킨다.
+
+연결로 x는 아직 어디에도 마스터가 없다(레인망은 factory가 모르는 물류 개념이다).
+fleet이 소유하는 게 맞을 수 있는데, 그러면 "평면도는 factory 것"과 경계가 미묘해진다 — 결정 필요.
+
+### 서비스 간 인증(M2M)
+
+`GET /api/layout`은 **인증 없이 열려 있다.** 평면도는 민감정보가 아니고(설비 위치·하역 좌표뿐),
+fleet이 기동 시 읽어야 하는데 서비스 간 인증이 없어 토큰을 받을 방법이 없다. 그래서 fleet은
+게이트웨이를 경유하지 않고 모듈에 직접 붙는다. M2M 인증이 생기면 이 엔드포인트를 닫고
+서비스 토큰으로 게이트웨이를 경유하게 바꾼다.
 
 
 ## AMR 교통정리 ✅ 구현 완료 (전체 경로 예약 방식)

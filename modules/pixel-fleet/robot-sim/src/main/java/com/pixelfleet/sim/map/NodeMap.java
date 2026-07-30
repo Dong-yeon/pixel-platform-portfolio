@@ -17,14 +17,21 @@ import org.springframework.stereotype.Component;
  *   [ASM-01][ASM-02][INS-01][PKG-01]      ← LINE-2 설비
  * </pre>
  *
- * 좌표는 control-service의 LocationRegistry, 대시보드 types.ts와 반드시 일치해야 한다
- * (단일화는 플랫폼 BACKLOG 항목).
+ * <p><b>좌표의 주인은 pixel-factory다</b>(layout_nodes / layout_settings). 여기는 그 값을
+ * 받아 오지 않고 자기 복사본을 갖는다 — 시뮬레이터는 물리 세계를 흉내내는 쪽이라 실제 설비처럼
+ * 서버가 알려주는 대로 위치를 바꾸지 않아야 하고, 서버가 죽어도 계속 돌아야 한다.
+ *
+ * <p>대신 {@code NodeMapLayoutConsistencyTest}가 서버 마스터(V7 마이그레이션)와 대조해
+ * <b>어긋나면 빌드를 깨뜨린다.</b> 런타임 의존을 만들지 않으면서 조용한 불일치를 막는 방법이다.
+ * 좌표를 바꿀 일이 있으면 마스터를 고치고 여기를 맞춘다(순서가 반대면 테스트가 잡아 준다).
  */
 @Component
 public class NodeMap {
 
-    private static final double MAX_X = 44.0;
-    private static final double MAX_Y = 24.0;
+    /** 평면도 가로. 서버 마스터(layout_settings.width)와 같아야 한다 — 대조 테스트가 확인한다. */
+    public static final double MAX_X = 44.0;
+    /** 평면도 세로. 서버 마스터(layout_settings.height)와 같아야 한다. */
+    public static final double MAX_Y = 24.0;
 
     private static final Map<String, double[]> NODES = Map.ofEntries(
             Map.entry("DOCK-1", new double[]{3, 3}),
@@ -48,6 +55,11 @@ public class NodeMap {
             "WAREHOUSE", "SHIPPING",
             "STATION-A1", "STATION-A2", "STATION-A3", "STATION-A4",
             "STATION-B1", "STATION-B2", "STATION-B3", "STATION-B4");
+
+    /** 이 시뮬레이터가 아는 노드 코드들. 서버 마스터와 대조하는 테스트가 쓴다. */
+    public java.util.Set<String> knownNodeCodes() {
+        return NODES.keySet();
+    }
 
     public double[] resolve(String node) {
         double[] known = NODES.get(node);

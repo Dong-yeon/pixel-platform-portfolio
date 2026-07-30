@@ -40,6 +40,16 @@ mqtt:
   client-id: ${MQTT_CLIENT_ID:control-service}
   topic-filter: "fleet/#"
 
+layout:
+  # 공장 평면도는 pixel-factory 가 소유한다. 여기서 받아 캐시하고, 못 받으면
+  # LocationRegistry 의 하드코딩 폴백으로 동작한다(WARN 남김).
+  #
+  # **게이트웨이를 경유하지 않고 모듈에 직접 붙는다** — 게이트웨이는 인증을 요구하는데
+  # 서비스 간 인증(M2M)이 아직 없다. factory 가 이 엔드포인트만 열어 두었다.
+  url: ${LAYOUT_URL:http://localhost:9001/api/layout}
+  # 노드는 자주 안 바뀐다. 기동 시 실패한 경우의 복구도 이 주기가 겸한다.
+  refresh-interval-ms: ${LAYOUT_REFRESH_INTERVAL_MS:300000}
+
 demo:
   task-generator:
     # 데모용 운송 작업 자동 생성. 교통 통제 도입으로 로봇 자율 순찰을 껐기 때문에,

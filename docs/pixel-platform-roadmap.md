@@ -38,7 +38,7 @@
 | D4 | **설비별 기간 조회 인덱스 없음** | ✅ **해결** | P8 `V4`에서 `idx_factory_events_target_type_time`(target_type, target_id, event_type, occurred_at desc) + `idx_factory_events_occurred_at` | — |
 | D5 | **계획가동시간 정의 불가** | ✅ **해결** | P9: `shift_calendars`(휴식 시각 포함) + `EquipmentStatus`에 SETUP·PLANNED_STOP 추가. 계획/실가동 판정은 enum 메서드로 | — |
 | D6 | **표준CT가 설비 고정값** | ❌ | `equipments.ideal_cycle_time_ms`. `items`/`processes` 테이블 없음, `WorkOrder.itemId`는 FK 없는 raw bigint | 품종 전환 시 Performance 왜곡 |
-| D7 | **좌표계 3중 하드코딩** | ❌ | `LocationRegistry.java` / robot-sim `NodeMap` / dashboard `types.ts` | 모듈 추가할수록 배수로 증가 |
+| D7 | **좌표계 3중 하드코딩** | ✅ **해결** | P11: factory가 `layout_nodes`·`layout_settings`·`equipments.pos_*` 마스터를 소유. 대시보드는 API로만, fleet은 받아 캐시(폴백+WARN), robot-sim은 대조 테스트로 검증 | 부분 잔존(LaneGraph 통로·연결로) |
 | D8 | **MQTT 유실 설계** | ✅ **해결** | P8: 브로커 `persistence true` + `max_queued_messages 100000`, 구독자 `cleanSession=false`(factory·fleet). **유한 버퍼** — 약 7시간치 | 부분 잔존(장기 장애) |
 | D9 | **LWT / retained 미사용** | ✅ **해결** | P8: 설비별 접속 + 자기 status 토픽에 LWT, status만 retained(cycle은 금지) | — |
 | D10 | **모듈별 개별 인증 (P6 미완)** | ✅ **해결** | P6에서 게이트웨이 중앙 인증. 토큰 1개(`pp_token`), `loginAll()` 제거 | — |
@@ -366,9 +366,46 @@
 
 ### 완료 기준
 
-- [ ] `types.ts`에 좌표 상수가 남아 있지 않다
-- [ ] layout API 응답만 바꿔서 설비 위치를 옮길 수 있다 (프론트 재빌드 없이)
-- [ ] robot-sim ↔ 서버 좌표 불일치 시 테스트가 실패한다
+- [x] `types.ts`에 좌표 상수가 남아 있지 않다 — `MAP_W/H`·`NODES`·`EQUIPMENT_POSITIONS`·
+      통로 y 전부 제거. 남은 건 타입 정의와 `routePoints(layout, …)`(규칙은 코드, 값은 서버)
+- [x] layout API 응답만 바꿔서 설비 위치를 옮길 수 있다 (프론트 재빌드 없이) —
+      DB에서 `CNC-01.pos_x` 11→6 만 바꾸고 지도가 x=6 으로 이동하는 것을 확인(프론트 무변경)
+- [x] robot-sim ↔ 서버 좌표 불일치 시 테스트가 실패한다 —
+      `STATION-A2`를 18→19 로 틀리게 만들어 **빌드가 실제로 깨지는지** 확인.
+      실패 메시지가 어느 노드가 어떻게 다른지 지목한다(`서버 마스터=[18.0, 5.5], robot-sim=[19.0, 5.5]`)
+
+### 소유권 결정 — factory가 평면도를 소유한다
+
+평면도는 공장의 것이지 물류만의 것이 아니다. 설비·하역 지점·(P12의) POP 단말이 모두 같은
+바닥 위에 있다. 그래서 `layout_nodes`·`layout_settings`·`equipments.pos_*`를 factory가 갖고,
+소비처는 각자 다르게 붙는다.
+
+| 소비처 | 방식 | 왜 |
+|---|---|---|
+| 대시보드 | API로만 (`GET /api/factory/layout` + 설비 좌표는 `Equipment`에 실려 온다) | 화면은 서버를 따라야 한다 |
+| control-service | 기동 시 + 5분 주기로 받아 캐시, 실패 시 폴백 + WARN | factory가 죽어도 배차는 계속돼야 한다 |
+| robot-sim | **받지 않는다.** 자기 좌표를 갖고 대조 테스트로 검증 | 시뮬레이터는 물리 세계를 흉내내는 쪽이다 — 실제 설비는 서버가 알려주는 대로 위치를 바꾸지 않는다 |
+
+설비 좌표를 layout 응답이 아니라 `EquipmentResponse`에 실은 이유: 설비는 이미 실시간 채널로
+흐르므로 위치를 바꿔도 **같은 경로로 함께** 갱신된다. 대시보드가 두 출처를 조합할 필요가 없다.
+
+### 남은 것 — `LaneGraph`의 통로 y·연결로 x
+
+`traffic/LaneGraph`는 통로 y와 연결로 x를 `static final`로 갖고 그 값으로 구간 이름까지 만든다.
+동적으로 바꾸려면 교통 통제 전체를 건드려야 해서 범위에 넣지 않았다. 대신 `LocationRegistry`가
+서버 평면도를 받을 때 **통로 y가 다르면 ERROR 로그**를 남긴다 — 조용히 어긋나면 그린 선과 실제
+주행이 갈리고 구간 점유가 엉킨다. 연결로 x는 아직 마스터가 없다(레인망은 factory가 모르는
+물류 개념이라 fleet이 소유하는 게 맞을 수 있는데, 그러면 소유권 경계가 미묘해진다 — 결정 필요).
+
+### 검증 중 걸린 것 — `numeric` vs `Double`
+
+마이그레이션을 `numeric(6,2)`로 쓰고 엔티티는 `Double`로 뒀더니 `ddl-auto: validate`가
+기동을 막았다(`found [numeric], but expecting [float(53)]`). 좌표는 기하값이라
+`double precision`이 맞다. `posX`→`posx` 함정과 같은 계열 — **스키마와 엔티티가 정확히
+같아야 하고, 어긋나면 컴파일이 아니라 기동에서 터진다.**
+
+> 마이그레이션을 고친 뒤 **jar를 다시 빌드**해야 한다. SQL은 jar 안의 리소스라서, 파일만
+> 고치고 재기동하면 예전 SQL이 그대로 돈다(한 번 헛돌았다).
 
 ---
 

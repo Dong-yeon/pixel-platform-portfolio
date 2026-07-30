@@ -1,5 +1,5 @@
 import type {
-  AuthUser, Equipment, EquipmentOee, FleetEvent, ProductionLine,
+  AuthUser, Equipment, EquipmentOee, FleetEvent, Layout, ProductionLine,
   Robot, Task, TaskPriority, TimelineEvent, WorkOrder,
 } from './types'
 
@@ -88,5 +88,7 @@ export const api = {
       request<WorkOrder>(FACTORY, `/work-orders/${id}/start`, { method: 'PATCH' }),
     /** 현재 교대 기준 전 설비 OEE. 이후 갱신은 WebSocket(/topic/factory/oee)이 밀어 준다. */
     oeeCurrent: () => request<EquipmentOee[]>(FACTORY, '/oee/current'),
+    /** 공장 평면도 — 좌표의 단일 출처. 대시보드는 좌표를 하드코딩하지 않는다. */
+    layout: () => request<Layout>(FACTORY, '/layout'),
   },
 }

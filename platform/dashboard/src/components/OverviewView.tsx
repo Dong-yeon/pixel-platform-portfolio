@@ -1,5 +1,5 @@
 import type {
-  Equipment, EquipmentOee, ModuleKey, Robot, Task, TimelineEvent, WorkOrder,
+  Equipment, EquipmentOee, Layout, ModuleKey, Robot, Task, TimelineEvent, WorkOrder,
 } from '../types'
 import { EventTimeline } from './EventTimeline'
 import { UnifiedMap } from './UnifiedMap'
@@ -19,6 +19,7 @@ function Stat({ label, value, sub, tone }: { label: string; value: string; sub?:
  * 이벤트 타임라인은 factory·fleet을 시간순으로 합쳐 보여준다.
  */
 export function OverviewView({
+  layout,
   equipments,
   workOrders,
   oee,
@@ -28,6 +29,7 @@ export function OverviewView({
   fleetEvents,
   onGo,
 }: {
+  layout: Layout | null
   equipments: Equipment[]
   workOrders: WorkOrder[]
   oee: EquipmentOee[]
@@ -99,7 +101,7 @@ export function OverviewView({
             {activeRoutes > 0 && ` · 운송 중 ${activeRoutes}`}
           </span>
         </div>
-        <UnifiedMap equipments={equipments} robots={robots} tasks={tasks} />
+        <UnifiedMap layout={layout} equipments={equipments} robots={robots} tasks={tasks} />
         <div className="umap-legend">
           <span><i className="lg-swatch" style={{ background: '#27ae60' }} />설비 가동</span>
           <span><i className="lg-swatch" style={{ background: '#9aa5b4' }} />대기</span>

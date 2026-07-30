@@ -5,7 +5,7 @@ import { FleetView } from './components/fleet/FleetView'
 import { OverviewView } from './components/OverviewView'
 import { usePlatformSocket } from './usePlatformSocket'
 import type {
-  AuthUser, Equipment, EquipmentOee, FleetEvent, ModuleKey, ProductionLine,
+  AuthUser, Equipment, EquipmentOee, FleetEvent, Layout, ModuleKey, ProductionLine,
   Robot, Task, TimelineEvent, WorkOrder,
 } from './types'
 
@@ -29,6 +29,8 @@ export function Dashboard({ user, onLogout }: { user: AuthUser; onLogout: () => 
   const [workOrders, setWorkOrders] = useState<WorkOrder[]>([])
   const [factoryEvents, setFactoryEvents] = useState<TimelineEvent[]>([])
   const [oee, setOee] = useState<EquipmentOee[]>([])
+  // 평면도 — 좌표의 단일 출처. 못 받으면 지도를 그릴 좌표계가 없다.
+  const [layout, setLayout] = useState<Layout | null>(null)
 
   const taskTimer = useRef<number | undefined>(undefined)
   const workOrderTimer = useRef<number | undefined>(undefined)
@@ -59,6 +61,7 @@ export function Dashboard({ user, onLogout }: { user: AuthUser; onLogout: () => 
     api.factory.lines().then(setLines).catch(() => {})
     api.factory.events().then(setFactoryEvents).catch(() => {})
     api.factory.oeeCurrent().then(setOee).catch(() => {})
+    api.factory.layout().then(setLayout).catch(() => {})
     loadTasks()
     loadWorkOrders()
   }, [loadTasks, loadWorkOrders])
@@ -145,6 +148,7 @@ export function Dashboard({ user, onLogout }: { user: AuthUser; onLogout: () => 
       <main className="content">
         {tab === 'overview' && (
           <OverviewView
+            layout={layout}
             equipments={equipments}
             workOrders={workOrders}
             oee={oee}
@@ -166,6 +170,7 @@ export function Dashboard({ user, onLogout }: { user: AuthUser; onLogout: () => 
         )}
         {tab === 'fleet' && (
           <FleetView
+            layout={layout}
             robots={robots}
             tasks={tasks}
             equipments={equipments}

@@ -1,6 +1,6 @@
 import {
-  EQUIPMENT_POSITIONS, LOWER_AISLE_Y, MAP_H, MAP_W, NODES, routePoints, UPPER_AISLE_Y,
-  type Equipment, type EquipmentStatus, type Robot, type RobotStatus, type Task,
+  nodeIndex, routePoints,
+  type Equipment, type EquipmentStatus, type Layout, type Robot, type RobotStatus, type Task,
 } from '../types'
 
 const ROBOT_COLOR: Record<RobotStatus, string> = {
@@ -35,24 +35,33 @@ const ACTIVE_TASK = new Set(['ASSIGNED', 'IN_PROGRESS'])
  * "한 공장을 두 시스템이 관제한다"는 플랫폼의 요지가 이 한 화면에 드러난다.
  */
 export function UnifiedMap({
+  layout,
   equipments,
   robots,
   tasks,
 }: {
+  /** 서버가 내려준 평면도. 아직 못 받았으면 그릴 좌표계가 없으므로 안내만 띄운다. */
+  layout: Layout | null
   equipments: Equipment[]
   robots: Robot[]
   tasks: Task[]
 }) {
+  if (!layout) {
+    return <p className="muted small">평면도를 불러오는 중…</p>
+  }
+
   const activeTasks = tasks.filter((t) => ACTIVE_TASK.has(t.status))
   const robotById = new Map(robots.map((r) => [r.id, r]))
+  const NODES = nodeIndex(layout)
+  const { width, height } = layout
 
   return (
-    <svg className="umap" viewBox={`0 0 ${MAP_W} ${MAP_H}`} preserveAspectRatio="xMidYMid meet">
-      <rect x={0} y={0} width={MAP_W} height={MAP_H} className="umap-bg" />
+    <svg className="umap" viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="xMidYMid meet">
+      <rect x={0} y={0} width={width} height={height} className="umap-bg" />
 
       {/* AMR 통로 — 라인마다 하나씩. 로봇은 이 위로만 다닌다. */}
-      {[UPPER_AISLE_Y, LOWER_AISLE_Y].map((y) => (
-        <line key={`aisle-${y}`} x1={2} y1={y} x2={MAP_W - 2} y2={y} className="umap-aisle" />
+      {[layout.upperAisleY, layout.lowerAisleY].map((y) => (
+        <line key={`aisle-${y}`} x1={2} y1={y} x2={width - 2} y2={y} className="umap-aisle" />
       ))}
 
       {/* AMR 이동 경로 — 설비/로봇보다 아래에 깔린다.
@@ -67,7 +76,7 @@ export function UnifiedMap({
           : NODES[t.originNode]
         if (!from) return null
         // 실제 주행과 같은 통로 경유 경로로 그린다(직선으로 그리면 설비를 관통하는 것처럼 보인다).
-        const pts = routePoints(from, to)
+        const pts = routePoints(layout, from, to)
         return (
           <g key={`route-${t.id}`}>
             <polyline points={pts.map((p) => `${p[0]},${p[1]}`).join(' ')} className="umap-route" />
@@ -91,11 +100,10 @@ export function UnifiedMap({
         </g>
       ))}
 
-      {/* 설비 (PixelFactory) */}
+      {/* 설비 (PixelFactory) — 좌표는 서버가 실어 보낸다(하드코딩 매핑 없음) */}
       {equipments.map((e) => {
-        const pos = EQUIPMENT_POSITIONS[e.equipmentCode]
-        if (!pos) return null
-        const [x, y] = pos
+        if (e.posX == null || e.posY == null) return null
+        const [x, y] = [e.posX, e.posY]
         return (
           <g key={e.equipmentCode}>
             <rect

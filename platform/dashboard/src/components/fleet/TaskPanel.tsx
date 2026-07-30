@@ -1,8 +1,7 @@
 import { useState } from 'react'
 import { api } from '../../api'
-import { NODES, type Robot, type Task, type TaskPriority } from '../../types'
+import type { Layout, Robot, Task, TaskPriority } from '../../types'
 
-const NODE_NAMES = Object.keys(NODES)
 const PRIORITIES: TaskPriority[] = ['LOW', 'NORMAL', 'HIGH', 'URGENT']
 
 function nextTaskCode(): string {
@@ -10,17 +9,25 @@ function nextTaskCode(): string {
 }
 
 export function TaskPanel({
+  layout,
   tasks,
   robots,
   onChanged,
 }: {
+  /** 출발·도착 선택지는 서버 평면도의 노드에서 나온다(하드코딩 목록 없음). */
+  layout: Layout | null
   tasks: Task[]
   robots: Robot[]
   onChanged: () => void
 }) {
+  // 도크는 충전 자리이지 운송 목적지가 아니므로 제외한다.
+  const nodeNames = (layout?.nodes ?? [])
+    .filter((n) => n.nodeType !== 'DOCK')
+    .map((n) => n.nodeCode)
+
   const [taskCode, setTaskCode] = useState(nextTaskCode)
-  const [origin, setOrigin] = useState('STATION-A')
-  const [destination, setDestination] = useState('WAREHOUSE')
+  const [origin, setOrigin] = useState('WAREHOUSE')
+  const [destination, setDestination] = useState('SHIPPING')
   const [priority, setPriority] = useState<TaskPriority>('NORMAL')
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
@@ -47,13 +54,13 @@ export function TaskPanel({
       <form className="task-form" onSubmit={submit}>
         <input value={taskCode} onChange={(e) => setTaskCode(e.target.value)} aria-label="작업 코드" />
         <select value={origin} onChange={(e) => setOrigin(e.target.value)} aria-label="출발">
-          {NODE_NAMES.map((n) => (
+          {nodeNames.map((n) => (
             <option key={n}>{n}</option>
           ))}
         </select>
         <span className="arrow">→</span>
         <select value={destination} onChange={(e) => setDestination(e.target.value)} aria-label="도착">
-          {NODE_NAMES.map((n) => (
+          {nodeNames.map((n) => (
             <option key={n}>{n}</option>
           ))}
         </select>
