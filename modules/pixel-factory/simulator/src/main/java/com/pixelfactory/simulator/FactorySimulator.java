@@ -22,36 +22,52 @@ import org.eclipse.paho.client.mqttv3.persist.MemoryPersistence;
  * factory/{lineCode}/{equipmentCode}/{kind} 토픽으로 발행한다.
  * 토픽/페이로드 계약은 docs/mqtt-topics.md 참고.
  *
+ * <b>시간 기준이 하나여야 한다.</b> 예전에는 "30초 사이클"이라고 발행하면서 SIM_SPEED=10 으로
+ * 3초마다 냈다. OEE는 실시간(occurred_at)으로 계산하므로 실시간 기준으로는 표준CT가 허용하는
+ * 양의 10배를 낸 셈이 되어 P가 250~650% 로 나왔다. 지금은 <b>데모 공장을 "빠른 공장"으로
+ * 정의</b>하고(사이클 1.5~4.5초) 배속을 쓰지 않는다 — 발행 주기는 전과 같고 P ≈ 1 이 된다.
+ *
  * 환경변수:
  *   MQTT_URL   기본 tcp://localhost:1883
- *   SIM_SPEED  배속 (기본 10 — 30초 사이클을 3초에 발행)
+ *   SIM_SPEED  배속 (기본 1 = 압축하지 않음). 올리면 OEE의 P가 그 배수만큼 부풀려진다.
  */
 public final class FactorySimulator {
 
     private record EquipmentSpec(String lineCode, String code, int idealCycleTimeMs) {}
 
-    // 설비 마스터(V2·V3 마이그레이션)와 코드·사이클타임이 일치해야 한다.
+    /**
+     * 설비 마스터({@code equipments.ideal_cycle_time_ms})와 <b>코드·사이클타임이 반드시
+     * 일치해야 한다</b> — 어긋나면 OEE의 P가 그 비율만큼 틀어진다.
+     * 현재 값은 V6 마이그레이션에서 10배 압축한 것과 같다(데모 시계).
+     */
     private static final List<EquipmentSpec> EQUIPMENTS = List.of(
             // LINE-1 가공
-            new EquipmentSpec("LINE-1", "CNC-01", 30000),
-            new EquipmentSpec("LINE-1", "CNC-02", 30000),
-            new EquipmentSpec("LINE-1", "CNC-03", 30000),
-            new EquipmentSpec("LINE-1", "MCT-01", 45000),
+            new EquipmentSpec("LINE-1", "CNC-01", 3000),
+            new EquipmentSpec("LINE-1", "CNC-02", 3000),
+            new EquipmentSpec("LINE-1", "CNC-03", 3000),
+            new EquipmentSpec("LINE-1", "MCT-01", 4500),
             // LINE-2 조립·검사
-            new EquipmentSpec("LINE-2", "ASM-01", 25000),
-            new EquipmentSpec("LINE-2", "ASM-02", 25000),
-            new EquipmentSpec("LINE-2", "INS-01", 20000),
-            new EquipmentSpec("LINE-2", "PKG-01", 15000)
+            new EquipmentSpec("LINE-2", "ASM-01", 2500),
+            new EquipmentSpec("LINE-2", "ASM-02", 2500),
+            new EquipmentSpec("LINE-2", "INS-01", 2000),
+            new EquipmentSpec("LINE-2", "PKG-01", 1500)
     );
 
     private static final double DEFECT_RATE = 0.03;
     private static final double BREAKDOWN_RATE = 0.02;
 
+    /**
+     * 고장 지속시간 범위(ms). 사이클타임과 같은 시계에 있어야 한다 —
+     * 사이클이 3초인데 고장이 30초면 A가 비현실적으로 떨어진다.
+     */
+    private static final int BREAKDOWN_MIN_MS = 1500;
+    private static final int BREAKDOWN_SPREAD_MS = 3000;
+
     private static final ObjectMapper objectMapper = new ObjectMapper();
 
     public static void main(String[] args) throws Exception {
         String brokerUrl = env("MQTT_URL", "tcp://localhost:1883");
-        double speed = Double.parseDouble(env("SIM_SPEED", "10"));
+        double speed = Double.parseDouble(env("SIM_SPEED", "1"));
 
         // 설비마다 **별개 접속**을 쓴다. LWT(유언)는 접속당 하나뿐이라, 접속을 공유하면
         // 8대 중 한 대의 status 토픽에만 유언을 걸 수 있다. 실제 현장에서도 설비마다
@@ -126,7 +142,7 @@ public final class FactorySimulator {
 
                 if (random.nextDouble() < BREAKDOWN_RATE) {
                     publishStatus(client, spec, "DOWN", "BREAKDOWN");
-                    Thread.sleep((long) ((15000 + random.nextInt(30000)) / speed));
+                    Thread.sleep((long) ((BREAKDOWN_MIN_MS + random.nextInt(BREAKDOWN_SPREAD_MS)) / speed));
                     publishStatus(client, spec, "RUNNING", null);
                 }
             }
