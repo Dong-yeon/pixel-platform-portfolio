@@ -111,9 +111,10 @@ public class RobotService {
         realtimePublisher.publishRobot(RobotResponse.of(master, updated));
     }
 
-    public void updatePosition(String robotCode, double posX, double posY, String payloadJson) {
+    public void updatePosition(String robotCode, double posX, double posY, boolean laden, String payloadJson) {
         Robot master = master(robotCode);
-        RobotLiveState updated = liveStateStore.findOrOffline(robotCode).withPosition(posX, posY, LocalDateTime.now());
+        RobotLiveState updated = liveStateStore.findOrOffline(robotCode)
+                .withPosition(posX, posY, laden, LocalDateTime.now());
         liveStateStore.save(updated); // Redis only — no per-tick Postgres write.
 
         // 지나온 레인 구간을 곧바로 반납한다 — 뒤따르는 로봇이 바로 쓸 수 있어야 통로 하나로도

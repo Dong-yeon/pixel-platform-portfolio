@@ -125,11 +125,14 @@ export function UnifiedMap({
           className="umap-robot"
           style={{ transform: `translate(${r.posX}px, ${r.posY}px)` }}
         >
+          {/* 적재 중이면 파렛트를 얹어 그린다 — "가지러 가는 중"과 "옮기는 중"의 구분이
+              물류 화면에서 가장 먼저 읽혀야 하는 정보다. 로봇 뒤에 깔아 원을 가리지 않는다. */}
+          {r.laden && <rect x={-1.15} y={-1.15} width={2.3} height={2.3} rx={0.2} className="umap-pallet" />}
           <circle r={0.95} fill={ROBOT_COLOR[r.status]} stroke="#fff" strokeWidth={0.18} />
           <text y={0.38} className="umap-robot-label" textAnchor="middle">
             {r.robotCode.slice(-1)}
           </text>
-          <text y={-1.35} className="umap-robot-batt" textAnchor="middle">
+          <text y={-1.55} className="umap-robot-batt" textAnchor="middle">
             {r.batteryPercent}%
           </text>
         </g>

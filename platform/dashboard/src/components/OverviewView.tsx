@@ -109,6 +109,7 @@ export function OverviewView({
           <span><i className="lg-dot" style={{ background: '#2d7ff9' }} />AMR 이동</span>
           <span><i className="lg-dot" style={{ background: '#27ae60' }} />대기</span>
           <span><i className="lg-dot" style={{ background: '#e08a00' }} />충전</span>
+          <span><i className="lg-swatch" style={{ background: '#c8912f' }} />적재(파렛트)</span>
           <span style={{ color: '#2d7ff9' }}>┈ 운송 경로</span>
         </div>
       </section>

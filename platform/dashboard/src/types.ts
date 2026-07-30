@@ -33,6 +33,13 @@ export interface Robot {
   batteryPercent: number
   posX: number
   posY: number
+  /**
+   * 적재(파렛트 있음) / 공차.
+   *
+   * 물류는 절반이 "가지러 가는 중"(공차), 절반이 "옮기는 중"(적재)이다.
+   * 구분하지 않으면 지도에서 그냥 원이 돌아다니는 것으로만 보인다.
+   */
+  laden: boolean
   lastHeartbeatAt: string | null
 }
 

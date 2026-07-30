@@ -17,6 +17,8 @@ public record RobotResponse(
         int batteryPercent,
         double posX,
         double posY,
+        /** 적재(파렛트 있음) / 공차. 지도에서 "가지러 가는 중"과 "옮기는 중"을 구분한다. */
+        boolean laden,
         LocalDateTime lastHeartbeatAt
 ) {
 
@@ -29,6 +31,7 @@ public record RobotResponse(
                 live.batteryPercent(),
                 live.posX(),
                 live.posY(),
+                live.laden(),
                 live.lastHeartbeatAt()
         );
     }

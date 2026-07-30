@@ -150,12 +150,18 @@ public class Simulator {
                 // leg1 완료 — 픽업 도착을 알리고 서버가 leg2 경로를 줄 때까지 기다린다.
                 // IDLE로 내리지 않는다(다른 작업이 배차되면 안 되므로). 경로만 빈 채 MOVING 유지.
                 robot.markPickedUp();
+                // 적재 상태가 바뀌었으니 즉시 알린다 — 위치 채널에 실려 가므로 지도에 파렛트가
+                // 바로 나타난다(하트비트를 기다리면 최대 10초 늦다).
+                publishPosition(robot);
                 publishTask(robot, "picked", null);
                 return;
             }
             publishTask(robot, "completed", null);
             robot.abortTask();
             setState(robot, RobotState.IDLE);
+            // 하역 완료 — 파렛트를 내렸음을 즉시 알린다. 이걸 빼면 로봇이 멈춘 뒤로 위치
+            // 발행이 없어, 하트비트(10초)까지 지도에 파렛트가 남아 있는다.
+            publishPosition(robot);
         } else if (robot.isChargingIntent()) {
             robot.abortTask();
             setState(robot, RobotState.CHARGING);
@@ -285,9 +291,20 @@ public class Simulator {
         mqtt.publish("fleet/" + robot.getCode() + "/status", Map.of("status", robot.getState().name()));
     }
 
+    /**
+     * 위치 + <b>적재 여부</b>를 함께 발행한다.
+     *
+     * <p>{@code laden}을 별도 토픽으로 "바뀔 때만" 보내지 않는 이유: 이 프로젝트에서 이미
+     * 한 번 겪었다 — 상태 변경만 발행하면 그 한 건이 유실됐을 때 서버와 영구히 어긋난다.
+     * 위치는 이동 중 매 tick 나가므로 여기 실어 보내면 <b>자가 복구</b>된다.
+     *
+     * <p>적재 여부는 로봇이 아는 물리 상태다. 서버도 leg 구조상 추론할 수 있지만
+     * (leg1=공차 / leg2=적재), 실제 AMR이라면 파렛트 센서가 알려주는 값이다.
+     */
     private void publishPosition(VirtualRobot robot) {
         mqtt.publish("fleet/" + robot.getCode() + "/position",
-                Map.of("x", round(robot.getX()), "y", round(robot.getY())));
+                Map.of("x", round(robot.getX()), "y", round(robot.getY()),
+                        "laden", robot.isPickedUp()));
     }
 
     /** Publish battery only when the whole-percent value changed (or when forced), to limit noise. */

@@ -70,7 +70,10 @@ public class MqttMessageHandler {
     private void handlePosition(String robotCode, JsonNode json, String payload) {
         double x = json.path("x").asDouble();
         double y = json.path("y").asDouble();
-        robotService.updatePosition(robotCode, x, y, payload);
+        // laden(적재 여부)은 위치와 함께 온다 — "바뀔 때만" 보내면 그 한 건이 유실됐을 때
+        // 서버와 영구히 어긋난다(이 프로젝트에서 이미 겪었다). 없으면 공차로 본다.
+        boolean laden = json.path("laden").asBoolean(false);
+        robotService.updatePosition(robotCode, x, y, laden, payload);
     }
 
     private void handleBattery(String robotCode, JsonNode json, String payload) {
