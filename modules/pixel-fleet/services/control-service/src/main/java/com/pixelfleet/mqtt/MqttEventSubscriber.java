@@ -2,6 +2,8 @@ package com.pixelfleet.mqtt;
 
 import jakarta.annotation.PreDestroy;
 import java.nio.charset.StandardCharsets;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import org.eclipse.paho.client.mqttv3.IMqttDeliveryToken;
 import org.eclipse.paho.client.mqttv3.MqttCallbackExtended;
 import org.eclipse.paho.client.mqttv3.MqttClient;
@@ -22,6 +24,9 @@ public class MqttEventSubscriber implements MqttCallbackExtended {
 
     private final MqttProperties properties;
     private final MqttMessageHandler messageHandler;
+    /** 구독 호출을 콜백 스레드에서 떼어내기 위한 전용 스레드 — 이유는 connectComplete 주석 참고. */
+    private final ExecutorService subscribeExecutor =
+            Executors.newSingleThreadExecutor(r -> new Thread(r, "mqtt-subscribe"));
     private MqttClient client;
 
     public MqttEventSubscriber(MqttProperties properties, MqttMessageHandler messageHandler) {
@@ -41,7 +46,11 @@ public class MqttEventSubscriber implements MqttCallbackExtended {
             client.setCallback(this);
 
             MqttConnectOptions options = new MqttConnectOptions();
-            options.setCleanSession(true);
+            // cleanSession=false — 서비스가 내려가 있는 동안 브로커가 QoS 1 메시지를 큐에
+            // 쌓아 재접속 때 밀어 준다(다운타임 동안의 로봇 텔레메트리 유실 방지).
+            // clientId 가 고정이어야 세션이 이어지므로 같은 id 로 두 인스턴스를 띄울 수 없다 —
+            // 로컬에서 여러 개 띄우려면 MQTT_CLIENT_ID 로 구분할 것.
+            options.setCleanSession(false);
             options.setAutomaticReconnect(true);
             options.setConnectionTimeout(5);
 
@@ -57,12 +66,18 @@ public class MqttEventSubscriber implements MqttCallbackExtended {
 
     @Override
     public void connectComplete(boolean reconnect, String serverUri) {
-        try {
-            client.subscribe(properties.getTopicFilter(), 1);
-            log.info("Subscribed to {} on {} (reconnect={})", properties.getTopicFilter(), serverUri, reconnect);
-        } catch (MqttException e) {
-            log.error("Failed to subscribe to {}", properties.getTopicFilter(), e);
-        }
+        // 구독은 콜백 스레드가 아닌 다른 스레드에서 한다.
+        // subscribe()는 SUBACK을 기다리는 블로킹 호출인데, 그 SUBACK을 처리할 주체가 바로
+        // 지금 막혀 있는 콜백 스레드라서 교착이 된다. cleanSession=false 로 바꾸면 접속 직후
+        // 백로그가 동시에 밀려와 콜백 큐가 먼저 차고, 수신이 통째로 멈춘다(factory 에서 실측).
+        subscribeExecutor.execute(() -> {
+            try {
+                client.subscribe(properties.getTopicFilter(), 1);
+                log.info("Subscribed to {} on {} (reconnect={})", properties.getTopicFilter(), serverUri, reconnect);
+            } catch (MqttException e) {
+                log.error("Failed to subscribe to {}", properties.getTopicFilter(), e);
+            }
+        });
     }
 
     @Override
@@ -88,6 +103,8 @@ public class MqttEventSubscriber implements MqttCallbackExtended {
 
     @PreDestroy
     public void disconnect() {
+        subscribeExecutor.shutdownNow();
+
         if (client == null) {
             return;
         }

@@ -1,5 +1,5 @@
 import type {
-  AuthUser, Equipment, FactoryEventRaw, FleetEvent, ProductionLine,
+  AuthUser, Equipment, FleetEvent, ProductionLine,
   Robot, Task, TaskPriority, TimelineEvent, WorkOrder,
 } from './types'
 
@@ -58,17 +58,6 @@ async function request<T>(base: string, path: string, options: RequestInit = {})
   return body.data as T
 }
 
-/** factory 이벤트(createdAt)를 공통 타임라인 형태(occurredAt)로 맞춘다. */
-function toTimeline(e: FactoryEventRaw): TimelineEvent {
-  return {
-    id: e.id,
-    eventType: e.eventType,
-    severity: e.severity,
-    message: e.message,
-    occurredAt: e.createdAt,
-  }
-}
-
 export const api = {
   /** 플랫폼 로그인 — 한 번으로 모든 모듈에 통하는 토큰을 받는다. */
   async login(username: string, password: string): Promise<AuthUser> {
@@ -93,8 +82,8 @@ export const api = {
     equipments: () => request<Equipment[]>(FACTORY, '/equipments'),
     lines: () => request<ProductionLine[]>(FACTORY, '/lines'),
     workOrders: () => request<WorkOrder[]>(FACTORY, '/work-orders'),
-    events: async (): Promise<TimelineEvent[]> =>
-      (await request<FactoryEventRaw[]>(FACTORY, '/events/recent')).map(toTimeline),
+    // 서버가 occurredAt(발생시각)을 내려주므로 변환 없이 그대로 쓴다.
+    events: () => request<TimelineEvent[]>(FACTORY, '/events/recent'),
     startWorkOrder: (id: number) =>
       request<WorkOrder>(FACTORY, `/work-orders/${id}/start`, { method: 'PATCH' }),
   },

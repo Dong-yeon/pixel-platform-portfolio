@@ -34,13 +34,13 @@
 |---|---|---|---|---|
 | D1 | **대시보드가 factory 데이터를 최초 1회만 조회.** 폴링도 WebSocket도 없음 | ❌ | `platform/dashboard/src/Dashboard.tsx` — `useEffect` 1회 실행, `useFleetSocket`은 fleet 전용 | 지도의 설비 색이 절대 안 변함. Factory KPI 4개 전부 정지 |
 | D2 | **사이클 이벤트가 작업지시 실적에 반영되지 않음** | ✅ **해결** | `MqttMessageHandler.handleCycle()`이 `IN_PROGRESS` 작업지시를 찾아 `workOrder.recordCycle(defect)` 호출, `workOrderId` 기록 | — |
-| D3 | **이벤트 발생시각 컬럼 없음** | ❌ | `FactoryEvent`에 `occurredAt` 없음(마이그레이션 V3까지). 시뮬레이터의 `ts`를 핸들러가 무시 | 브로커 지연·재처리 시 OEE 구간 길이가 틀어짐 |
-| D4 | **설비별 기간 조회 인덱스 없음** | ❌ | `V1__init.sql` — `idx_factory_events_created_at` 만 존재 | 설비 단위 OEE 집계가 풀스캔 |
+| D3 | **이벤트 발생시각 컬럼 없음** | ✅ **해결** | P8에서 `V4` 마이그레이션 + `FactoryEvent.occurredAt`. 핸들러가 payload `ts`(UTC)를 시스템 시간대로 변환해 저장, 실패 시 적재 시각 폴백+WARN | — |
+| D4 | **설비별 기간 조회 인덱스 없음** | ✅ **해결** | P8 `V4`에서 `idx_factory_events_target_type_time`(target_type, target_id, event_type, occurred_at desc) + `idx_factory_events_occurred_at` | — |
 | D5 | **계획가동시간 정의 불가** | ❌ | 시프트 캘린더 테이블 없음. `EquipmentStatus`는 `IDLE/RUNNING/DOWN/QUALITY_HOLD` 4개뿐 | Availability 분모를 만들 수 없음 |
 | D6 | **표준CT가 설비 고정값** | ❌ | `equipments.ideal_cycle_time_ms`. `items`/`processes` 테이블 없음, `WorkOrder.itemId`는 FK 없는 raw bigint | 품종 전환 시 Performance 왜곡 |
 | D7 | **좌표계 3중 하드코딩** | ❌ | `LocationRegistry.java` / robot-sim `NodeMap` / dashboard `types.ts` | 모듈 추가할수록 배수로 증가 |
-| D8 | **MQTT 유실 설계** | ❌ | `mosquitto.conf` `persistence false`, 구독자 `cleanSession=true` (5곳) | 서비스 다운 중 이벤트 소실 → OEE 구간에 구멍 |
-| D9 | **LWT / retained 미사용** | ❌ | `FactorySimulator`에 `setWill`·`setRetained` 없음 | 시뮬레이터가 죽어도 설비가 RUNNING으로 남아 Availability 부풀려짐 |
+| D8 | **MQTT 유실 설계** | ✅ **해결** | P8: 브로커 `persistence true` + `max_queued_messages 100000`, 구독자 `cleanSession=false`(factory·fleet). **유한 버퍼** — 약 7시간치 | 부분 잔존(장기 장애) |
+| D9 | **LWT / retained 미사용** | ✅ **해결** | P8: 설비별 접속 + 자기 status 토픽에 LWT, status만 retained(cycle은 금지) | — |
 | D10 | **모듈별 개별 인증 (P6 미완)** | ✅ **해결** | P6에서 게이트웨이 중앙 인증. 토큰 1개(`pp_token`), `loginAll()` 제거 | — |
 | D11 | **게이트웨이 `/ws` 라우트가 fleet 전용** | ❌ | `pixel-fleet-ws` 라우트 = `Path=/ws/**` → 9002 | factory가 WebSocket을 열면 경로 충돌 |
 | D12 | **미사용 enum 값** | ❌ | `FactoryEventType.NOTIFICATION_SENT`, `INSPECTION_*` 4종 | P14에서 실제로 채운다 |
@@ -139,19 +139,49 @@
    - `FactorySimulator.publishStatus()`: `message.setRetained(true)`.
      (cycle은 retained 금지 — 재접속마다 유령 사이클이 한 개 더 잡힌다.)
 
+   > **원안이 그대로는 불가능했던 부분 — LWT는 접속당 하나뿐이다.**
+   > 시뮬레이터가 클라이언트 하나로 설비 8대를 발행하고 있었으므로, `factory/{line}/{eq}/status`에
+   > 유언을 걸면 8대 중 한 대만 걸린다. → **설비마다 별개로 접속**하게 바꿨다
+   > (clientId `simulator-{equipmentCode}`). 실제 현장에서도 설비마다 자기 장치가 붙으므로
+   > 도메인에도 맞고, 유언이 설계대로 설비 단위로 동작한다.
+   >
+   > 유언 payload에는 **`ts`를 넣지 않는다.** 접속 시점에 브로커에 맡겨 두는 고정 문구라서
+   > 발행 시각을 미리 박으면 실제 죽은 시각과 무관한 값이 된다. 서버가 수신 시각으로 폴백한다.
+   >
+   > 정상 종료면 유언이 발행되지 않으므로 설비가 마지막 `RUNNING`으로 남는다.
+   > 종료 훅에서 `IDLE`(`SIMULATOR_STOPPED`)을 남겨 "고장"과 "멈춤"을 구분한다.
+
 ### 완료 기준
 
-- [ ] 설비 8대 전부에서 cycle/status 이벤트가 들어온다 (`select target_id, count(*) from factory_events group by 1`)
-- [ ] 시뮬레이터를 5분 돌린 뒤 `work_orders.produced_qty > 0`, `defect_qty > 0`
-- [ ] `factory_events.occurred_at`이 payload의 `ts`와 일치 (created_at과 다른 행이 존재)
-- [ ] oee-service를 죽였다 살린 뒤, 다운타임 동안 발행된 사이클이 DB에 들어와 있다
-- [ ] 시뮬레이터를 강제 종료하면 해당 설비가 몇 초 내 `DOWN`으로 바뀐다
-- [ ] oee-service만 재기동해도 설비 상태가 즉시 복원된다 (retained)
+- [x] 설비 8대 전부에서 cycle/status 이벤트가 들어온다 — 8개 설비, 72,862건
+- [x] 시뮬레이터를 5분 돌린 뒤 `work_orders.produced_qty > 0`, `defect_qty > 0` — 8건 전부 실적/불량 집계됨
+- [x] `factory_events.occurred_at`이 payload의 `ts`와 일치 — UTC→KST 변환 후 일치 확인, 적재 지연 17~43ms
+- [x] oee-service를 죽였다 살린 뒤, 다운타임 동안 발행된 사이클이 DB에 들어와 있다 —
+      70초 다운타임 중 215건 발생, 213건이 재접속 후 적재(최대 94초 지연), 유실 0
+- [x] 시뮬레이터를 강제 종료하면 해당 설비가 몇 초 내 `DOWN`으로 바뀐다 — SIGKILL 12초 내 8대 전부 DOWN
+- [x] oee-service만 재기동해도 설비 상태가 즉시 복원된다 (retained) —
+      DB를 전부 IDLE로 오염시킨 뒤 oee-service만 재기동 → 8대 전부 RUNNING 복원
 
 ### 주의
 
 - `occurred_at` 추가는 **기존 이벤트 조회 API의 응답 필드가 바뀌는 변경**이다. 대시보드를 같은 커밋에서 함께 고칠 것.
 - 고정 clientId를 쓰면 같은 id로 두 인스턴스를 띄울 수 없다. 로컬 다중 기동 시 환경변수로 suffix를 받게 할 것.
+
+### 검증에서 잡힌 것 두 가지 (둘 다 이 단계의 핵심)
+
+**1. `cleanSession=false` 가 Paho 콜백 교착을 드러냈다.**
+`connectComplete()` 안에서 블로킹 `subscribe()`를 호출하고 있었다. SUBACK을 처리해야 할
+주체가 바로 그 콜백 스레드라서 서로를 기다린다. `cleanSession=true` 일 때는 접속 직후
+밀려올 메시지가 없어 SUBACK이 먼저 도착해 **우연히** 넘어갔는데, `false`로 바꾸자 브로커가
+백로그를 동시에 밀어넣어 콜백 큐가 먼저 차고 **수신이 1건 처리 후 완전히 멈췄다.**
+스레드 덤프로 확인(`MQTT Rec` → `CommsCallback.messageArrived`, `MQTT Call` →
+`Token.waitForResponse`). → 구독을 전용 스레드로 옮겼다. fleet 구독자도 같은 패턴이라 함께 고쳤다.
+
+**2. `max_queued_messages` 기본값 1000이 조용히 버린다.**
+7분 다운타임 뒤 백로그가 배출되긴 했으나 417초 중 53초가 비어 있었다. 브로커 로그에
+`Outgoing messages are being dropped for client oee-service` 만 남는다 — 앱에는 아무 신호가 없다.
+→ 100000으로 올렸다(현재 발행률로 약 7시간치). **유한 버퍼임을 잊지 말 것** —
+그보다 긴 장애는 여전히 유실되므로 그때는 이벤트를 다시 받을 다른 경로가 필요하다.
 
 ---
 

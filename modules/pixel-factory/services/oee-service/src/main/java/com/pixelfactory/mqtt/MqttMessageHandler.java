@@ -13,6 +13,10 @@ import com.pixelfactory.event.service.FactoryEventService;
 import com.pixelfactory.workorder.domain.WorkOrder;
 import com.pixelfactory.workorder.domain.WorkOrderStatus;
 import com.pixelfactory.workorder.repository.WorkOrderRepository;
+import java.time.Instant;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
+import java.time.format.DateTimeParseException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -60,14 +64,48 @@ public class MqttMessageHandler {
             log.warn("Received event for unknown equipment '{}'. Recording without target id.", equipmentCode);
         }
 
+        LocalDateTime occurredAt = resolveOccurredAt(json, equipmentCode);
+
         switch (kind) {
-            case "status" -> handleStatus(equipmentCode, equipmentId, json, payload);
-            case "cycle" -> handleCycle(equipmentCode, equipmentId, json, payload);
+            case "status" -> handleStatus(equipmentCode, equipmentId, json, payload, occurredAt);
+            case "cycle" -> handleCycle(equipmentCode, equipmentId, json, payload, occurredAt);
             default -> log.debug("Ignoring unsupported message kind '{}' on topic {}", kind, topic);
         }
     }
 
-    private void handleStatus(String equipmentCode, Long equipmentId, JsonNode json, String payload) {
+    /**
+     * payload의 {@code ts}(설비가 보낸 발생시각)를 읽는다.
+     *
+     * <p>계약상 UTC ISO-8601(Instant)이다. <b>시스템 기본 시간대로 변환해서 저장한다</b> —
+     * {@code createdAt}이 로컬 시각이므로 한쪽만 UTC로 넣으면 같은 테이블에 시차가 생기고,
+     * 두 컬럼을 섞어 쓰는 순간 구간 길이가 조용히 틀어진다.
+     *
+     * <p>파싱이 안 되면 적재 시각으로 폴백한다. 이벤트를 버리는 것보다는 낫지만 그 행의
+     * 구간은 파이프라인 지연만큼 틀어지므로 WARN을 남긴다(조용히 넘기면 안 된다).
+     */
+    private LocalDateTime resolveOccurredAt(JsonNode json, String equipmentCode) {
+        String ts = json.path("ts").asText(null);
+
+        if (ts == null || ts.isBlank()) {
+            log.warn("Missing ts from {} — falling back to ingest time", equipmentCode);
+            return LocalDateTime.now();
+        }
+
+        try {
+            return LocalDateTime.ofInstant(Instant.parse(ts), ZoneId.systemDefault());
+        } catch (DateTimeParseException e) {
+            log.warn("Unparseable ts '{}' from {} — falling back to ingest time", ts, equipmentCode);
+            return LocalDateTime.now();
+        }
+    }
+
+    private void handleStatus(
+            String equipmentCode,
+            Long equipmentId,
+            JsonNode json,
+            String payload,
+            LocalDateTime occurredAt
+    ) {
         EquipmentStatus status;
         try {
             status = EquipmentStatus.valueOf(json.path("status").asText());
@@ -96,11 +134,18 @@ public class MqttMessageHandler {
                 null,
                 severity,
                 "Equipment " + equipmentCode + " changed to " + status,
-                payload
+                payload,
+                occurredAt
         );
     }
 
-    private void handleCycle(String equipmentCode, Long equipmentId, JsonNode json, String payload) {
+    private void handleCycle(
+            String equipmentCode,
+            Long equipmentId,
+            JsonNode json,
+            String payload,
+            LocalDateTime occurredAt
+    ) {
         boolean defect = json.path("defect").asBoolean(false);
 
         // 사이클 1회 = 생산 1개. 그 설비에서 진행 중인 작업지시가 있으면 실적을 올린다.
@@ -125,7 +170,8 @@ public class MqttMessageHandler {
                 null,
                 defect ? EventSeverity.WARNING : EventSeverity.INFO,
                 (defect ? "Defect cycle completed: " : "Cycle completed: ") + equipmentCode,
-                payload
+                payload,
+                occurredAt
         );
     }
 }

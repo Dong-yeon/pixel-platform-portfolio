@@ -226,7 +226,10 @@ public class WorkOrderService {
                 workOrder.getLotNo(),
                 severity,
                 message,
-                payloadJson
+                payloadJson,
+                // 작업지시 이벤트는 이 요청 처리가 곧 발생 시점이다(설비 텔레메트리와 달리
+                // 외부에서 받은 ts가 없다). 그래서 발생시각 = 지금.
+                LocalDateTime.now()
         );
     }
 
@@ -247,7 +250,8 @@ public class WorkOrderService {
                 workOrder.getLotNo(),
                 severity,
                 message,
-                payloadJson
+                payloadJson,
+                LocalDateTime.now()
         );
     }
 

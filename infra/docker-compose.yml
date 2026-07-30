@@ -35,6 +35,9 @@ services:
       - "1883:1883"
     volumes:
       - ./mosquitto/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+      # persistence true 를 켰으므로 데이터 디렉터리를 볼륨으로 뺀다.
+      # 안 빼면 컨테이너를 recreate 할 때 큐·retained 가 사라져 영속화가 무의미해진다.
+      - mosquitto-data:/mosquitto/data
     healthcheck:
       test: ["CMD-SHELL", "mosquitto_sub -t '$$SYS/#' -C 1 -W 3 | grep -q ."]
       interval: 10s
@@ -58,3 +61,4 @@ services:
 volumes:
   postgres-data:
   redis-data:
+  mosquitto-data:

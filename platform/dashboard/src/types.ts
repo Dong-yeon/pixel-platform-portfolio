@@ -153,12 +153,5 @@ export interface WorkOrder {
   holdReason: string | null
 }
 
-/** factory 이벤트 원본은 createdAt을 쓴다 → TimelineEvent로 변환해서 사용. */
-export interface FactoryEventRaw {
-  id: number
-  eventType: string
-  severity: EventSeverity
-  message: string
-  workOrderId: number | null
-  createdAt: string
-}
+// factory 이벤트도 occurredAt(발생시각)을 내려주므로 fleet과 같은 TimelineEvent를 쓴다.
+// 예전엔 createdAt(적재 시각)만 있어서 대시보드에서 변환(toTimeline)해야 했다.

@@ -35,7 +35,9 @@ jwt:
 mqtt:
   enabled: true
   broker-url: tcp://localhost:1883
-  client-id: control-service
+  # cleanSession=false 로 붙으므로 clientId 가 세션 키다 — 같은 id 로 두 인스턴스를 띄우면
+  # 서로 밀어낸다. 로컬에서 여러 개 띄울 때는 MQTT_CLIENT_ID 로 구분할 것.
+  client-id: ${MQTT_CLIENT_ID:control-service}
   topic-filter: "fleet/#"
 
 demo:

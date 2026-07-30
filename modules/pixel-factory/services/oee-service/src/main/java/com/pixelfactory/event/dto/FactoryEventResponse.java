@@ -19,6 +19,9 @@ public record FactoryEventResponse(
         EventSeverity severity,
         String message,
         String payloadJson,
+        /** 설비에서 실제로 일어난 시각. 타임라인 정렬·구간 계산은 이 값을 쓴다. */
+        LocalDateTime occurredAt,
+        /** 서버 적재 시각. occurredAt과의 차이가 곧 파이프라인 지연이다(감사용). */
         LocalDateTime createdAt
 ) {
 
@@ -35,6 +38,7 @@ public record FactoryEventResponse(
                 event.getSeverity(),
                 event.getMessage(),
                 event.getPayloadJson(),
+                event.getOccurredAt(),
                 event.getCreatedAt()
         );
     }
