@@ -1,4 +1,6 @@
-import type { Equipment, ModuleKey, Robot, Task, TimelineEvent, WorkOrder } from '../types'
+import type {
+  Equipment, EquipmentOee, ModuleKey, Robot, Task, TimelineEvent, WorkOrder,
+} from '../types'
 import { EventTimeline } from './EventTimeline'
 import { UnifiedMap } from './UnifiedMap'
 
@@ -19,6 +21,7 @@ function Stat({ label, value, sub, tone }: { label: string; value: string; sub?:
 export function OverviewView({
   equipments,
   workOrders,
+  oee,
   robots,
   tasks,
   factoryEvents,
@@ -27,6 +30,7 @@ export function OverviewView({
 }: {
   equipments: Equipment[]
   workOrders: WorkOrder[]
+  oee: EquipmentOee[]
   robots: Robot[]
   tasks: Task[]
   factoryEvents: TimelineEvent[]
@@ -36,9 +40,35 @@ export function OverviewView({
   const running = equipments.filter((e) => e.status === 'RUNNING').length
   const down = equipments.filter((e) => e.status === 'DOWN').length
   const activeWo = workOrders.filter((w) => w.status === 'IN_PROGRESS').length
-  const produced = workOrders.reduce((s, w) => s + w.producedQty, 0)
-  const defects = workOrders.reduce((s, w) => s + w.defectQty, 0)
-  const quality = produced > 0 ? ((produced - defects) / produced) * 100 : null
+
+  // OEE는 **서버가 이벤트에서 계산한 값**이다(현재 교대 기준). 여기서 다시 계산하지 않는다.
+  // 예전엔 work_orders 누적 수량으로 품질률만 직접 냈는데, 조회 구간 개념이 없어
+  // "지금 이 교대가 어떤가"에 답하지 못했다.
+  //
+  // 전 설비를 합산해 공장 값을 만든다 — 설비별 값의 단순 평균은 계획가동시간이 다른 설비를
+  // 같은 무게로 다뤄 조금 돌린 설비가 지표를 흔든다(서버 ofLine과 같은 원칙).
+  // P의 분자는 설비별 표준CT가 달라 직접 못 더하므로, 각 설비의 P × 실가동으로 되돌려 합한다.
+  const totals = oee.reduce(
+    (acc, e) => ({
+      planned: acc.planned + e.plannedMinutes,
+      operating: acc.operating + e.operatingMinutes,
+      produced: acc.produced + e.producedQty,
+      defects: acc.defects + e.defectQty,
+      idealMinutes: acc.idealMinutes + e.performance * e.operatingMinutes,
+    }),
+    { planned: 0, operating: 0, produced: 0, defects: 0, idealMinutes: 0 },
+  )
+
+  const availability = totals.planned > 0 ? totals.operating / totals.planned : null
+  const performance = totals.operating > 0 ? totals.idealMinutes / totals.operating : null
+  const quality = totals.produced > 0 ? (totals.produced - totals.defects) / totals.produced : null
+  const overallOee =
+    availability !== null && performance !== null && quality !== null
+      ? availability * performance * quality
+      : null
+
+  const anomalies = oee.filter((e) => e.performanceAnomaly).length
+  const pct = (v: number | null) => (v === null ? '—' : `${(v * 100).toFixed(1)}%`)
 
   const online = robots.filter((r) => r.status !== 'OFFLINE').length
   const moving = robots.filter((r) => r.status === 'MOVING').length
@@ -87,14 +117,34 @@ export function OverviewView({
           <span className="link">자세히 →</span>
         </div>
         <div className="stat-row">
+          <Stat
+            label="OEE"
+            value={pct(overallOee)}
+            sub={totals.planned > 0 ? '현재 교대' : '교대 시간 아님'}
+            tone={overallOee !== null && overallOee < 0.5 ? 'bad' : ''}
+          />
+          <Stat
+            label="가동률 A"
+            value={pct(availability)}
+            sub={totals.planned > 0 ? `실가동 ${totals.operating}/${totals.planned}분` : undefined}
+          />
+          <Stat
+            label="성능 P"
+            value={pct(performance)}
+            // P > 1.0 은 표준CT가 실제보다 크다는 신호다. 값을 자르지 않으므로 여기서 알린다.
+            sub={anomalies > 0 ? `표준CT 확인 필요 ${anomalies}대` : undefined}
+            tone={anomalies > 0 ? 'warn' : ''}
+          />
+          <Stat
+            label="품질 Q"
+            value={pct(quality)}
+            sub={totals.produced > 0 ? `생산 ${totals.produced} · 불량 ${totals.defects}` : '생산 실적 없음'}
+          />
+        </div>
+        <div className="stat-row">
           <Stat label="가동 설비" value={`${running}/${equipments.length}`} />
           <Stat label="고장" value={String(down)} tone={down > 0 ? 'bad' : ''} />
           <Stat label="진행 중 작업지시" value={String(activeWo)} />
-          <Stat
-            label="품질률"
-            value={quality === null ? '—' : `${quality.toFixed(1)}%`}
-            sub={produced > 0 ? `생산 ${produced} · 불량 ${defects}` : '생산 실적 없음'}
-          />
         </div>
       </section>
 

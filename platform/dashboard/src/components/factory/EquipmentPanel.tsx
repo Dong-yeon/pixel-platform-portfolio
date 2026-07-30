@@ -3,8 +3,10 @@ import type { Equipment, EquipmentStatus, ProductionLine } from '../../types'
 const STATUS_LABEL: Record<EquipmentStatus, string> = {
   RUNNING: '가동',
   IDLE: '대기',
+  SETUP: '준비',
   DOWN: '고장',
   QUALITY_HOLD: '품질보류',
+  PLANNED_STOP: '계획정지',
 }
 
 export function EquipmentPanel({

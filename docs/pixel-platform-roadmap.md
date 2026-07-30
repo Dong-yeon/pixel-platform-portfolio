@@ -19,7 +19,7 @@
 | 항목 | 근거 |
 |---|---|
 | 모노레포 재구성 (P1~P4) | `platform/`, `modules/`, `infra/` 배치 완료 |
-| 게이트웨이 | `platform/gateway/src/main/resources/application.yml` — RewritePath, DedupeResponseHeader, `/ws` 프록시 |
+| 게이트웨이 | `platform/gateway/src/main/resources/application.yml` — RewritePath, DedupeResponseHeader, 모듈별 `/ws/{module}` 프록시, 중앙 인증 필터 |
 | 통합 대시보드 | `platform/dashboard/` — Overview / Factory / Fleet 3탭, `UnifiedMap` |
 | **공통 코어 추출 (P5)** | `shared/src/main/java/com/pixelplatform/core/` — common·auth·user |
 | **중앙 인증 (P6 = 아래 P12-1)** | `platform/gateway/.../auth/AuthenticationGlobalFilter` — **P12보다 먼저 끝냈다** |
@@ -32,7 +32,7 @@
 
 | # | 결함 | 상태 | 근거 | 영향 |
 |---|---|---|---|---|
-| D1 | **대시보드가 factory 데이터를 최초 1회만 조회.** 폴링도 WebSocket도 없음 | ❌ | `platform/dashboard/src/Dashboard.tsx` — `useEffect` 1회 실행, `useFleetSocket`은 fleet 전용 | 지도의 설비 색이 절대 안 변함. Factory KPI 4개 전부 정지 |
+| D1 | **대시보드가 factory 데이터를 최초 1회만 조회** | ✅ **해결** | P10: factory STOMP(`/ws/factory`) — 설비·이벤트는 즉시 push, OEE는 5초 주기. `usePlatformSocket`으로 모듈별 연결 | — |
 | D2 | **사이클 이벤트가 작업지시 실적에 반영되지 않음** | ✅ **해결** | `MqttMessageHandler.handleCycle()`이 `IN_PROGRESS` 작업지시를 찾아 `workOrder.recordCycle(defect)` 호출, `workOrderId` 기록 | — |
 | D3 | **이벤트 발생시각 컬럼 없음** | ✅ **해결** | P8에서 `V4` 마이그레이션 + `FactoryEvent.occurredAt`. 핸들러가 payload `ts`(UTC)를 시스템 시간대로 변환해 저장, 실패 시 적재 시각 폴백+WARN | — |
 | D4 | **설비별 기간 조회 인덱스 없음** | ✅ **해결** | P8 `V4`에서 `idx_factory_events_target_type_time`(target_type, target_id, event_type, occurred_at desc) + `idx_factory_events_occurred_at` | — |
@@ -42,7 +42,7 @@
 | D8 | **MQTT 유실 설계** | ✅ **해결** | P8: 브로커 `persistence true` + `max_queued_messages 100000`, 구독자 `cleanSession=false`(factory·fleet). **유한 버퍼** — 약 7시간치 | 부분 잔존(장기 장애) |
 | D9 | **LWT / retained 미사용** | ✅ **해결** | P8: 설비별 접속 + 자기 status 토픽에 LWT, status만 retained(cycle은 금지) | — |
 | D10 | **모듈별 개별 인증 (P6 미완)** | ✅ **해결** | P6에서 게이트웨이 중앙 인증. 토큰 1개(`pp_token`), `loginAll()` 제거 | — |
-| D11 | **게이트웨이 `/ws` 라우트가 fleet 전용** | ❌ | `pixel-fleet-ws` 라우트 = `Path=/ws/**` → 9002 | factory가 WebSocket을 열면 경로 충돌 |
+| D11 | **게이트웨이 `/ws` 라우트가 fleet 전용** | ✅ **해결** | P10: `/ws/fleet/**`→9002, `/ws/factory/**`→9001. 서버 엔드포인트도 같은 경로로 이동 | — |
 | D12 | **미사용 enum 값** | ❌ | `FactoryEventType.NOTIFICATION_SENT`, `INSPECTION_*` 4종 | P14에서 실제로 채운다 |
 | D13 | **설비 8대 중 3대만 시뮬레이션됨** | ✅ **해결** | `FactorySimulator.EQUIPMENTS`가 8대 전부 | — |
 
@@ -61,7 +61,7 @@
 | 표방 | 실제 상태 |
 |---|---|
 | 로봇관제 | ✅ 완성도 높음 (유일하게 "제품"처럼 보임) |
-| MES | ⚠️ **OEE 엔진 완료(P9)**, 이벤트 정합성 완료(P8). POP 없음, 품목 마스터 없음 |
+| MES | ⚠️ **OEE 엔진(P9) + 실시간 대시보드(P10) 완료.** POP 없음, 품목 마스터 없음 |
 | QMS | ❌ enum 껍데기만 |
 | WMS | ❌ `WAREHOUSE` 노드 좌표 1개뿐 |
 
@@ -305,10 +305,27 @@
 
 ### 완료 기준
 
-- [ ] 시뮬레이터가 고장을 내면 **새로고침 없이** 지도 설비가 빨강으로 바뀐다
-- [ ] Overview의 OEE 숫자가 시간에 따라 움직인다
-- [ ] 게이트웨이 경유(9000)로 factory·fleet **두 WebSocket이 동시에** 살아 있다
-- [ ] 한쪽 서비스를 죽여도 다른 쪽 실시간이 유지된다
+- [x] 시뮬레이터가 고장을 내면 **새로고침 없이** 지도 설비가 빨강으로 바뀐다 —
+      브라우저에서 200ms 간격으로 색을 기록해 `#e0392b` 관측(고장이 1.5~4.5초라 띄엄띄엄
+      샘플링하면 창을 놓친다. 실제로 처음엔 놓쳤다)
+- [x] Overview의 OEE 숫자가 시간에 따라 움직인다 — 같은 페이지 인스턴스에서 P 71.8% → 71.9%,
+      타임라인 갱신 확인(리로드 없음을 `window` 상태 생존으로 증명)
+- [x] 게이트웨이 경유(9000)로 factory·fleet **두 WebSocket이 동시에** 살아 있다 —
+      `/ws/fleet/info` 200, `/ws/factory/info` 200, 옛 경로 `/ws/info` 404
+- [x] 한쪽 서비스를 죽여도 다른 쪽 실시간이 유지된다 — factory만 정지 →
+      pill이 `일부 연결 (물류만)`으로 바뀌고 로봇 좌표는 계속 갱신, OEE는 `—`.
+      factory 복귀 후 새로고침 없이 `실시간 연결됨` + OEE 값 복귀
+
+### 구현 판단
+
+- **OEE만 주기 push(5초), 상태·이벤트는 즉시 push.** OEE는 이벤트 하나로 정해지지 않고 구간
+  전체를 재집계해야 나온다 — 사이클이 초당 여러 건 들어오는데 그때마다 8대를 재계산하면 DB만
+  두드리고 화면은 사람 눈에 똑같다. 반대로 고장은 즉시 떠야 관제의 의미가 있다.
+- **연결 상태는 두 소켓의 AND.** 하나만 살아 있는데 초록 불이면 화면 절반이 멈춘 걸 모른 채
+  보게 되므로, 어느 쪽이 끊겼는지(`일부 연결 (물류만)`) 표시한다.
+- **대시보드는 OEE를 다시 계산하지 않는다.** 서버가 이벤트에서 계산한 값을 그대로 쓴다.
+  공장 전체 값은 설비별 값의 평균이 아니라 합산으로 만든다(서버 `ofLine`과 같은 원칙).
+- `useFleetSocket` → `usePlatformSocket(endpoint, topics)`로 일반화하고 옛 훅은 지웠다.
 
 ### 주의
 

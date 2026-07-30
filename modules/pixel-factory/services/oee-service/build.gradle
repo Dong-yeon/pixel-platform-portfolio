@@ -41,6 +41,10 @@ dependencies {
 
     implementation 'org.eclipse.paho:org.eclipse.paho.client.mqttv3:1.2.5'
 
+    // STOMP over WebSocket — 설비 상태·이벤트·OEE 실시간 push.
+    // fleet과 달리 Redis는 쓰지 않는다(이유는 realtime/RealtimeBroadcaster 주석).
+    implementation 'org.springframework.boot:spring-boot-starter-websocket'
+
     compileOnly 'org.projectlombok:lombok'
     annotationProcessor 'org.projectlombok:lombok'
     runtimeOnly 'org.postgresql:postgresql'

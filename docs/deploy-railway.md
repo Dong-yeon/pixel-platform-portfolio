@@ -162,6 +162,7 @@ AUTH_MODULE_URI=http://pixel-factory.railway.internal:9001
 MODULE_FACTORY_URI=http://pixel-factory.railway.internal:9001
 MODULE_FLEET_URI=http://pixel-fleet.railway.internal:9002
 MODULE_FLEET_WS_URI=http://pixel-fleet.railway.internal:9002
+MODULE_FACTORY_WS_URI=http://pixel-factory.railway.internal:9001
 PLATFORM_JWT_SECRET=<32바이트 이상 랜덤 문자열>   ← 세 서비스가 같은 값
 ```
 
@@ -171,9 +172,12 @@ PLATFORM_JWT_SECRET=<32바이트 이상 랜덤 문자열>   ← 세 서비스가
 > 된다. 서비스 그래프에 화살표가 그려지더라도 값이 있다는 뜻은 아니니 속지 말 것.
 > 그래서 모듈 쪽에 `PORT=9001`/`PORT=9002`를 명시하고, 여기서는 그 숫자를 그대로 쓴다.
 
-> `MODULE_FLEET_WS_URI`도 **http://** 로 둔다. 게이트웨이가 `Upgrade` 헤더를 보고
-> 자동으로 ws로 바꾼다. `ws://`로 두면 SockJS의 `/ws/info`(일반 HTTP)가 400이 된다.
+> **WS URI 두 개는 `http://` 로 둔다.** 게이트웨이가 `Upgrade` 헤더를 보고 자동으로 ws로
+> 바꾼다. `ws://`로 두면 SockJS의 `/info`(일반 HTTP)가 400이 된다.
 > 자세한 배경은 [platform/gateway/README.md](../platform/gateway/README.md).
+>
+> WebSocket 경로는 모듈별이다(`/ws/fleet/**` → fleet, `/ws/factory/**` → factory).
+> 서버 쪽 STOMP 엔드포인트도 같은 경로이므로 한쪽만 바꾸면 실시간이 **조용히** 끊긴다.
 
 ## 3. 배포 후 확인
 

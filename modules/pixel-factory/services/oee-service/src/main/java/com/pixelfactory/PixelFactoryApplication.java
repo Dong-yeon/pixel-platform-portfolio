@@ -8,6 +8,7 @@ import org.springframework.boot.autoconfigure.domain.EntityScan;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.data.jpa.repository.config.EnableJpaAuditing;
 import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
+import org.springframework.scheduling.annotation.EnableScheduling;
 
 /**
  * 공통 코어(common/auth/user)는 {@code com.pixelplatform.core}에 있다. 기본 스캔은
@@ -15,6 +16,7 @@ import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
  * 두 패키지로 명시해야 한다.
  */
 @EnableJpaAuditing
+@EnableScheduling   // OEE 스냅샷 주기 push (realtime/OeePushScheduler)
 @SpringBootApplication(scanBasePackages = {"com.pixelfactory", "com.pixelplatform.core"})
 @EntityScan(basePackages = {"com.pixelfactory", "com.pixelplatform.core"})
 @EnableJpaRepositories(basePackages = {"com.pixelfactory", "com.pixelplatform.core"})

@@ -11,11 +11,15 @@ const ROBOT_COLOR: Record<RobotStatus, string> = {
   OFFLINE: '#8a8a8a',
 }
 
+// 서버 EquipmentStatus 전부를 다뤄야 한다 — Record<EquipmentStatus, …>라 값이 빠지면
+// 타입체크가 잡아 준다(새 상태가 지도에서 조용히 무색이 되는 일을 막는다).
 const EQUIP_COLOR: Record<EquipmentStatus, string> = {
   RUNNING: '#27ae60',
   IDLE: '#9aa5b4',
+  SETUP: '#2d7ff9',        // 준비·교체 — 비계획 정지지만 고장과는 구분
   DOWN: '#e0392b',
   QUALITY_HOLD: '#e08a00',
+  PLANNED_STOP: '#5c6470', // 계획정지 — 애초에 돌릴 계획이 없던 시간(A의 분모에서 빠진다)
 }
 
 /** 진행 중인 운송만 흐름선으로 그린다(대기/완료는 제외). */

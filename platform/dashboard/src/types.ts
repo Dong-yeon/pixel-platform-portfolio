@@ -118,7 +118,10 @@ export const EQUIPMENT_POSITIONS: Record<string, [number, number]> = {
 
 // ---------- pixel-factory (OEE) ----------
 
-export type EquipmentStatus = 'IDLE' | 'RUNNING' | 'DOWN' | 'QUALITY_HOLD'
+// 서버 EquipmentStatus 와 일치해야 한다. SETUP·PLANNED_STOP 은 P9에서 추가됐다
+// (계획가동시간 정의 — PLANNED_STOP 만 A의 분모에서 빠진다).
+export type EquipmentStatus =
+  | 'IDLE' | 'RUNNING' | 'SETUP' | 'DOWN' | 'QUALITY_HOLD' | 'PLANNED_STOP'
 
 export interface Equipment {
   id: number
@@ -127,6 +130,24 @@ export interface Equipment {
   lineId: number
   idealCycleTimeMs: number
   status: EquipmentStatus
+}
+
+/** 설비 1대의 OEE. 서버가 이벤트에서 계산한 값이며 대시보드는 다시 계산하지 않는다. */
+export interface EquipmentOee {
+  equipmentCode: string
+  name: string
+  from: string
+  to: string
+  availability: number
+  performance: number
+  quality: number
+  oee: number
+  /** P > 1.0 — 표준CT가 실제보다 크게 잡혀 있다는 신호. 값은 잘리지 않는다. */
+  performanceAnomaly: boolean
+  plannedMinutes: number
+  operatingMinutes: number
+  producedQty: number
+  defectQty: number
 }
 
 export interface ProductionLine {

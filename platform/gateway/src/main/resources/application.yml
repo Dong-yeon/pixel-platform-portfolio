@@ -35,13 +35,26 @@ spring:
             - RewritePath=/api/fleet/(?<segment>.*), /api/$\{segment}
 
         # 실시간 push(STOMP over SockJS). 경로 재작성 없이 그대로 넘긴다.
-        # uri는 반드시 http:// 로 둔다 — 게이트웨이가 Upgrade 헤더를 보고 자동으로
-        # ws 로 전환하며, SockJS의 /ws/info 와 XHR 폴백(일반 HTTP)도 같은 라우트로
-        # 통과시킨다. ws:// 로 두면 업그레이드가 아닌 요청이 400으로 거부된다.
+        #
+        # **모듈마다 경로가 다르다.** 예전엔 /ws/** 를 통째로 fleet으로 보냈는데, 그러면
+        # factory가 WebSocket을 열 자리가 없다(모듈이 늘어나면 더 막힌다).
+        # 서버 쪽 엔드포인트도 같은 경로다(fleet WebSocketConfig=/ws/fleet, factory=/ws/factory).
+        #
+        # uri는 반드시 http:// 로 둔다 — 게이트웨이가 Upgrade 헤더를 보고 자동으로 ws 로
+        # 전환하며, SockJS의 /info 와 XHR 폴백(일반 HTTP)도 같은 라우트로 통과시킨다.
+        # ws:// 로 두면 업그레이드가 아닌 요청이 400으로 거부된다.
+        #
+        # SockJS는 /ws/{module}/info, /ws/{module}/{server}/{session}/xhr 처럼 하위 경로를
+        # 전부 쓰므로 라우트가 그 아래를 다 잡아야 한다.
         - id: pixel-fleet-ws
           uri: ${MODULE_FLEET_WS_URI:http://localhost:9002}
           predicates:
-            - Path=/ws/**
+            - Path=/ws/fleet/**
+
+        - id: pixel-factory-ws
+          uri: ${MODULE_FACTORY_WS_URI:http://localhost:9001}
+          predicates:
+            - Path=/ws/factory/**
 
       # 대시보드(9200)는 다른 오리진이므로 게이트웨이에서 CORS를 한 곳에 모아 처리한다.
       globalcors:

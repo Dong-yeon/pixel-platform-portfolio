@@ -160,8 +160,8 @@ jjwt를 직접 가져왔다.
 
 ## 그 외
 
-- **PixelFactory 실시간 push** — 현재 실시간은 fleet만 제공. factory도 WebSocket을 태우면
-  통합 현황이 양쪽 다 살아 움직인다.
+- ~~**PixelFactory 실시간 push**~~ → **P10에서 완료.** `/ws/factory`로 설비·이벤트 즉시 push,
+  OEE는 5초 주기. 게이트웨이 WS 라우트도 모듈별로 갈랐다(`/ws/fleet`, `/ws/factory`).
 - **OEE 계산 엔진** — 가동률×성능×품질. PixelFactory 로드맵 Phase 2가 미완이라 대시보드에
   품질률만 나온다.
 - **이벤트 보존 정책** — `fleet_events`/`factory_events`가 무한 증가. 배포 환경 비용 직결.

@@ -8,8 +8,10 @@ import com.pixelfactory.event.domain.TargetType;
 import com.pixelfactory.event.dto.FactoryEventCreateRequest;
 import com.pixelfactory.event.dto.FactoryEventResponse;
 import com.pixelfactory.event.repository.FactoryEventRepository;
+import com.pixelfactory.realtime.FactoryRealtimeEvents;
 import java.time.LocalDateTime;
 import java.util.List;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -22,9 +24,14 @@ public class FactoryEventService {
     private static final int MAX_RECENT_LIMIT = 100;
 
     private final FactoryEventRepository factoryEventRepository;
+    private final ApplicationEventPublisher eventPublisher;
 
-    public FactoryEventService(FactoryEventRepository factoryEventRepository) {
+    public FactoryEventService(
+            FactoryEventRepository factoryEventRepository,
+            ApplicationEventPublisher eventPublisher
+    ) {
         this.factoryEventRepository = factoryEventRepository;
+        this.eventPublisher = eventPublisher;
     }
 
     @Transactional
@@ -44,7 +51,7 @@ public class FactoryEventService {
                 LocalDateTime.now()
         );
 
-        return FactoryEventResponse.from(factoryEventRepository.save(event));
+        return publish(FactoryEventResponse.from(factoryEventRepository.save(event)));
     }
 
     /**
@@ -82,7 +89,7 @@ public class FactoryEventService {
                 occurredAt
         );
 
-        return FactoryEventResponse.from(factoryEventRepository.save(event));
+        return publish(FactoryEventResponse.from(factoryEventRepository.save(event)));
     }
 
     public List<FactoryEventResponse> getRecent(Integer limit) {
@@ -101,6 +108,18 @@ public class FactoryEventService {
                 .stream()
                 .map(FactoryEventResponse::from)
                 .toList();
+    }
+
+    /**
+     * 적재된 이벤트를 실시간 타임라인으로 알린다.
+     *
+     * <p>여기서 직접 push하지 않고 애플리케이션 이벤트만 발행한다 — 도메인 서비스가 메시징
+     * 인프라에 의존하지 않게 하고, 실제 발행은 트랜잭션 커밋 후로 미루기 위해서다
+     * ({@link com.pixelfactory.realtime.RealtimeBroadcaster}).
+     */
+    private FactoryEventResponse publish(FactoryEventResponse response) {
+        eventPublisher.publishEvent(new FactoryRealtimeEvents.FactoryEventRecorded(response));
+        return response;
     }
 
     private int normalizeLimit(Integer limit) {

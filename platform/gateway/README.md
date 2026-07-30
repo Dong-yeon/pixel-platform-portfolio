@@ -12,13 +12,18 @@ Spring Cloud Gateway(WebFlux 기반). 라우트는 `application.yml`에 선언�
 | `/api/auth/**` | 인증 담당 모듈 (기본 `:9001`) | 변환 없음 |
 | `/api/factory/**` | pixel-factory `:9001` | `/api/factory/robots` → `/api/robots` |
 | `/api/fleet/**` | pixel-fleet `:9002` | `/api/fleet/robots` → `/api/robots` |
-| `/ws/**` | pixel-fleet `:9002` | 변환 없음 (STOMP/SockJS) |
+| `/ws/fleet/**` | pixel-fleet `:9002` | 변환 없음 (STOMP/SockJS) |
+| `/ws/factory/**` | pixel-factory `:9001` | 변환 없음 (STOMP/SockJS) |
 
 모듈은 플랫폼 접두사를 모르고 자기 경로(`/api/robots`)만 안다. 접두사 제거는
 `RewritePath` 필터가 담당한다.
 
 환경변수로 대상 주소를 바꿀 수 있다: `AUTH_MODULE_URI`, `MODULE_FACTORY_URI`,
-`MODULE_FLEET_URI`, `MODULE_FLEET_WS_URI` (배포 시 사용).
+`MODULE_FLEET_URI`, `MODULE_FLEET_WS_URI`, `MODULE_FACTORY_WS_URI` (배포 시 사용).
+
+> **WebSocket 경로에 모듈명이 들어간다.** 예전엔 `/ws/**`를 통째로 fleet으로 보냈는데,
+> 그러면 factory가 WebSocket을 열 자리가 없다(모듈이 늘어나면 더 막힌다).
+> 서버 쪽 STOMP 엔드포인트도 같은 경로다 — 한쪽만 바꾸면 실시간이 **조용히** 끊긴다.
 
 ## 중앙 인증 (P6)
 

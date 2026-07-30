@@ -1,5 +1,5 @@
 import type {
-  AuthUser, Equipment, FleetEvent, ProductionLine,
+  AuthUser, Equipment, EquipmentOee, FleetEvent, ProductionLine,
   Robot, Task, TaskPriority, TimelineEvent, WorkOrder,
 } from './types'
 
@@ -86,5 +86,7 @@ export const api = {
     events: () => request<TimelineEvent[]>(FACTORY, '/events/recent'),
     startWorkOrder: (id: number) =>
       request<WorkOrder>(FACTORY, `/work-orders/${id}/start`, { method: 'PATCH' }),
+    /** 현재 교대 기준 전 설비 OEE. 이후 갱신은 WebSocket(/topic/factory/oee)이 밀어 준다. */
+    oeeCurrent: () => request<EquipmentOee[]>(FACTORY, '/oee/current'),
   },
 }
