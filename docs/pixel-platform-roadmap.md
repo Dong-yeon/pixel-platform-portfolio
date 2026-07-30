@@ -36,7 +36,7 @@
 | D2 | **사이클 이벤트가 작업지시 실적에 반영되지 않음** | ✅ **해결** | `MqttMessageHandler.handleCycle()`이 `IN_PROGRESS` 작업지시를 찾아 `workOrder.recordCycle(defect)` 호출, `workOrderId` 기록 | — |
 | D3 | **이벤트 발생시각 컬럼 없음** | ✅ **해결** | P8에서 `V4` 마이그레이션 + `FactoryEvent.occurredAt`. 핸들러가 payload `ts`(UTC)를 시스템 시간대로 변환해 저장, 실패 시 적재 시각 폴백+WARN | — |
 | D4 | **설비별 기간 조회 인덱스 없음** | ✅ **해결** | P8 `V4`에서 `idx_factory_events_target_type_time`(target_type, target_id, event_type, occurred_at desc) + `idx_factory_events_occurred_at` | — |
-| D5 | **계획가동시간 정의 불가** | ❌ | 시프트 캘린더 테이블 없음. `EquipmentStatus`는 `IDLE/RUNNING/DOWN/QUALITY_HOLD` 4개뿐 | Availability 분모를 만들 수 없음 |
+| D5 | **계획가동시간 정의 불가** | ✅ **해결** | P9: `shift_calendars`(휴식 시각 포함) + `EquipmentStatus`에 SETUP·PLANNED_STOP 추가. 계획/실가동 판정은 enum 메서드로 | — |
 | D6 | **표준CT가 설비 고정값** | ❌ | `equipments.ideal_cycle_time_ms`. `items`/`processes` 테이블 없음, `WorkOrder.itemId`는 FK 없는 raw bigint | 품종 전환 시 Performance 왜곡 |
 | D7 | **좌표계 3중 하드코딩** | ❌ | `LocationRegistry.java` / robot-sim `NodeMap` / dashboard `types.ts` | 모듈 추가할수록 배수로 증가 |
 | D8 | **MQTT 유실 설계** | ✅ **해결** | P8: 브로커 `persistence true` + `max_queued_messages 100000`, 구독자 `cleanSession=false`(factory·fleet). **유한 버퍼** — 약 7시간치 | 부분 잔존(장기 장애) |
@@ -61,7 +61,7 @@
 | 표방 | 실제 상태 |
 |---|---|
 | 로봇관제 | ✅ 완성도 높음 (유일하게 "제품"처럼 보임) |
-| MES | ⚠️ 골격만 — OEE 미구현, POP 없음, 품목 마스터 없음 |
+| MES | ⚠️ **OEE 엔진 완료(P9)**, 이벤트 정합성 완료(P8). POP 없음, 품목 마스터 없음 |
 | QMS | ❌ enum 껍데기만 |
 | WMS | ❌ `WAREHOUSE` 노드 좌표 1개뿐 |
 
@@ -224,15 +224,45 @@
 
 ### 완료 기준
 
-- [ ] 단위 테스트: 아래 케이스가 손계산과 일치
-      (계획가동 450분 / 실가동 403분 / 표준CT 1.0분 / 생산 373 / 불량 12 → **A 89.6%, P 92.6%, Q 96.8%, OEE 80.2%**)
-- [ ] 캐리인 테스트: 조회 구간 이전에 시작된 DOWN 구간이 A에 반영된다
-- [ ] 시프트 경계 분할 테스트
-- [ ] `P > 1.0` 상황에서 값이 잘리지 않고 플래그가 선다
+- [x] 단위 테스트: 손계산과 일치 — A 89.6%, P 92.6%, Q 96.8%, OEE 80.2%
+- [x] 캐리인 테스트: 조회 구간 이전에 시작된 DOWN 구간이 A에 반영된다
+- [x] 시프트 경계 분할 테스트
+- [x] `P > 1.0` 상황에서 값이 잘리지 않고 플래그가 선다
+
+테스트 20개 전부 통과(`OeeCalculatorTest` 5 · `ShiftWindowResolverTest` 10 · `StateIntervalAssemblerTest` 5).
+런타임: 설비/라인/current 3개 엔드포인트 동작, 휴식 시간대·교대 밖 조회 → 계획가동 0, 없는 설비 → 404.
+
+### 구현 중 갈라진 것 — 휴식은 "총 분"이 아니라 "시각"이어야 한다
+
+원안의 `shift_calendars.break_minutes`(총 분)로는 **A를 올바르게 계산할 수 없다.**
+분모에서는 뺄 수 있어도 분자(RUNNING 구간)에서는 뺄 수가 없다 — 언제가 휴식인지 모르니까.
+그대로 계산하니 휴식 중에도 돌아간 설비가 실가동 > 계획가동이 되어 **A가 109%로 나왔다.**
+
+→ `break_start`/`break_end` 시각으로 바꿨다. 교대에서 휴식을 뺀 **생산 창(production window)**
+을 만들고, 계획가동시간과 실가동시간을 **모두 그 창 안에서** 잰다. 그러면 실가동이 계획을
+넘는 일이 구조적으로 불가능하다(비례 배분 같은 보정도 필요 없다).
+
+### ⚠️ 남은 문제 — 시뮬레이터와 OEE의 시간 기준이 어긋난다 (P15 항목)
+
+엔진은 맞는데 **P가 250~650%로 나온다.** `SIM_SPEED=10`이라 시뮬레이터가 "30초 사이클"이라고
+말하면서 3초마다 발행하기 때문이다. 실시간 기준으로 보면 표준CT가 허용하는 양의 10배를 낸 셈이라
+P가 그만큼 커진다. `performanceAnomaly` 플래그는 **정상 동작**이다(표준CT와 실제가 안 맞는다고 알림).
+
+즉 엔진 버그가 아니라 데모의 시계 문제다. 선택지:
+
+| 안 | 결과 | 대가 |
+|---|---|---|
+| `SIM_SPEED=1` | OEE가 의미 있어진다 | 사이클 30초 — 지도가 한참 조용하다 |
+| 설비 마스터 `ideal_cycle_time_ms`를 배속에 맞춤(30000→3000) | 지도도 활발, OEE도 정상 | 설비 스펙이 "3초 사이클"로 비현실적 |
+| 시뮬레이터가 시뮬레이션 시계로 `ts` 발행 | 가장 정확 | `occurred_at`이 실시간보다 빨라져 "현재 교대" 개념이 깨진다 |
+
+P15의 "시뮬레이터 파라미터 재조정"이 이 항목이다.
 
 ### 주의
 
 - **표준CT는 품번 단위가 맞다(D6).** 다만 `items` 테이블 신설은 P13(WMS)에서 품목 마스터를 만들 때 함께 한다.
+  P9는 `IdealCycleTimeProvider.idealCycleTimeMs(equipmentId, itemId)` 인터페이스로 받아 뒀으므로
+  **구현만 갈아끼우면** 되고 계산기는 손대지 않는다.
   P9에서는 설비 고정값을 쓰되, **계산기 인터페이스는 `idealCycleTimeMs(equipmentId, itemId)` 형태로 받아두어**
   나중에 구현만 갈아끼우면 되게 한다.
 

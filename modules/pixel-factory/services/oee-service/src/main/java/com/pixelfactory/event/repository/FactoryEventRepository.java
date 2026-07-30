@@ -1,7 +1,11 @@
 package com.pixelfactory.event.repository;
 
 import com.pixelfactory.event.domain.FactoryEvent;
+import com.pixelfactory.event.domain.FactoryEventType;
+import com.pixelfactory.event.domain.TargetType;
+import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 
@@ -12,4 +16,28 @@ public interface FactoryEventRepository extends JpaRepository<FactoryEvent, Long
     List<FactoryEvent> findByOrderByOccurredAtDesc(Pageable pageable);
 
     List<FactoryEvent> findByWorkOrderIdOrderByOccurredAtDesc(Long workOrderId);
+
+    // ---- OEE 집계용 (idx_factory_events_target_type_time 이 이 형태를 받는다) ----
+
+    /** 조회 구간 안의 이벤트. 상태 구간 조립·사이클 집계에 쓴다. */
+    List<FactoryEvent> findByEventTypeAndTargetTypeAndTargetIdAndOccurredAtGreaterThanEqualAndOccurredAtLessThanOrderByOccurredAtAsc(
+            FactoryEventType eventType,
+            TargetType targetType,
+            Long targetId,
+            LocalDateTime from,
+            LocalDateTime to
+    );
+
+    /**
+     * 조회 시작 <b>이전</b>의 마지막 상태 변경 — 캐리인용.
+     *
+     * <p>이걸 빼면 구간 시작 시점의 상태를 알 수 없어 첫 이벤트까지가 통째로 비고,
+     * 이전부터 이어진 정지가 사라져 A가 부풀려진다.
+     */
+    Optional<FactoryEvent> findFirstByEventTypeAndTargetTypeAndTargetIdAndOccurredAtLessThanOrderByOccurredAtDesc(
+            FactoryEventType eventType,
+            TargetType targetType,
+            Long targetId,
+            LocalDateTime before
+    );
 }

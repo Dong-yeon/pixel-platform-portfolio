@@ -33,8 +33,15 @@ LWT(유언)는 접속당 하나뿐이라 접속을 공유하면 설비 한 대�
 { "status": "DOWN", "reason": "BREAKDOWN", "ts": "2026-07-16T10:00:00Z" }
 ```
 
-- `status`: `RUNNING` | `IDLE` | `DOWN` | `QUALITY_HOLD`
+- `status`: `RUNNING` | `IDLE` | `SETUP` | `DOWN` | `QUALITY_HOLD` | `PLANNED_STOP`
 - `reason`: 선택 (상태 사유)
+
+> **각 값이 OEE의 Availability에 어떻게 들어가는지가 정의의 핵심이다.**
+> `PLANNED_STOP`만 계획가동시간(분모)에서 빠지고, 나머지는 모두 분모에 들어간다.
+> 실가동시간(분자)은 `RUNNING`만이다. 근거는 `EquipmentStatus` Javadoc 참고 —
+> 특히 `SETUP`을 분모에 넣는 이유(빼면 준비시간이 길어질수록 A가 좋아 보인다).
+>
+> 휴식은 상태로 오지 않는다. `shift_calendars`의 휴식 시각으로 관리한다.
 - **retained = true.** "현재 상태"이므로 나중에 붙는 구독자도 즉시 알아야 한다.
   oee-service만 재기동해도 브로커가 마지막 상태를 다시 밀어 주므로 상태가 복원된다.
 - 처리: equipments.status 갱신 + `EQUIPMENT_STATUS_CHANGED` 이벤트 기록
