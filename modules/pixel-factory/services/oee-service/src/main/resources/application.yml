@@ -35,6 +35,11 @@ mqtt:
   client-id: ${MQTT_CLIENT_ID:oee-service}
   topic-filter: "factory/#"
 
+pop:
+  # POP 단말 presence(파생 위치) 타임아웃(분). 마지막 조작 후 이 시간이 지나면 지도 배지를 뗀다.
+  # 데모/검증 시 짧게 낮춰 stale 처리를 눈으로 확인할 수 있다(POP_PRESENCE_TIMEOUT_MINUTES).
+  presence-timeout-minutes: ${POP_PRESENCE_TIMEOUT_MINUTES:30}
+
 ---
 spring:
   config:

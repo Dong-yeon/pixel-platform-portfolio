@@ -1,8 +1,9 @@
+import { useState } from 'react'
 import type {
-  Equipment, EquipmentOee, Layout, ModuleKey, Robot, Task, TimelineEvent, WorkOrder,
+  Equipment, EquipmentOee, Layout, ModuleKey, Robot, Task, TerminalPresence, TimelineEvent, WorkOrder,
 } from '../types'
 import { EventTimeline } from './EventTimeline'
-import { UnifiedMap } from './UnifiedMap'
+import { UnifiedMap, type MapLayers } from './UnifiedMap'
 
 function Stat({ label, value, sub, tone }: { label: string; value: string; sub?: string; tone?: string }) {
   return (
@@ -18,6 +19,13 @@ function Stat({ label, value, sub, tone }: { label: string; value: string; sub?:
  * 플랫폼 요약 — 두 모듈의 지표를 한 화면에 모은다.
  * 이벤트 타임라인은 factory·fleet을 시간순으로 합쳐 보여준다.
  */
+const LAYER_LABEL: { key: keyof MapLayers; label: string }[] = [
+  { key: 'equipment', label: '설비' },
+  { key: 'amr', label: 'AMR' },
+  { key: 'routes', label: '운송경로' },
+  { key: 'pop', label: 'POP·작업자' },
+]
+
 export function OverviewView({
   layout,
   equipments,
@@ -25,6 +33,7 @@ export function OverviewView({
   oee,
   robots,
   tasks,
+  presence,
   factoryEvents,
   fleetEvents,
   onGo,
@@ -35,10 +44,15 @@ export function OverviewView({
   oee: EquipmentOee[]
   robots: Robot[]
   tasks: Task[]
+  presence: TerminalPresence[]
   factoryEvents: TimelineEvent[]
   fleetEvents: TimelineEvent[]
   onGo: (m: ModuleKey) => void
 }) {
+  // 지도 레이어 토글 — 밀도가 빠듯해 겹치는 시스템을 끌 수 있게 한다(지도 시각 규칙).
+  const [layers, setLayers] = useState<MapLayers>({ equipment: true, amr: true, routes: true, pop: true })
+  const toggleLayer = (key: keyof MapLayers) => setLayers((prev) => ({ ...prev, [key]: !prev[key] }))
+
   const running = equipments.filter((e) => e.status === 'RUNNING').length
   const down = equipments.filter((e) => e.status === 'DOWN').length
   const activeWo = workOrders.filter((w) => w.status === 'IN_PROGRESS').length
@@ -101,7 +115,22 @@ export function OverviewView({
             {activeRoutes > 0 && ` · 운송 중 ${activeRoutes}`}
           </span>
         </div>
-        <UnifiedMap layout={layout} equipments={equipments} robots={robots} tasks={tasks} />
+        <UnifiedMap
+          layout={layout}
+          equipments={equipments}
+          robots={robots}
+          tasks={tasks}
+          presence={presence}
+          layers={layers}
+        />
+        <div className="umap-layers">
+          {LAYER_LABEL.map(({ key, label }) => (
+            <label key={key} className="umap-layer-toggle">
+              <input type="checkbox" checked={layers[key]} onChange={() => toggleLayer(key)} />
+              {label}
+            </label>
+          ))}
+        </div>
         <div className="umap-legend">
           <span><i className="lg-swatch" style={{ background: '#27ae60' }} />설비 가동</span>
           <span><i className="lg-swatch" style={{ background: '#9aa5b4' }} />대기</span>
@@ -111,6 +140,7 @@ export function OverviewView({
           <span><i className="lg-dot" style={{ background: '#e08a00' }} />충전</span>
           <span><i className="lg-swatch" style={{ background: '#c8912f' }} />적재(파렛트)</span>
           <span style={{ color: '#2d7ff9' }}>┈ 운송 경로</span>
+          <span><i className="lg-swatch" style={{ background: '#7b61ff' }} />POP 단말</span>
         </div>
       </section>
 

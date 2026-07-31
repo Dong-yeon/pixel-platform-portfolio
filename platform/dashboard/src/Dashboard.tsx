@@ -2,22 +2,42 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { api } from './api'
 import { FactoryView } from './components/factory/FactoryView'
 import { FleetView } from './components/fleet/FleetView'
+import { InspectionView } from './components/inspection/InspectionView'
 import { OverviewView } from './components/OverviewView'
+import { PopScreen } from './components/pop/PopScreen'
 import { usePlatformSocket } from './usePlatformSocket'
 import type {
   AuthUser, Equipment, EquipmentOee, FleetEvent, Layout, ModuleKey, ProductionLine,
-  Robot, Task, TimelineEvent, WorkOrder,
+  Robot, Task, TerminalPresence, TimelineEvent, WorkOrder,
 } from './types'
 
 const MAX_EVENTS = 200
-const TABS: { key: ModuleKey; label: string }[] = [
-  { key: 'overview', label: '통합 현황' },
-  { key: 'factory', label: 'PixelFactory' },
-  { key: 'fleet', label: 'PixelFleet' },
-]
+
+const TAB_LABEL: Record<ModuleKey, string> = {
+  overview: '통합 현황',
+  factory: 'PixelFactory',
+  fleet: 'PixelFleet',
+  pop: 'POP 단말',
+  inspection: '검사 대기',
+}
+
+// 역할별 진입 화면·접근 범위(P12-4). 배열 첫 항목이 진입 탭이다.
+//   ADMIN → 통합현황(전체) · OPERATOR → POP · INSPECTOR → 검사대기 · DISPATCHER → Fleet 관제
+// 프론트 게이팅이 1차 차단이다(operator는 관제 탭이 아예 없다). 서버측 강제는 모듈 몫.
+const ROLE_TABS: Record<string, ModuleKey[]> = {
+  ADMIN: ['overview', 'factory', 'fleet'],
+  OPERATOR: ['pop'],
+  INSPECTOR: ['inspection'],
+  DISPATCHER: ['fleet'],
+}
+
+function tabsForRole(role: string): ModuleKey[] {
+  return ROLE_TABS[role] ?? ['overview']
+}
 
 export function Dashboard({ user, onLogout }: { user: AuthUser; onLogout: () => void }) {
-  const [tab, setTab] = useState<ModuleKey>('overview')
+  const allowedTabs = useMemo(() => tabsForRole(user.role), [user.role])
+  const [tab, setTab] = useState<ModuleKey>(() => allowedTabs[0])
 
   // fleet
   const [robots, setRobots] = useState<Robot[]>([])
@@ -31,9 +51,12 @@ export function Dashboard({ user, onLogout }: { user: AuthUser; onLogout: () => 
   const [oee, setOee] = useState<EquipmentOee[]>([])
   // 평면도 — 좌표의 단일 출처. 못 받으면 지도를 그릴 좌표계가 없다.
   const [layout, setLayout] = useState<Layout | null>(null)
+  // POP 파생 위치(presence) — 지도 키오스크 배지용. 저장값 아님, 서버가 최근 이벤트에서 계산.
+  const [presence, setPresence] = useState<TerminalPresence[]>([])
 
   const taskTimer = useRef<number | undefined>(undefined)
   const workOrderTimer = useRef<number | undefined>(undefined)
+  const presenceTimer = useRef<number | undefined>(undefined)
 
   const loadTasks = useCallback(() => {
     api.fleet.tasks().then(setTasks).catch(() => {})
@@ -41,6 +64,10 @@ export function Dashboard({ user, onLogout }: { user: AuthUser; onLogout: () => 
 
   const loadWorkOrders = useCallback(() => {
     api.factory.workOrders().then(setWorkOrders).catch(() => {})
+  }, [])
+
+  const loadPresence = useCallback(() => {
+    api.factory.terminalPresence().then(setPresence).catch(() => {})
   }, [])
 
   // 같은 종류 이벤트가 몰려올 때 목록 리페치를 한 번으로 묶는다.
@@ -54,6 +81,11 @@ export function Dashboard({ user, onLogout }: { user: AuthUser; onLogout: () => 
     workOrderTimer.current = window.setTimeout(loadWorkOrders, 500)
   }, [loadWorkOrders])
 
+  const schedulePresenceRefetch = useCallback(() => {
+    window.clearTimeout(presenceTimer.current)
+    presenceTimer.current = window.setTimeout(loadPresence, 500)
+  }, [loadPresence])
+
   useEffect(() => {
     api.fleet.robots().then(setRobots).catch(() => {})
     api.fleet.events().then((e: FleetEvent[]) => setFleetEvents(e)).catch(() => {})
@@ -64,7 +96,15 @@ export function Dashboard({ user, onLogout }: { user: AuthUser; onLogout: () => 
     api.factory.layout().then(setLayout).catch(() => {})
     loadTasks()
     loadWorkOrders()
-  }, [loadTasks, loadWorkOrders])
+    loadPresence()
+  }, [loadTasks, loadWorkOrders, loadPresence])
+
+  // presence는 이벤트로도 갱신되지만, 타임아웃 경과분은 이벤트 없이도 사라져야 한다.
+  // 주기적으로 다시 파생시켜 오래된 배지를 걷어낸다(흐리기→제거).
+  useEffect(() => {
+    const timer = window.setInterval(loadPresence, 60_000)
+    return () => window.clearInterval(timer)
+  }, [loadPresence])
 
   // ---- 실시간 ----
   // 모듈마다 별개 연결이다. 한쪽이 재기동돼도 다른 쪽 실시간은 살아 있어야 한다.
@@ -98,10 +138,15 @@ export function Dashboard({ user, onLogout }: { user: AuthUser; onLogout: () => 
       if (event.eventType === 'CYCLE_COMPLETED' || event.eventType.startsWith('WORK_ORDER_')) {
         scheduleWorkOrderRefetch()
       }
+      // POP 조작(WORK_ORDER_*)은 단말 배지를 바꾼다 — presence를 다시 파생시킨다.
+      // 신규 WS 토픽 없이 기존 이벤트 스트림에 얹는다.
+      if (event.eventType.startsWith('WORK_ORDER_') || event.eventType === 'PRODUCTION_COMPLETED') {
+        schedulePresenceRefetch()
+      }
     },
     // OEE는 서버가 몇 초마다 계산해 밀어 준다 — 대시보드는 다시 계산하지 않는다.
     '/topic/factory/oee': (body: unknown) => setOee(body as EquipmentOee[]),
-  }), [scheduleWorkOrderRefetch])
+  }), [scheduleWorkOrderRefetch, schedulePresenceRefetch])
 
   const fleetConnected = usePlatformSocket('/ws/fleet', fleetTopics)
   const factoryConnected = usePlatformSocket('/ws/factory', factoryTopics)
@@ -125,13 +170,13 @@ export function Dashboard({ user, onLogout }: { user: AuthUser; onLogout: () => 
           </span>
         </div>
         <nav className="tabs">
-          {TABS.map((t) => (
+          {allowedTabs.map((key) => (
             <button
-              key={t.key}
-              className={tab === t.key ? 'tab active' : 'tab'}
-              onClick={() => setTab(t.key)}
+              key={key}
+              className={tab === key ? 'tab active' : 'tab'}
+              onClick={() => setTab(key)}
             >
-              {t.label}
+              {TAB_LABEL[key]}
             </button>
           ))}
         </nav>
@@ -154,10 +199,17 @@ export function Dashboard({ user, onLogout }: { user: AuthUser; onLogout: () => 
             oee={oee}
             robots={robots}
             tasks={tasks}
+            presence={presence}
             factoryEvents={factoryEvents}
             fleetEvents={fleetEvents}
             onGo={setTab}
           />
+        )}
+        {tab === 'pop' && (
+          <PopScreen terminals={layout?.terminals ?? []} />
+        )}
+        {tab === 'inspection' && (
+          <InspectionView workOrders={workOrders} equipments={equipments} />
         )}
         {tab === 'factory' && (
           <FactoryView

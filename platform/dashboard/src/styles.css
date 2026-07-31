@@ -214,3 +214,40 @@ button.mini { padding: 3px 10px; font-size: 12px; margin-left: auto; }
 .umap-legend span { display: inline-flex; align-items: center; gap: 5px; }
 .lg-swatch { width: 11px; height: 11px; border-radius: 2px; display: inline-block; }
 .lg-dot { width: 11px; height: 11px; border-radius: 50%; display: inline-block; }
+
+/* POP 단말(키오스크) — 세로 직사각. 사용 중이면 보라 채움 + 담당자 배지. */
+.umap-terminal { fill: #efeaff; stroke: #7b61ff; stroke-width: 0.18; }
+.umap-terminal.in-use { fill: #7b61ff; }
+.umap-terminal-label { font-size: 1px; fill: #4a3aa0; font-weight: 700; }
+.umap-terminal-label.in-use { fill: #fff; }
+.umap-operator-badge rect { fill: #2b2440; opacity: 0.92; }
+.umap-badge-name { font-size: 1.05px; fill: #fff; font-weight: 700; }
+.umap-badge-wo { font-size: 0.9px; fill: #cbc4e6; }
+
+/* 지도 레이어 토글 */
+.umap-layers { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 10px; font-size: 12px; }
+.umap-layer-toggle { display: inline-flex; align-items: center; gap: 5px; color: var(--ink); cursor: pointer; user-select: none; }
+.umap-layer-toggle input { accent-color: #2d7ff9; }
+
+/* ===== POP 단말 화면 ===== */
+.pop { max-width: 720px; margin: 0 auto; padding: 16px; }
+.pop-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
+.pop-head h1 { font-size: 22px; margin: 0; }
+.pop-head-actions { display: flex; gap: 8px; }
+.pop-terminal-pick { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; }
+.pop-wo-list { display: flex; flex-direction: column; gap: 14px; }
+.pop-wo { border: 1px solid var(--line); border-radius: 12px; padding: 16px; background: var(--card); }
+.pop-wo-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
+.pop-wo-no { font-size: 18px; font-weight: 700; }
+/* 터치 친화적 큰 버튼 — 현장 장갑 낀 손에도 눌리게. */
+.pop-big {
+  display: inline-flex; flex-direction: column; align-items: center; justify-content: center;
+  min-height: 56px; padding: 12px 20px; font-size: 17px; font-weight: 700;
+  border: 1px solid var(--line); border-radius: 10px; background: #fff; color: var(--ink); cursor: pointer;
+}
+.pop-big.primary { background: #2d7ff9; border-color: #2d7ff9; color: #fff; }
+.pop-big:disabled { opacity: 0.55; cursor: default; }
+.pop-actions { display: flex; gap: 10px; margin-top: 12px; }
+.pop-report { margin-top: 12px; display: flex; flex-direction: column; gap: 10px; }
+.pop-report label { display: flex; align-items: center; justify-content: space-between; gap: 10px; font-size: 15px; }
+.pop-report input { width: 130px; padding: 10px; font-size: 17px; border: 1px solid var(--line); border-radius: 8px; text-align: right; }

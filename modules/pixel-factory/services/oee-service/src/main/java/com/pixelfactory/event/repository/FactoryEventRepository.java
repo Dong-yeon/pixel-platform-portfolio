@@ -2,6 +2,7 @@ package com.pixelfactory.event.repository;
 
 import com.pixelfactory.event.domain.FactoryEvent;
 import com.pixelfactory.event.domain.FactoryEventType;
+import com.pixelfactory.event.domain.SourceType;
 import com.pixelfactory.event.domain.TargetType;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -14,6 +15,17 @@ public interface FactoryEventRepository extends JpaRepository<FactoryEvent, Long
     // 정렬 기준은 적재 시각(createdAt)이 아니라 발생 시각(occurredAt)이다.
     // 밀렸다 한꺼번에 들어온 메시지가 처리 순서대로 붙으면 실제 일어난 순서와 뒤바뀐다.
     List<FactoryEvent> findByOrderByOccurredAtDesc(Pageable pageable);
+
+    /**
+     * 타임아웃 이내의 TERMINAL 소스 이벤트 — POP presence(파생 위치) 계산 입력.
+     *
+     * <p>최신순으로 받아 터미널(sourceId)별 첫 1건을 "그 단말의 현재 상태"로 본다.
+     * presence는 저장하지 않고 이 이벤트 스트림에서 파생한다(P12).
+     */
+    List<FactoryEvent> findBySourceTypeAndOccurredAtGreaterThanEqualOrderByOccurredAtDesc(
+            SourceType sourceType,
+            LocalDateTime since
+    );
 
     List<FactoryEvent> findByWorkOrderIdOrderByOccurredAtDesc(Long workOrderId);
 

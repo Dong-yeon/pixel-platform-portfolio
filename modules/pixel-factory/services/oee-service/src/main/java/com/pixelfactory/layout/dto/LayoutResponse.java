@@ -3,6 +3,7 @@ package com.pixelfactory.layout.dto;
 import com.pixelfactory.layout.domain.LayoutNode;
 import com.pixelfactory.layout.domain.LayoutNodeType;
 import com.pixelfactory.layout.domain.LayoutSettings;
+import com.pixelfactory.terminal.domain.PopTerminal;
 import java.util.List;
 
 /**
@@ -34,16 +35,21 @@ public record LayoutResponse(
 
     /** POP 단말 (P12). */
     public record Terminal(String terminalCode, String name, double posX, double posY) {
+
+        public static Terminal from(PopTerminal terminal) {
+            return new Terminal(terminal.getTerminalCode(), terminal.getName(),
+                    terminal.getPosX(), terminal.getPosY());
+        }
     }
 
-    public static LayoutResponse of(LayoutSettings settings, List<LayoutNode> nodes) {
+    public static LayoutResponse of(LayoutSettings settings, List<LayoutNode> nodes, List<PopTerminal> terminals) {
         return new LayoutResponse(
                 settings.getWidth(),
                 settings.getHeight(),
                 settings.getUpperAisleY(),
                 settings.getLowerAisleY(),
                 nodes.stream().map(Node::from).toList(),
-                List.of()
+                terminals.stream().map(Terminal::from).toList()
         );
     }
 }

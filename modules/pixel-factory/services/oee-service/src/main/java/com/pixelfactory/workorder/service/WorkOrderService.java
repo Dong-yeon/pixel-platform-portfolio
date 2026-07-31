@@ -54,6 +54,7 @@ public class WorkOrderService {
         WorkOrder savedWorkOrder = workOrderRepository.save(workOrder);
         recordWorkOrderEvent(
                 savedWorkOrder,
+                null,
                 FactoryEventType.WORK_ORDER_ASSIGNED,
                 EventSeverity.INFO,
                 "Work order assigned: " + savedWorkOrder.getWorkOrderNo(),
@@ -82,12 +83,18 @@ public class WorkOrderService {
 
     @Transactional
     public WorkOrderResponse start(Long id) {
+        return start(id, null);
+    }
+
+    @Transactional
+    public WorkOrderResponse start(Long id, OperationSource source) {
         WorkOrder workOrder = getWorkOrder(id);
         validateTransition(workOrder.getStatus(), WorkOrderStatus.IN_PROGRESS);
 
         workOrder.start(LocalDateTime.now());
         recordWorkOrderEvent(
                 workOrder,
+                source,
                 FactoryEventType.WORK_ORDER_STARTED,
                 EventSeverity.INFO,
                 "Work order started: " + workOrder.getWorkOrderNo(),
@@ -105,6 +112,11 @@ public class WorkOrderService {
 
     @Transactional
     public WorkOrderResponse completeProduction(Long id, WorkOrderCompleteProductionRequest request) {
+        return completeProduction(id, request, null);
+    }
+
+    @Transactional
+    public WorkOrderResponse completeProduction(Long id, WorkOrderCompleteProductionRequest request, OperationSource source) {
         WorkOrder workOrder = getWorkOrder(id);
         validateTransition(workOrder.getStatus(), WorkOrderStatus.INSPECTION_WAITING);
         validateProductionQty(workOrder.getPlannedQty(), request.producedQty(), request.defectQty());
@@ -112,6 +124,7 @@ public class WorkOrderService {
         workOrder.completeProduction(request.producedQty(), request.defectQty());
         recordWorkOrderEvent(
                 workOrder,
+                source,
                 FactoryEventType.PRODUCTION_COMPLETED,
                 EventSeverity.SUCCESS,
                 "Production completed: " + workOrder.getWorkOrderNo(),
@@ -128,6 +141,7 @@ public class WorkOrderService {
         workOrder.hold(request.reason());
         recordWorkOrderEvent(
                 workOrder,
+                null,
                 FactoryEventType.WORK_ORDER_ON_HOLD,
                 EventSeverity.WARNING,
                 "Work order on hold: " + workOrder.getWorkOrderNo(),
@@ -145,12 +159,18 @@ public class WorkOrderService {
 
     @Transactional
     public WorkOrderResponse close(Long id) {
+        return close(id, null);
+    }
+
+    @Transactional
+    public WorkOrderResponse close(Long id, OperationSource source) {
         WorkOrder workOrder = getWorkOrder(id);
         validateTransition(workOrder.getStatus(), WorkOrderStatus.COMPLETED);
 
         workOrder.close(LocalDateTime.now());
         recordWorkOrderEvent(
                 workOrder,
+                source,
                 FactoryEventType.WORK_ORDER_COMPLETED,
                 EventSeverity.SUCCESS,
                 "Work order completed: " + workOrder.getWorkOrderNo(),
@@ -211,15 +231,19 @@ public class WorkOrderService {
 
     private void recordWorkOrderEvent(
             WorkOrder workOrder,
+            OperationSource source,
             FactoryEventType eventType,
             EventSeverity severity,
             String message,
             String payloadJson
     ) {
+        // 기본 출처는 작업지시 자신(REST). POP 경로는 단말을 출처로 넘겨 presence를 성립시킨다.
+        SourceType sourceType = source != null ? source.type() : SourceType.WORK_ORDER;
+        Long sourceId = source != null ? source.sourceId() : workOrder.getId();
         factoryEventService.record(
                 eventType,
-                SourceType.WORK_ORDER,
-                workOrder.getId(),
+                sourceType,
+                sourceId,
                 TargetType.WORK_ORDER,
                 workOrder.getId(),
                 workOrder.getId(),

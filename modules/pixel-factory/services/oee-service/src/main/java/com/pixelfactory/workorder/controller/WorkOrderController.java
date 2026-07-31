@@ -1,6 +1,7 @@
 package com.pixelfactory.workorder.controller;
 
 import com.pixelplatform.core.common.response.ApiResponse;
+import com.pixelfactory.auth.CurrentUserProvider;
 import com.pixelfactory.workorder.domain.WorkOrderStatus;
 import com.pixelfactory.workorder.dto.WorkOrderCompleteProductionRequest;
 import com.pixelfactory.workorder.dto.WorkOrderCreateRequest;
@@ -23,9 +24,11 @@ import org.springframework.web.bind.annotation.RestController;
 public class WorkOrderController {
 
     private final WorkOrderService workOrderService;
+    private final CurrentUserProvider currentUserProvider;
 
-    public WorkOrderController(WorkOrderService workOrderService) {
+    public WorkOrderController(WorkOrderService workOrderService, CurrentUserProvider currentUserProvider) {
         this.workOrderService = workOrderService;
+        this.currentUserProvider = currentUserProvider;
     }
 
     @PostMapping
@@ -43,9 +46,9 @@ public class WorkOrderController {
     }
 
     @GetMapping("/my")
-    public ApiResponse<List<WorkOrderResponse>> getMyWorkOrders(@RequestParam Long assignedUserId) {
-        // TODO: Replace assignedUserId request param with authenticated user id after real auth is implemented.
-        return ApiResponse.ok(workOrderService.getMyWorkOrders(assignedUserId));
+    public ApiResponse<List<WorkOrderResponse>> getMyWorkOrders() {
+        // 인증된 사용자(username)를 userId로 해석해 배정된 작업지시만 돌려준다.
+        return ApiResponse.ok(workOrderService.getMyWorkOrders(currentUserProvider.requireUserId()));
     }
 
     @GetMapping("/{id}")

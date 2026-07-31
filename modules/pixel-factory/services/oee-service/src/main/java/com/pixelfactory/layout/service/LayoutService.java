@@ -4,6 +4,7 @@ import com.pixelfactory.layout.domain.LayoutSettings;
 import com.pixelfactory.layout.dto.LayoutResponse;
 import com.pixelfactory.layout.repository.LayoutNodeRepository;
 import com.pixelfactory.layout.repository.LayoutSettingsRepository;
+import com.pixelfactory.terminal.repository.PopTerminalRepository;
 import com.pixelplatform.core.common.exception.BusinessException;
 import com.pixelplatform.core.common.exception.ErrorCode;
 import org.springframework.stereotype.Service;
@@ -15,10 +16,13 @@ public class LayoutService {
 
     private final LayoutSettingsRepository settingsRepository;
     private final LayoutNodeRepository nodeRepository;
+    private final PopTerminalRepository terminalRepository;
 
-    public LayoutService(LayoutSettingsRepository settingsRepository, LayoutNodeRepository nodeRepository) {
+    public LayoutService(LayoutSettingsRepository settingsRepository, LayoutNodeRepository nodeRepository,
+                         PopTerminalRepository terminalRepository) {
         this.settingsRepository = settingsRepository;
         this.nodeRepository = nodeRepository;
+        this.terminalRepository = terminalRepository;
     }
 
     public LayoutResponse get() {
@@ -28,6 +32,8 @@ public class LayoutService {
                 .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND,
                         "평면도 설정이 없습니다. V7 마이그레이션이 적용됐는지 확인하세요."));
 
-        return LayoutResponse.of(settings, nodeRepository.findAllByOrderByNodeCodeAsc());
+        return LayoutResponse.of(settings,
+                nodeRepository.findAllByOrderByNodeCodeAsc(),
+                terminalRepository.findAllByOrderByTerminalCodeAsc());
     }
 }

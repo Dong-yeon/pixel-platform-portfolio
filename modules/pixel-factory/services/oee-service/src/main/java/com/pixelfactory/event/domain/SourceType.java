@@ -7,5 +7,6 @@ public enum SourceType {
     EQUIPMENT,
     PRODUCTION,
     INSPECTION,
-    AI
+    AI,
+    TERMINAL
 }

@@ -19,7 +19,7 @@ export interface AuthUser {
   role: string
 }
 
-export type ModuleKey = 'overview' | 'factory' | 'fleet'
+export type ModuleKey = 'overview' | 'factory' | 'fleet' | 'pop' | 'inspection'
 
 // ---------- pixel-fleet (AMR) ----------
 
@@ -81,12 +81,25 @@ export interface LayoutNode {
   posY: number
 }
 
-/** POP 단말 — P12에서 채워진다(지금은 빈 목록). */
+/** POP 단말 — layout에 실려 오는 마스터(코드·이름·좌표). */
 export interface LayoutTerminal {
   terminalCode: string
   name: string
   posX: number
   posY: number
+}
+
+/**
+ * 파생 위치(presence) — "이 단말에서 지금 누가 작업 중인가".
+ *
+ * 서버가 최근 TERMINAL 이벤트에서 계산해 내려준다(저장값 아님). 지도가 키오스크 배지로 그린다.
+ * `lastActivityAt`으로 오래된 배지를 흐리게 표시한다(타임아웃 임박).
+ */
+export interface TerminalPresence {
+  terminalCode: string
+  operatorName: string
+  workOrderNo: string
+  lastActivityAt: string
 }
 
 export interface Layout {

@@ -1,7 +1,13 @@
 import type {
   AuthUser, Equipment, EquipmentOee, FleetEvent, Layout, ProductionLine,
-  Robot, Task, TaskPriority, TimelineEvent, WorkOrder,
+  Robot, Task, TaskPriority, TerminalPresence, TimelineEvent, WorkOrder,
 } from './types'
+
+/** POP 화면 초기 데이터 — 단말 + 로그인 작업자의 작업지시. */
+export interface PopBoard {
+  terminal: { id: number; terminalCode: string; name: string; lineId: number; posX: number; posY: number }
+  workOrders: WorkOrder[]
+}
 
 // 모든 호출은 게이트웨이(9000)로 나가고, 접두사로 모듈이 정해진다.
 //   /api/auth/**     → 인증 담당 모듈 (플랫폼 로그인 창구)
@@ -90,5 +96,23 @@ export const api = {
     oeeCurrent: () => request<EquipmentOee[]>(FACTORY, '/oee/current'),
     /** 공장 평면도 — 좌표의 단일 출처. 대시보드는 좌표를 하드코딩하지 않는다. */
     layout: () => request<Layout>(FACTORY, '/layout'),
+    /** 파생 위치(presence) — 지도 키오스크 배지용. 저장값 아님, 최근 TERMINAL 이벤트에서 계산. */
+    terminalPresence: () => request<TerminalPresence[]>(FACTORY, '/terminals/presence'),
+    /** 내게 배정된 작업지시(인증된 사용자 기준). POP·현장용. */
+    myWorkOrders: () => request<WorkOrder[]>(FACTORY, '/work-orders/my'),
+  },
+
+  /** POP(Point of Production) 단말 — 현장 작업자 전용 조작. */
+  pop: {
+    board: (terminalCode: string) => request<PopBoard>(FACTORY, `/pop/${terminalCode}`),
+    start: (terminalCode: string, id: number) =>
+      request<WorkOrder>(FACTORY, `/pop/${terminalCode}/work-orders/${id}/start`, { method: 'POST' }),
+    completeProduction: (terminalCode: string, id: number, input: { producedQty: number; defectQty: number }) =>
+      request<WorkOrder>(FACTORY, `/pop/${terminalCode}/work-orders/${id}/complete-production`, {
+        method: 'POST',
+        body: JSON.stringify(input),
+      }),
+    close: (terminalCode: string, id: number) =>
+      request<WorkOrder>(FACTORY, `/pop/${terminalCode}/work-orders/${id}/close`, { method: 'POST' }),
   },
 }

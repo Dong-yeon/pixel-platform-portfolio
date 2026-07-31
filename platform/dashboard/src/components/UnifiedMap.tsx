@@ -1,7 +1,21 @@
 import {
   nodeIndex, routePoints,
   type Equipment, type EquipmentStatus, type Layout, type Robot, type RobotStatus, type Task,
+  type TerminalPresence,
 } from '../types'
+
+/** 지도 레이어 on/off. 밀도가 빠듯해 겹치는 시스템을 끌 수 있게 한다(지도 시각 규칙). */
+export interface MapLayers {
+  equipment: boolean
+  amr: boolean
+  routes: boolean
+  pop: boolean
+}
+
+const ALL_LAYERS: MapLayers = { equipment: true, amr: true, routes: true, pop: true }
+
+// 마지막 조작 후 이만큼 지나면 배지를 흐리게 — "곧 사라짐" 신호(서버는 타임아웃에 목록에서 뺀다).
+const STALE_FADE_MINUTES = 15
 
 const ROBOT_COLOR: Record<RobotStatus, string> = {
   IDLE: '#27ae60',
@@ -39,12 +53,17 @@ export function UnifiedMap({
   equipments,
   robots,
   tasks,
+  presence = [],
+  layers = ALL_LAYERS,
 }: {
   /** 서버가 내려준 평면도. 아직 못 받았으면 그릴 좌표계가 없으므로 안내만 띄운다. */
   layout: Layout | null
   equipments: Equipment[]
   robots: Robot[]
   tasks: Task[]
+  /** POP 파생 위치 — 사용 중 단말에 담당자 배지를 붙인다(작업자 독립 마커는 그리지 않는다). */
+  presence?: TerminalPresence[]
+  layers?: MapLayers
 }) {
   if (!layout) {
     return <p className="muted small">평면도를 불러오는 중…</p>
@@ -52,6 +71,7 @@ export function UnifiedMap({
 
   const activeTasks = tasks.filter((t) => ACTIVE_TASK.has(t.status))
   const robotById = new Map(robots.map((r) => [r.id, r]))
+  const presenceByTerminal = new Map(presence.map((p) => [p.terminalCode, p]))
   const NODES = nodeIndex(layout)
   const { width, height } = layout
 
@@ -67,7 +87,7 @@ export function UnifiedMap({
       {/* AMR 이동 경로 — 설비/로봇보다 아래에 깔린다.
           배정된 로봇이 있으면 "그 로봇의 현재 위치 → 목적지"를 그려 실제로 남은 경로를
           보여준다(로봇이 움직이면 선도 따라 줄어든다). 아직 배정 전이면 출발지에서 그린다. */}
-      {activeTasks.map((t) => {
+      {layers.routes && activeTasks.map((t) => {
         const to = NODES[t.destinationNode]
         if (!to) return null
         const robot = t.assignedRobotId ? robotById.get(t.assignedRobotId) : undefined
@@ -101,7 +121,7 @@ export function UnifiedMap({
       ))}
 
       {/* 설비 (PixelFactory) — 좌표는 서버가 실어 보낸다(하드코딩 매핑 없음) */}
-      {equipments.map((e) => {
+      {layers.equipment && equipments.map((e) => {
         if (e.posX == null || e.posY == null) return null
         const [x, y] = [e.posX, e.posY]
         return (
@@ -118,8 +138,40 @@ export function UnifiedMap({
         )
       })}
 
+      {/* POP 단말 — 세로 직사각(키오스크). 사용 중이면 하단에 담당자·WO 배지.
+          작업자는 독립 마커로 그리지 않는다(지도 시각 규칙) — 단말에 붙는 배지로만. */}
+      {layers.pop && layout.terminals.map((t) => {
+        const here = presenceByTerminal.get(t.terminalCode)
+        const stale = here ? minutesSince(here.lastActivityAt) >= STALE_FADE_MINUTES : false
+        return (
+          <g key={t.terminalCode} className="umap-terminal-g">
+            <rect
+              x={t.posX - 0.9} y={t.posY - 1.5} width={1.8} height={3.0} rx={0.3}
+              className={`umap-terminal ${here ? 'in-use' : ''}`}
+            />
+            <text
+              x={t.posX} y={t.posY + 0.3} textAnchor="middle"
+              className={`umap-terminal-label ${here ? 'in-use' : ''}`}
+            >
+              {t.terminalCode.replace('POP-', '')}
+            </text>
+            {here && (
+              <g className="umap-operator-badge" opacity={stale ? 0.45 : 1}>
+                <rect x={t.posX - 3.4} y={t.posY + 1.7} width={6.8} height={2.2} rx={0.4} />
+                <text x={t.posX} y={t.posY + 2.75} textAnchor="middle" className="umap-badge-name">
+                  {here.operatorName}
+                </text>
+                <text x={t.posX} y={t.posY + 3.55} textAnchor="middle" className="umap-badge-wo">
+                  {here.workOrderNo}
+                </text>
+              </g>
+            )}
+          </g>
+        )
+      })}
+
       {/* AMR (PixelFleet) — 항상 맨 위 */}
-      {robots.map((r) => (
+      {layers.amr && robots.map((r) => (
         <g
           key={r.robotCode}
           className="umap-robot"
@@ -139,4 +191,11 @@ export function UnifiedMap({
       ))}
     </svg>
   )
+}
+
+/** ISO 시각으로부터 지난 분. 배지 흐리기 판정에 쓴다. */
+function minutesSince(iso: string): number {
+  const then = new Date(iso).getTime()
+  if (Number.isNaN(then)) return 0
+  return (Date.now() - then) / 60000
 }

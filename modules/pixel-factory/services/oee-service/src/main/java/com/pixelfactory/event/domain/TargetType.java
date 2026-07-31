@@ -6,5 +6,6 @@ public enum TargetType {
     WORK_ORDER,
     LOT,
     EQUIPMENT,
-    LINE
+    LINE,
+    TERMINAL
 }
