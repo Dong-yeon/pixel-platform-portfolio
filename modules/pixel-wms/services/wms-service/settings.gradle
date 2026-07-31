@@ -1,0 +1,19 @@
+pluginManagement {
+    repositories {
+        mavenCentral()
+        gradlePluginPortal()
+    }
+}
+
+dependencyResolutionManagement {
+    repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
+    repositories {
+        mavenCentral()
+    }
+}
+
+rootProject.name = 'wms-service'
+
+// 플랫폼 공통 코어를 복합 빌드로 가져온다. 각 모듈은 여전히 독립적으로 빌드된다.
+// (경로는 이 디렉터리 기준 레포 루트의 shared/)
+includeBuild('../../../../shared')

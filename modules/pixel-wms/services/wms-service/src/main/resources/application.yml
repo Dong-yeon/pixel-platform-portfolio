@@ -1,0 +1,96 @@
+spring:
+  application:
+    name: wms-service
+  profiles:
+    active: local
+
+server:
+  # Pixel Platform은 9000번대를 쓴다 (gateway 9000 / factory 9001 / fleet 9002 / wms 9003).
+  port: ${PORT:9003}
+  servlet:
+    encoding:
+      charset: UTF-8
+      force: true
+
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
+    operations-sorter: method
+  api-docs:
+    path: /v3/api-docs
+
+jwt:
+  # 플랫폼 단일 서명 키 — 모든 모듈이 같은 값을 써야 한 번 로그인한 토큰이 전체에서 통한다.
+  secret: ${PLATFORM_JWT_SECRET:pixel-platform-local-jwt-secret-key-must-be-at-least-32-bytes}
+  access-token-expiration-minutes: 120
+
+mqtt:
+  enabled: true
+  broker-url: tcp://localhost:1883
+  client-id: ${MQTT_CLIENT_ID:wms-service}
+  # fleet이 발행하는 운송 작업 생명주기(fleet/tasks/#)를 구독해 완료 시 재고를 차감한다.
+  # fleet이 WMS를 모르게 하기 위해 REST 콜백이 아니라 이벤트 구독으로 받는다.
+  topic-filter: "fleet/tasks/#"
+
+fleet:
+  # 출고지시가 생기면 fleet에 운송 작업을 요청한다. 게이트웨이(9000) 경유가 원칙이지만
+  # 서비스 간 인증(M2M)이 아직 없어, fleet이 열어 둔 경로에 직접 붙는다(백로그: M2M 토큰).
+  base-url: ${FLEET_BASE_URL:http://localhost:9002}
+
+---
+spring:
+  config:
+    activate:
+      on-profile: local
+  datasource:
+    url: jdbc:postgresql://localhost:5432/pixelwms
+    username: wms
+    password: wms
+    driver-class-name: org.postgresql.Driver
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        format_sql: true
+        default_batch_fetch_size: 100
+    open-in-view: false
+    show-sql: true
+
+logging:
+  level:
+    org.hibernate.SQL: debug
+    org.hibernate.orm.jdbc.bind: trace
+
+---
+spring:
+  config:
+    activate:
+      on-profile: dev
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/pixelwms}
+    username: ${SPRING_DATASOURCE_USERNAME:wms}
+    password: ${SPRING_DATASOURCE_PASSWORD:wms}
+    driver-class-name: org.postgresql.Driver
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        format_sql: false
+        default_batch_fetch_size: 100
+    open-in-view: false
+    show-sql: false
+
+jwt:
+  secret: ${PLATFORM_JWT_SECRET:pixel-platform-dev-jwt-secret-key-must-be-at-least-32-bytes}
+  access-token-expiration-minutes: ${JWT_ACCESS_TOKEN_EXPIRATION_MINUTES:120}
+
+mqtt:
+  enabled: ${MQTT_ENABLED:true}
+  broker-url: ${MQTT_BROKER_URL:tcp://localhost:1883}
+  client-id: ${MQTT_CLIENT_ID:wms-service}
+  topic-filter: "fleet/tasks/#"
+
+fleet:
+  base-url: ${FLEET_BASE_URL:http://localhost:9002}

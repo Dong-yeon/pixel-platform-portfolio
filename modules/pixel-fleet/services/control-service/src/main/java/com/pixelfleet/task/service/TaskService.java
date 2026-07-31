@@ -17,12 +17,14 @@ import com.pixelfleet.traffic.TrafficController;
 import com.pixelfleet.task.domain.TaskPriority;
 import com.pixelfleet.task.domain.TaskStatus;
 import com.pixelfleet.task.domain.TransportTask;
+import com.pixelfleet.task.event.TaskLifecycleChanged;
 import com.pixelfleet.task.repository.TransportTaskRepository;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -63,6 +65,7 @@ public class TaskService {
     private final AssignmentPolicy assignmentPolicy;
     private final LaneGraph laneGraph;
     private final TrafficController trafficController;
+    private final ApplicationEventPublisher eventPublisher;
 
     public TaskService(
             TransportTaskRepository taskRepository,
@@ -71,7 +74,8 @@ public class TaskService {
             RobotCommandPublisher robotCommandPublisher,
             AssignmentPolicy assignmentPolicy,
             LaneGraph laneGraph,
-            TrafficController trafficController
+            TrafficController trafficController,
+            ApplicationEventPublisher eventPublisher
     ) {
         this.taskRepository = taskRepository;
         this.robotService = robotService;
@@ -80,6 +84,7 @@ public class TaskService {
         this.assignmentPolicy = assignmentPolicy;
         this.laneGraph = laneGraph;
         this.trafficController = trafficController;
+        this.eventPublisher = eventPublisher;
     }
 
     @Transactional(readOnly = true)
@@ -267,6 +272,8 @@ public class TaskService {
                 TargetType.TASK, task.getId(),
                 task.getId(), EventSeverity.INFO,
                 "Task " + taskCode + " completed", null);
+        // 모듈 밖에도 알린다(커밋 후 MQTT 발행). fleet은 누가 듣는지 모른다.
+        eventPublisher.publishEvent(TaskLifecycleChanged.completed(taskCode));
     }
 
     /**
@@ -297,7 +304,12 @@ public class TaskService {
                     TargetType.TASK, task.getId(),
                     task.getId(), EventSeverity.WARNING,
                     "Task " + taskCode + " re-queued (attempt " + (task.getRetryCount() + 1) + ")", null);
+            return;
         }
+
+        // 재시도가 남아 있으면 아직 진행 중인 작업이다 — 최종 실패일 때만 밖에 알린다.
+        // (재시도할 작업을 실패로 알리면 받은 쪽이 전표를 성급히 정리한다.)
+        eventPublisher.publishEvent(TaskLifecycleChanged.failed(taskCode, reason));
     }
 
     private TransportTask requireByCode(String taskCode) {
