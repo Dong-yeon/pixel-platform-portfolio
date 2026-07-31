@@ -30,16 +30,22 @@ public class UserDataInitializer implements CommandLineRunner {
 
     @Override
     public void run(String... args) {
-        if (userRepository.count() > 0) {
-            return;
-        }
-
+        // 계정별로 없는 것만 채운다 — 전체 count로 건너뛰면 데모 계정이 추가된 버전으로
+        // 올렸을 때 기존 DB에 새 계정(dispatcher 등)이 영영 안 생긴다(실제로 그랬다).
         String encodedPassword = passwordEncoder.encode(DEMO_PASSWORD);
-        userRepository.saveAll(List.of(
+        List<User> seeds = List.of(
                 new User("admin", encodedPassword, "관리자", UserRole.ADMIN, "생산관리"),
                 new User("inspector", encodedPassword, "검사 담당자", UserRole.INSPECTOR, "품질"),
-                new User("operator", encodedPassword, "작업자", UserRole.OPERATOR, "생산")
-        ));
-        log.info("Seeded {} demo users (password: '{}').", userRepository.count(), DEMO_PASSWORD);
+                new User("operator", encodedPassword, "작업자", UserRole.OPERATOR, "생산"),
+                new User("dispatcher", encodedPassword, "배차 담당자", UserRole.DISPATCHER, "물류")
+        );
+
+        long seeded = seeds.stream()
+                .filter(user -> userRepository.findByUsername(user.getUsername()).isEmpty())
+                .map(userRepository::save)
+                .count();
+        if (seeded > 0) {
+            log.info("Seeded {} demo users (password: '{}').", seeded, DEMO_PASSWORD);
+        }
     }
 }
