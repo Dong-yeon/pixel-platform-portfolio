@@ -1,6 +1,7 @@
 package com.pixelfactory;
 
 import com.pixelfactory.mqtt.MqttProperties;
+import com.pixelfactory.quality.QualityProperties;
 import com.pixelfactory.terminal.PopProperties;
 import com.pixelplatform.core.auth.jwt.JwtProperties;
 import org.springframework.boot.SpringApplication;
@@ -21,7 +22,9 @@ import org.springframework.scheduling.annotation.EnableScheduling;
 @SpringBootApplication(scanBasePackages = {"com.pixelfactory", "com.pixelplatform.core"})
 @EntityScan(basePackages = {"com.pixelfactory", "com.pixelplatform.core"})
 @EnableJpaRepositories(basePackages = {"com.pixelfactory", "com.pixelplatform.core"})
-@EnableConfigurationProperties({JwtProperties.class, MqttProperties.class, PopProperties.class})
+@EnableConfigurationProperties({
+        JwtProperties.class, MqttProperties.class, PopProperties.class, QualityProperties.class
+})
 public class PixelFactoryApplication {
 
     public static void main(String[] args) {

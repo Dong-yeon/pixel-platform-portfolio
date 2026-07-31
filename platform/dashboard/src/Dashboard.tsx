@@ -3,6 +3,7 @@ import { api } from './api'
 import { FactoryView } from './components/factory/FactoryView'
 import { FleetView } from './components/fleet/FleetView'
 import { InspectionView } from './components/inspection/InspectionView'
+import { OutboxView } from './components/outbox/OutboxView'
 import { OverviewView } from './components/OverviewView'
 import { PopScreen } from './components/pop/PopScreen'
 import { usePlatformSocket } from './usePlatformSocket'
@@ -18,16 +19,17 @@ const TAB_LABEL: Record<ModuleKey, string> = {
   factory: 'PixelFactory',
   fleet: 'PixelFleet',
   pop: 'POP 단말',
-  inspection: '검사 대기',
+  inspection: '품질 (검사·MRB)',
+  outbox: '발송함',
 }
 
 // 역할별 진입 화면·접근 범위(P12-4). 배열 첫 항목이 진입 탭이다.
-//   ADMIN → 통합현황(전체) · OPERATOR → POP · INSPECTOR → 검사대기 · DISPATCHER → Fleet 관제
+//   ADMIN → 통합현황(전체) · OPERATOR → POP · INSPECTOR → 품질 · DISPATCHER → Fleet 관제
 // 프론트 게이팅이 1차 차단이다(operator는 관제 탭이 아예 없다). 서버측 강제는 모듈 몫.
 const ROLE_TABS: Record<string, ModuleKey[]> = {
-  ADMIN: ['overview', 'factory', 'fleet'],
+  ADMIN: ['overview', 'factory', 'fleet', 'inspection', 'outbox'],
   OPERATOR: ['pop'],
-  INSPECTOR: ['inspection'],
+  INSPECTOR: ['inspection', 'outbox'],
   DISPATCHER: ['fleet'],
 }
 
@@ -208,9 +210,8 @@ export function Dashboard({ user, onLogout }: { user: AuthUser; onLogout: () => 
         {tab === 'pop' && (
           <PopScreen terminals={layout?.terminals ?? []} />
         )}
-        {tab === 'inspection' && (
-          <InspectionView workOrders={workOrders} equipments={equipments} />
-        )}
+        {tab === 'inspection' && <InspectionView />}
+        {tab === 'outbox' && <OutboxView />}
         {tab === 'factory' && (
           <FactoryView
             equipments={equipments}

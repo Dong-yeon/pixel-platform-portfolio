@@ -1,5 +1,6 @@
 import type {
-  AuthUser, Equipment, EquipmentOee, FleetEvent, Layout, ProductionLine,
+  AuthUser, Equipment, EquipmentOee, FleetEvent, Inspection, Layout, MrbDecision,
+  MrbOpenSummary, MrbReview, Nonconformance, OutboxMail, ProductionLine,
   Robot, Task, TaskPriority, TerminalPresence, TimelineEvent, WorkOrder,
 } from './types'
 
@@ -16,6 +17,7 @@ export interface PopBoard {
 const AUTH = '/api/auth'
 const FACTORY = '/api/factory'
 const FLEET = '/api/fleet'
+const QMS = '/api/qms'
 
 // 게이트웨이 중앙 인증(P6) — 토큰 하나로 모든 모듈에 접근한다.
 // 모듈들이 같은 서명 키를 쓰므로 로그인은 한 번이면 되고, 게이트웨이가 관문에서 검증한다.
@@ -100,6 +102,27 @@ export const api = {
     terminalPresence: () => request<TerminalPresence[]>(FACTORY, '/terminals/presence'),
     /** 내게 배정된 작업지시(인증된 사용자 기준). POP·현장용. */
     myWorkOrders: () => request<WorkOrder[]>(FACTORY, '/work-orders/my'),
+  },
+
+  /** 품질(QMS) — 검사·부적합·MRB 심의·발송함. */
+  qms: {
+    inspections: () => request<Inspection[]>(QMS, '/inspections'),
+    pendingInspections: () => request<Inspection[]>(QMS, '/inspections/pending'),
+    completeInspection: (id: number, input: {
+      result: 'PASSED' | 'FAILED'; inspectedQty?: number; defectQty?: number; note?: string; defectCode?: string
+    }) => request<Inspection>(QMS, `/inspections/${id}/complete`, { method: 'POST', body: JSON.stringify(input) }),
+    nonconformances: () => request<Nonconformance[]>(QMS, '/nonconformances'),
+    mrbList: () => request<MrbReview[]>(QMS, '/mrb'),
+    /** 지도 품질관리실 배지 — 열려 있는 심의. */
+    mrbOpen: () => request<MrbOpenSummary>(QMS, '/mrb/open'),
+    raiseMrb: (nonconformanceId: number) =>
+      request<MrbReview>(QMS, '/mrb', { method: 'POST', body: JSON.stringify({ nonconformanceId }) }),
+    startMrbReview: (id: number) => request<MrbReview>(QMS, `/mrb/${id}/start-review`, { method: 'POST' }),
+    decideMrb: (id: number, decision: MrbDecision, decisionNote?: string) =>
+      request<MrbReview>(QMS, `/mrb/${id}/decide`, { method: 'POST', body: JSON.stringify({ decision, decisionNote }) }),
+    closeMrb: (id: number) => request<MrbReview>(QMS, `/mrb/${id}/close`, { method: 'POST' }),
+    /** 발송함 — Outbox에 쌓인 메일 카드. */
+    notifications: () => request<OutboxMail[]>(QMS, '/notifications'),
   },
 
   /** POP(Point of Production) 단말 — 현장 작업자 전용 조작. */

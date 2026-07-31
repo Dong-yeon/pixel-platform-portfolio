@@ -41,6 +41,13 @@ spring:
           filters:
             - RewritePath=/api/wms/(?<segment>.*), /api/$\{segment}
 
+        - id: pixel-qms
+          uri: ${MODULE_QMS_URI:http://localhost:9004}
+          predicates:
+            - Path=/api/qms/**
+          filters:
+            - RewritePath=/api/qms/(?<segment>.*), /api/$\{segment}
+
         # 실시간 push(STOMP over SockJS). 경로 재작성 없이 그대로 넘긴다.
         #
         # **모듈마다 경로가 다르다.** 예전엔 /ws/** 를 통째로 fleet으로 보냈는데, 그러면

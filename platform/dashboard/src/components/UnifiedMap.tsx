@@ -1,7 +1,7 @@
 import {
   nodeIndex, routePoints,
-  type Equipment, type EquipmentStatus, type Layout, type Robot, type RobotStatus, type Task,
-  type TerminalPresence,
+  type Equipment, type EquipmentStatus, type Layout, type MrbOpenSummary,
+  type Robot, type RobotStatus, type Task, type TerminalPresence,
 } from '../types'
 
 /** 지도 레이어 on/off. 밀도가 빠듯해 겹치는 시스템을 끌 수 있게 한다(지도 시각 규칙). */
@@ -10,9 +10,14 @@ export interface MapLayers {
   amr: boolean
   routes: boolean
   pop: boolean
+  /** 품질 흐름 — 사무실 박스 + 부적합 정보 흐름 점선. */
+  quality: boolean
 }
 
-const ALL_LAYERS: MapLayers = { equipment: true, amr: true, routes: true, pop: true }
+const ALL_LAYERS: MapLayers = { equipment: true, amr: true, routes: true, pop: true, quality: true }
+
+/** 사무실(QMS)은 평면도 **바깥** 우측 상단 — 바닥 위 오브젝트가 아니라 정보의 목적지다. */
+const OFFICE = { w: 7, h: 3.4, marginX: 0.5, marginY: 0.2 }
 
 // 마지막 조작 후 이만큼 지나면 배지를 흐리게 — "곧 사라짐" 신호(서버는 타임아웃에 목록에서 뺀다).
 const STALE_FADE_MINUTES = 15
@@ -54,6 +59,7 @@ export function UnifiedMap({
   robots,
   tasks,
   presence = [],
+  mrbOpen = null,
   layers = ALL_LAYERS,
 }: {
   /** 서버가 내려준 평면도. 아직 못 받았으면 그릴 좌표계가 없으므로 안내만 띄운다. */
@@ -63,6 +69,8 @@ export function UnifiedMap({
   tasks: Task[]
   /** POP 파생 위치 — 사용 중 단말에 담당자 배지를 붙인다(작업자 독립 마커는 그리지 않는다). */
   presence?: TerminalPresence[]
+  /** 열려 있는 MRB — 사무실 배지 + 현장→사무실 정보 흐름 점선의 근거. */
+  mrbOpen?: MrbOpenSummary | null
   layers?: MapLayers
 }) {
   if (!layout) {
@@ -72,11 +80,28 @@ export function UnifiedMap({
   const activeTasks = tasks.filter((t) => ACTIVE_TASK.has(t.status))
   const robotById = new Map(robots.map((r) => [r.id, r]))
   const presenceByTerminal = new Map(presence.map((p) => [p.terminalCode, p]))
+  const equipByCode = new Map(equipments.map((e) => [e.equipmentCode, e]))
   const NODES = nodeIndex(layout)
   const { width, height } = layout
 
+  // 사무실은 평면도 바깥(위) — viewBox를 위로 늘려 자리를 만든다.
+  const officeSpace = layers.quality ? OFFICE.h + OFFICE.marginY * 2 : 0
+  const officeX = width - OFFICE.w - OFFICE.marginX
+  const officeY = -officeSpace + OFFICE.marginY
+  const openCount = mrbOpen?.count ?? 0
+  // 정보 흐름: 열려 있는 심의의 설비 → 사무실. 운송 경로와 다른 색 점선(지도 시각 규칙).
+  const qualityFlows = layers.quality && mrbOpen
+    ? mrbOpen.reviews
+        .map((r) => (r.equipmentCode ? equipByCode.get(r.equipmentCode) : undefined))
+        .filter((e): e is Equipment => !!e && e.posX != null && e.posY != null)
+    : []
+
   return (
-    <svg className="umap" viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="xMidYMid meet">
+    <svg
+      className="umap"
+      viewBox={`0 ${-officeSpace} ${width} ${height + officeSpace}`}
+      preserveAspectRatio="xMidYMid meet"
+    >
       <rect x={0} y={0} width={width} height={height} className="umap-bg" />
 
       {/* AMR 통로 — 라인마다 하나씩. 로봇은 이 위로만 다닌다. */}
@@ -169,6 +194,30 @@ export function UnifiedMap({
           </g>
         )
       })}
+
+      {/* 품질관리실(QMS) — 평면도 바깥 우측 상단 + MRB 대기 건수 배지.
+          부적합이 열려 있으면 현장 설비 → 사무실로 정보 흐름 점선(운송 경로와 다른 색). */}
+      {layers.quality && (
+        <g className="umap-office-g">
+          {qualityFlows.map((e) => (
+            <polyline
+              key={`qflow-${e.equipmentCode}`}
+              points={`${e.posX},${e.posY} ${e.posX},${-0.6} ${officeX + OFFICE.w / 2},${-0.6} ${officeX + OFFICE.w / 2},${officeY + OFFICE.h}`}
+              className="umap-quality-flow"
+            />
+          ))}
+          <rect x={officeX} y={officeY} width={OFFICE.w} height={OFFICE.h} rx={0.4} className="umap-office" />
+          <text x={officeX + OFFICE.w / 2} y={officeY + 1.4} textAnchor="middle" className="umap-office-label">
+            품질관리실
+          </text>
+          <text x={officeX + OFFICE.w / 2} y={officeY + 2.7} textAnchor="middle" className="umap-office-sub">
+            MRB 대기 {openCount}건
+          </text>
+          {openCount > 0 && (
+            <circle cx={officeX + OFFICE.w - 0.4} cy={officeY + 0.4} r={0.65} className="umap-office-badge" />
+          )}
+        </g>
+      )}
 
       {/* AMR (PixelFleet) — 항상 맨 위 */}
       {layers.amr && robots.map((r) => (

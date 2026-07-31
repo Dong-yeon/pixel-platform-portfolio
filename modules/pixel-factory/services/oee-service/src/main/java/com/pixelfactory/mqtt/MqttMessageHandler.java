@@ -10,6 +10,8 @@ import com.pixelfactory.event.domain.FactoryEventType;
 import com.pixelfactory.event.domain.SourceType;
 import com.pixelfactory.event.domain.TargetType;
 import com.pixelfactory.event.service.FactoryEventService;
+import com.pixelfactory.quality.QualityEvents;
+import com.pixelfactory.quality.QualityProperties;
 import com.pixelfactory.workorder.domain.WorkOrder;
 import com.pixelfactory.workorder.domain.WorkOrderStatus;
 import com.pixelfactory.workorder.repository.WorkOrderRepository;
@@ -17,8 +19,11 @@ import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.format.DateTimeParseException;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -27,21 +32,35 @@ public class MqttMessageHandler {
 
     private static final Logger log = LoggerFactory.getLogger(MqttMessageHandler.class);
 
+    /**
+     * 이미 검사를 요청한 작업지시 — 임계를 넘은 뒤 사이클마다 다시 요청하지 않기 위한 것이다.
+     *
+     * <p>메모리에만 둔다. 재기동하면 한 번 더 요청될 수 있지만, QMS가 같은 작업지시의 검사를
+     * 중복 생성하지 않으므로(수신 측 멱등) 문제되지 않는다.
+     */
+    private final Set<String> inspectionRequested = ConcurrentHashMap.newKeySet();
+
     private final EquipmentService equipmentService;
     private final FactoryEventService factoryEventService;
     private final WorkOrderRepository workOrderRepository;
     private final ObjectMapper objectMapper;
+    private final ApplicationEventPublisher eventPublisher;
+    private final QualityProperties qualityProperties;
 
     public MqttMessageHandler(
             EquipmentService equipmentService,
             FactoryEventService factoryEventService,
             WorkOrderRepository workOrderRepository,
-            ObjectMapper objectMapper
+            ObjectMapper objectMapper,
+            ApplicationEventPublisher eventPublisher,
+            QualityProperties qualityProperties
     ) {
         this.equipmentService = equipmentService;
         this.factoryEventService = factoryEventService;
         this.workOrderRepository = workOrderRepository;
         this.objectMapper = objectMapper;
+        this.eventPublisher = eventPublisher;
+        this.qualityProperties = qualityProperties;
     }
 
     // Topic contract: factory/{lineCode}/{equipmentCode}/{kind} — see docs/mqtt-topics.md
@@ -157,6 +176,7 @@ public class MqttMessageHandler {
                     .orElse(null);
             if (workOrder != null && workOrder.recordCycle(defect)) {
                 workOrderId = workOrder.getId();
+                requestInspectionIfDefectThresholdExceeded(equipmentCode, workOrder);
             }
         }
 
@@ -173,5 +193,27 @@ public class MqttMessageHandler {
                 payload,
                 occurredAt
         );
+    }
+
+    /**
+     * 누적 불량이 임계를 넘으면 검사를 요청한다 — 작업지시당 한 번.
+     *
+     * <p>factory는 <b>누가 검사하는지 모른다</b>. 커밋 후 토픽에 신호를 던지고, 품질 시스템이
+     * 구독해 검사를 만든다. QMS를 내려도 생산은 그대로 돈다(신호만 아무도 안 들을 뿐).
+     */
+    private void requestInspectionIfDefectThresholdExceeded(String equipmentCode, WorkOrder workOrder) {
+        if (workOrder.getDefectQty() < qualityProperties.getDefectThreshold()) {
+            return;
+        }
+        if (!inspectionRequested.add(workOrder.getWorkOrderNo())) {
+            return; // 이미 요청했다.
+        }
+
+        eventPublisher.publishEvent(new QualityEvents.InspectionRequested(
+                equipmentCode,
+                workOrder.getWorkOrderNo(),
+                workOrder.getLotNo(),
+                workOrder.getDefectQty()
+        ));
     }
 }

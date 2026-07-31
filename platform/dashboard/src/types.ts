@@ -19,7 +19,7 @@ export interface AuthUser {
   role: string
 }
 
-export type ModuleKey = 'overview' | 'factory' | 'fleet' | 'pop' | 'inspection'
+export type ModuleKey = 'overview' | 'factory' | 'fleet' | 'pop' | 'inspection' | 'outbox'
 
 // ---------- pixel-fleet (AMR) ----------
 
@@ -201,3 +201,68 @@ export interface WorkOrder {
 
 // factory 이벤트도 occurredAt(발생시각)을 내려주므로 fleet과 같은 TimelineEvent를 쓴다.
 // 예전엔 createdAt(적재 시각)만 있어서 대시보드에서 변환(toTimeline)해야 했다.
+
+// ---------- pixel-qms (품질) ----------
+
+export type InspectionResult = 'PENDING' | 'PASSED' | 'FAILED'
+
+export interface Inspection {
+  id: number
+  inspectionNo: string
+  inspectionType: 'INCOMING' | 'IN_PROCESS' | 'FINAL'
+  equipmentCode: string | null
+  workOrderNo: string | null
+  lotNo: string | null
+  result: InspectionResult
+  inspectedQty: number
+  defectQty: number
+  note: string | null
+  completedAt: string | null
+  createdAt: string
+}
+
+export type MrbStatus = 'RAISED' | 'UNDER_REVIEW' | 'DECIDED' | 'CLOSED'
+export type MrbDecision = 'USE_AS_IS' | 'REWORK' | 'SCRAP' | 'RETURN'
+
+export interface MrbReview {
+  id: number
+  mrbNo: string
+  nonconformanceId: number
+  equipmentCode: string | null
+  workOrderNo: string | null
+  lotNo: string | null
+  status: MrbStatus
+  decision: MrbDecision | null
+  decisionNote: string | null
+  holdApplied: boolean
+  decidedAt: string | null
+  closedAt: string | null
+  createdAt: string
+}
+
+export interface Nonconformance {
+  id: number
+  ncrNo: string
+  equipmentCode: string | null
+  workOrderNo: string | null
+  lotNo: string | null
+  defectQty: number
+  description: string | null
+}
+
+/** 발송함의 메일 한 통 — 실제 SMTP가 아니라 Outbox에 쌓인 것. */
+export interface OutboxMail {
+  id: number
+  recipient: string
+  subject: string
+  body: string
+  channel: string
+  referenceNo: string | null
+  sentAt: string
+}
+
+/** 지도 품질관리실 배지 — 열려 있는 MRB. */
+export interface MrbOpenSummary {
+  count: number
+  reviews: MrbReview[]
+}

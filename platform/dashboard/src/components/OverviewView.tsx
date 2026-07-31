@@ -1,6 +1,8 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import { api } from '../api'
 import type {
-  Equipment, EquipmentOee, Layout, ModuleKey, Robot, Task, TerminalPresence, TimelineEvent, WorkOrder,
+  Equipment, EquipmentOee, Layout, ModuleKey, MrbOpenSummary, Robot, Task,
+  TerminalPresence, TimelineEvent, WorkOrder,
 } from '../types'
 import { EventTimeline } from './EventTimeline'
 import { UnifiedMap, type MapLayers } from './UnifiedMap'
@@ -24,6 +26,7 @@ const LAYER_LABEL: { key: keyof MapLayers; label: string }[] = [
   { key: 'amr', label: 'AMR' },
   { key: 'routes', label: '운송경로' },
   { key: 'pop', label: 'POP·작업자' },
+  { key: 'quality', label: '품질 흐름' },
 ]
 
 export function OverviewView({
@@ -50,8 +53,19 @@ export function OverviewView({
   onGo: (m: ModuleKey) => void
 }) {
   // 지도 레이어 토글 — 밀도가 빠듯해 겹치는 시스템을 끌 수 있게 한다(지도 시각 규칙).
-  const [layers, setLayers] = useState<MapLayers>({ equipment: true, amr: true, routes: true, pop: true })
+  const [layers, setLayers] = useState<MapLayers>({
+    equipment: true, amr: true, routes: true, pop: true, quality: true,
+  })
   const toggleLayer = (key: keyof MapLayers) => setLayers((prev) => ({ ...prev, [key]: !prev[key] }))
+
+  // 품질관리실 배지 — 열려 있는 MRB. QMS가 없으면 조용히 비워 둔다(컴포저블).
+  const [mrbOpen, setMrbOpen] = useState<MrbOpenSummary | null>(null)
+  useEffect(() => {
+    const loadMrb = () => api.qms.mrbOpen().then(setMrbOpen).catch(() => setMrbOpen(null))
+    loadMrb()
+    const timer = window.setInterval(loadMrb, 15_000)
+    return () => window.clearInterval(timer)
+  }, [])
 
   const running = equipments.filter((e) => e.status === 'RUNNING').length
   const down = equipments.filter((e) => e.status === 'DOWN').length
@@ -121,6 +135,7 @@ export function OverviewView({
           robots={robots}
           tasks={tasks}
           presence={presence}
+          mrbOpen={mrbOpen}
           layers={layers}
         />
         <div className="umap-layers">

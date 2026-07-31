@@ -15,6 +15,9 @@ create database pixelfleet owner fleet;
 create role wms with login password 'wms';
 create database pixelwms owner wms;
 
+create role qms with login password 'qms';
+create database pixelqms owner qms;
+
 -- Future modules get their own role + database here:
 --   create role vision with login password 'vision';
 --   create database pixelvision owner vision;
