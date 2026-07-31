@@ -19,7 +19,7 @@ export interface AuthUser {
   role: string
 }
 
-export type ModuleKey = 'overview' | 'factory' | 'fleet' | 'pop' | 'inspection' | 'outbox'
+export type ModuleKey = 'overview' | 'factory' | 'fleet' | 'pop' | 'inspection' | 'outbox' | 'master'
 
 // ---------- pixel-fleet (AMR) ----------
 
@@ -224,9 +224,52 @@ export type WorkOrderStatus =
   | 'CREATED' | 'ASSIGNED' | 'READY' | 'IN_PROGRESS'
   | 'INSPECTION_WAITING' | 'COMPLETED' | 'ON_HOLD' | 'CANCELLED'
 
+// ---------- 생산 기준정보 (차종 · 품번 · BOM) ----------
+
+export type PartType = 'PRODUCT' | 'SEMI' | 'MATERIAL'
+
+export interface VehicleModel {
+  id: number
+  modelCode: string
+  name: string
+  inProduction: boolean
+}
+
+export interface Part {
+  id: number
+  partCode: string
+  name: string
+  partType: PartType
+  unit: string
+  /** 공용 부품이면 null. */
+  modelCode: string | null
+}
+
+/** BOM 트리 한 노드 — **서버가 조립해서** 중첩으로 내려준다(화면이 부모를 추측하지 않는다). */
+export interface BomNode {
+  partCode: string
+  name: string
+  partType: PartType
+  unit: string
+  /** 상위 1개당 소요량. 루트는 null. */
+  qtyPer: string | null
+  level: number
+  children: BomNode[]
+}
+
+export interface BomRevision {
+  revNo: number
+  lineCount: number
+  latest: boolean
+}
+
 export interface WorkOrder {
   id: number
   workOrderNo: string
+  /** 무엇을 만드는가 — 기준정보가 생기기 전엔 없던 정보다. */
+  partCode: string | null
+  partName: string | null
+  modelCode: string | null
   equipmentId: number
   lotNo: string
   plannedQty: number

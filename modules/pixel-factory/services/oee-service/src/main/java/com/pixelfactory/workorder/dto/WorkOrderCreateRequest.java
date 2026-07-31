@@ -8,7 +8,8 @@ import java.time.LocalDateTime;
 
 public record WorkOrderCreateRequest(
         @NotBlank String workOrderNo,
-        @NotNull Long itemId,
+        /** 무엇을 만드는가 — {@code parts.id}(V10에서 실체를 갖게 됐다). */
+        @NotNull Long partId,
         @NotNull Long processId,
         @NotNull Long equipmentId,
         @NotNull Long assignedUserId,

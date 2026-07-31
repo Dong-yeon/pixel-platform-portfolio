@@ -167,6 +167,13 @@ function PopWorkOrderCard({
         <span className="mono pop-wo-no">{wo.workOrderNo}</span>
         <span className={`badge wo-${wo.status}`}>{wo.status}</span>
       </div>
+      {/* 작업자가 제일 먼저 봐야 할 것 — 무엇을 만드는가. */}
+      {wo.partCode && (
+        <div className="pop-wo-part">
+          <span className="mono">{wo.partCode}</span> {wo.partName}
+          {wo.modelCode && <span className="badge model-badge">{wo.modelCode}</span>}
+        </div>
+      )}
       <div className="muted small">LOT {wo.lotNo}</div>
       <div className="wo-bar">
         <div className="wo-fill" style={{ width: `${progress(wo)}%` }} />

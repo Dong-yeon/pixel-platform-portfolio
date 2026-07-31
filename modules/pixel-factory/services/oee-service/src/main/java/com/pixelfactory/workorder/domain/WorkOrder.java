@@ -27,8 +27,14 @@ public class WorkOrder extends BaseEntity {
     @Column(nullable = false, unique = true, length = 50)
     private String workOrderNo;
 
+    /**
+     * 무엇을 만드는가 — {@code parts.id}.
+     *
+     * <p>V10 이전에는 {@code item_id}라는 이름으로 <b>아무 테이블도 가리키지 않는 숫자</b>였고
+     * 시더가 1을 박아 넣었다. 기준정보(차종·품번·BOM)가 생기면서 실체를 갖게 됐다.
+     */
     @Column(nullable = false)
-    private Long itemId;
+    private Long partId;
 
     @Column(nullable = false)
     private Long processId;
@@ -70,7 +76,7 @@ public class WorkOrder extends BaseEntity {
 
     public WorkOrder(
             String workOrderNo,
-            Long itemId,
+            Long partId,
             Long processId,
             Long equipmentId,
             Long assignedUserId,
@@ -80,7 +86,7 @@ public class WorkOrder extends BaseEntity {
             LocalDateTime plannedEndAt
     ) {
         this.workOrderNo = workOrderNo;
-        this.itemId = itemId;
+        this.partId = partId;
         this.processId = processId;
         this.equipmentId = equipmentId;
         this.assignedUserId = assignedUserId;

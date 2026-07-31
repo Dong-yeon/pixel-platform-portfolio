@@ -7,6 +7,8 @@ import com.pixelfactory.event.domain.FactoryEventType;
 import com.pixelfactory.event.domain.SourceType;
 import com.pixelfactory.event.domain.TargetType;
 import com.pixelfactory.event.service.FactoryEventService;
+import com.pixelfactory.master.domain.Part;
+import com.pixelfactory.master.service.PartService;
 import com.pixelfactory.workorder.domain.WorkOrder;
 import com.pixelfactory.workorder.domain.WorkOrderStatus;
 import com.pixelfactory.workorder.dto.WorkOrderCompleteProductionRequest;
@@ -16,6 +18,7 @@ import com.pixelfactory.workorder.dto.WorkOrderResponse;
 import com.pixelfactory.workorder.repository.WorkOrderRepository;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -25,13 +28,36 @@ public class WorkOrderService {
 
     private final WorkOrderRepository workOrderRepository;
     private final FactoryEventService factoryEventService;
+    private final PartService partService;
 
     public WorkOrderService(
             WorkOrderRepository workOrderRepository,
-            FactoryEventService factoryEventService
+            FactoryEventService factoryEventService,
+            PartService partService
     ) {
         this.workOrderRepository = workOrderRepository;
         this.factoryEventService = factoryEventService;
+        this.partService = partService;
+    }
+
+    /**
+     * 작업지시에 품번·차종을 붙인다.
+     *
+     * <p>목록마다 품번을 하나씩 조회하면 N+1이 되므로 마스터를 한 번에 받아 맞춘다
+     * (품번은 수십 건 규모의 마스터라 통째로 읽는 게 싸다).
+     */
+    private List<WorkOrderResponse> withParts(List<WorkOrder> workOrders) {
+        Map<Long, Part> partsById = partService.partsById();
+        Map<Long, String> modelCodes = partService.modelCodesById();
+        return workOrders.stream().map(workOrder -> {
+            Part part = partsById.get(workOrder.getPartId());
+            String modelCode = part == null ? null : modelCodes.get(part.getModelId());
+            return WorkOrderResponse.from(workOrder, part, modelCode);
+        }).toList();
+    }
+
+    private WorkOrderResponse withPart(WorkOrder workOrder) {
+        return withParts(List.of(workOrder)).get(0);
     }
 
     @Transactional
@@ -41,7 +67,7 @@ public class WorkOrderService {
 
         WorkOrder workOrder = new WorkOrder(
                 request.workOrderNo(),
-                request.itemId(),
+                request.partId(),
                 request.processId(),
                 request.equipmentId(),
                 request.assignedUserId(),
@@ -60,25 +86,19 @@ public class WorkOrderService {
                 "Work order assigned: " + savedWorkOrder.getWorkOrderNo(),
                 workOrderPayload(savedWorkOrder)
         );
-        return WorkOrderResponse.from(savedWorkOrder);
+        return withPart(savedWorkOrder);
     }
 
     public List<WorkOrderResponse> search(WorkOrderStatus status, Long assignedUserId, String lotNo) {
-        return workOrderRepository.search(status, assignedUserId, lotNo)
-                .stream()
-                .map(WorkOrderResponse::from)
-                .toList();
+        return withParts(workOrderRepository.search(status, assignedUserId, lotNo));
     }
 
     public WorkOrderResponse get(Long id) {
-        return WorkOrderResponse.from(getWorkOrder(id));
+        return withPart(getWorkOrder(id));
     }
 
     public List<WorkOrderResponse> getMyWorkOrders(Long assignedUserId) {
-        return workOrderRepository.search(null, assignedUserId, null)
-                .stream()
-                .map(WorkOrderResponse::from)
-                .toList();
+        return withParts(workOrderRepository.search(null, assignedUserId, null));
     }
 
     @Transactional
@@ -107,7 +127,7 @@ public class WorkOrderService {
                 "Equipment changed to RUNNING for work order: " + workOrder.getWorkOrderNo(),
                 "{\"equipmentStatus\":\"RUNNING\"}"
         );
-        return WorkOrderResponse.from(workOrder);
+        return withPart(workOrder);
     }
 
     @Transactional
@@ -130,7 +150,7 @@ public class WorkOrderService {
                 "Production completed: " + workOrder.getWorkOrderNo(),
                 productionPayload(workOrder)
         );
-        return WorkOrderResponse.from(workOrder);
+        return withPart(workOrder);
     }
 
     @Transactional
@@ -154,7 +174,7 @@ public class WorkOrderService {
                 "Equipment changed to QUALITY_HOLD for work order: " + workOrder.getWorkOrderNo(),
                 "{\"equipmentStatus\":\"QUALITY_HOLD\"}"
         );
-        return WorkOrderResponse.from(workOrder);
+        return withPart(workOrder);
     }
 
     @Transactional
@@ -176,7 +196,7 @@ public class WorkOrderService {
                 "Work order completed: " + workOrder.getWorkOrderNo(),
                 workOrderPayload(workOrder)
         );
-        return WorkOrderResponse.from(workOrder);
+        return withPart(workOrder);
     }
 
     private WorkOrder getWorkOrder(Long id) {

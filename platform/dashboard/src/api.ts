@@ -1,7 +1,7 @@
 import type {
-  AuthUser, Equipment, EquipmentOee, FleetEvent, Inspection, Layout, MrbDecision,
-  MrbOpenSummary, MrbReview, Nonconformance, OutboxMail, ProductionLine,
-  Robot, Task, TaskPriority, TerminalPresence, TimelineEvent, WorkOrder,
+  AuthUser, BomNode, BomRevision, Equipment, EquipmentOee, FleetEvent, Inspection, Layout,
+  MrbDecision, MrbOpenSummary, MrbReview, Nonconformance, OutboxMail, Part, ProductionLine,
+  Robot, Task, TaskPriority, TerminalPresence, TimelineEvent, VehicleModel, WorkOrder,
 } from './types'
 
 /** POP 화면 초기 데이터 — 단말 + 로그인 작업자의 작업지시. */
@@ -111,6 +111,22 @@ export const api = {
     terminalPresence: () => request<TerminalPresence[]>(FACTORY, '/terminals/presence'),
     /** 내게 배정된 작업지시(인증된 사용자 기준). POP·현장용. */
     myWorkOrders: () => request<WorkOrder[]>(FACTORY, '/work-orders/my'),
+
+    // ---- 생산 기준정보 ----
+    vehicleModels: () => request<VehicleModel[]>(FACTORY, '/vehicle-models'),
+    /** @param modelCode 지정하면 그 차종 전용 품번만(공용 부품 제외). */
+    parts: (modelCode?: string) =>
+      request<Part[]>(FACTORY, modelCode ? `/parts?modelCode=${encodeURIComponent(modelCode)}` : '/parts'),
+    bomTree: (partCode: string) => request<BomNode>(FACTORY, `/boms/${encodeURIComponent(partCode)}`),
+    bomRevisions: (partCode: string) =>
+      request<BomRevision[]>(FACTORY, `/boms/${encodeURIComponent(partCode)}/revisions`),
+    /**
+     * BOM 개정 — **대상 rev를 보내지 않는다.** 서버가 DB의 MAX+1로 정한다.
+     * 화면이 보던 rev를 믿고 +1 하면 최신이 아닌 rev에서 개정할 때 중복이 적재된다.
+     */
+    reviseBom: (partCode: string) =>
+      request<{ partCode: string; revNo: number }>(
+        FACTORY, `/boms/${encodeURIComponent(partCode)}/revisions`, { method: 'POST' }),
   },
 
   /** 창고(WMS) — 재고. 로케이션 코드가 곧 렉 코드라 지도의 적재율이 여기서 나온다. */

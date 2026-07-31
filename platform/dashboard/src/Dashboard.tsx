@@ -3,6 +3,7 @@ import { api } from './api'
 import { FactoryView } from './components/factory/FactoryView'
 import { FleetView } from './components/fleet/FleetView'
 import { InspectionView } from './components/inspection/InspectionView'
+import { MasterView } from './components/master/MasterView'
 import { OutboxView } from './components/outbox/OutboxView'
 import { OverviewView } from './components/OverviewView'
 import { PopScreen } from './components/pop/PopScreen'
@@ -21,13 +22,14 @@ const TAB_LABEL: Record<ModuleKey, string> = {
   pop: 'POP 단말',
   inspection: '품질 (검사·MRB)',
   outbox: '발송함',
+  master: '기준정보 (차종·BOM)',
 }
 
 // 역할별 진입 화면·접근 범위(P12-4). 배열 첫 항목이 진입 탭이다.
 //   ADMIN → 통합현황(전체) · OPERATOR → POP · INSPECTOR → 품질 · DISPATCHER → Fleet 관제
 // 프론트 게이팅이 1차 차단이다(operator는 관제 탭이 아예 없다). 서버측 강제는 모듈 몫.
 const ROLE_TABS: Record<string, ModuleKey[]> = {
-  ADMIN: ['overview', 'factory', 'fleet', 'inspection', 'outbox'],
+  ADMIN: ['overview', 'factory', 'fleet', 'inspection', 'outbox', 'master'],
   OPERATOR: ['pop'],
   INSPECTOR: ['inspection', 'outbox'],
   DISPATCHER: ['fleet'],
@@ -212,6 +214,7 @@ export function Dashboard({ user, onLogout }: { user: AuthUser; onLogout: () => 
         )}
         {tab === 'inspection' && <InspectionView />}
         {tab === 'outbox' && <OutboxView />}
+        {tab === 'master' && <MasterView role={user.role} />}
         {tab === 'factory' && (
           <FactoryView
             equipments={equipments}

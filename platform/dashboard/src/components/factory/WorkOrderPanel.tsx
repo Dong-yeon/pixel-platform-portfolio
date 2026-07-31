@@ -55,6 +55,14 @@ export function WorkOrderPanel({
               )}
             </div>
             <div className="muted small">
+              {/* 무엇을 만드는지 — 기준정보가 생기기 전엔 지시번호만 보였다. */}
+              {wo.partCode && (
+                <>
+                  <span className="mono">{wo.partCode}</span> {wo.partName}
+                  {wo.modelCode && <span className="badge model-badge">{wo.modelCode}</span>}
+                  {' · '}
+                </>
+              )}
               {equipCode.get(wo.equipmentId) ?? `설비 #${wo.equipmentId}`} · LOT {wo.lotNo}
             </div>
             <div className="wo-bar">

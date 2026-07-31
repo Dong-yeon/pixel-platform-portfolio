@@ -265,6 +265,26 @@ button.mini { padding: 3px 10px; font-size: 12px; margin-left: auto; }
 .mrb-CLOSED { background: #e3f7ec; color: #1a7f4b; }
 .mini.danger { border-color: #e0392b; color: #c0271b; }
 
+/* ===== 기준정보 (차종 · 품번 · BOM) ===== */
+.part-row { cursor: pointer; }
+.part-row.selected { border-color: #2d7ff9; background: #f5f9ff; }
+.part-PRODUCT { background: #e4efff; color: #1e5fd0; }
+.part-SEMI { background: #e3f7ec; color: #1a7f4b; }
+.part-MATERIAL { background: #eceff3; color: #6b7688; }
+.model-badge { background: #f1eafe; color: #6a3fc0; margin-left: 6px; }
+
+.bom-tree { display: flex; flex-direction: column; gap: 2px; }
+.bom-node { display: flex; flex-direction: column; gap: 2px; }
+/* 들여쓰기만으로 계층이 읽히도록 왼쪽에 가는 세로선을 둔다. */
+.bom-node .bom-node { border-left: 1px solid var(--line); padding-left: 8px; }
+.bom-line { display: flex; align-items: center; gap: 6px; padding: 4px 0; font-size: 13px; }
+.bom-qty { font-weight: 700; color: #1e5fd0; }
+.bom-revs { margin-top: 12px; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.bom-revs .rev { padding: 2px 7px; border-radius: 999px; background: var(--bg); }
+.bom-revs .rev.latest { background: #e3f7ec; color: #1a7f4b; font-weight: 700; }
+
+.pop-wo-part { font-size: 15px; margin: 4px 0; }
+
 /* ===== 발송함 (메일 카드) ===== */
 .mail-list { display: flex; flex-direction: column; gap: 10px; }
 .mail-card { border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; background: var(--card); cursor: pointer; }
