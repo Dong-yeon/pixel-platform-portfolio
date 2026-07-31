@@ -1,12 +1,19 @@
 package com.pixelfactory.layout.service;
 
+import com.pixelfactory.layout.domain.LayoutFloor;
 import com.pixelfactory.layout.domain.LayoutSettings;
 import com.pixelfactory.layout.dto.LayoutResponse;
+import com.pixelfactory.layout.repository.LayoutBuildingRepository;
+import com.pixelfactory.layout.repository.LayoutFloorRepository;
 import com.pixelfactory.layout.repository.LayoutNodeRepository;
+import com.pixelfactory.layout.repository.LayoutRackRepository;
 import com.pixelfactory.layout.repository.LayoutSettingsRepository;
 import com.pixelfactory.terminal.repository.PopTerminalRepository;
 import com.pixelplatform.core.common.exception.BusinessException;
 import com.pixelplatform.core.common.exception.ErrorCode;
+import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -17,12 +24,19 @@ public class LayoutService {
     private final LayoutSettingsRepository settingsRepository;
     private final LayoutNodeRepository nodeRepository;
     private final PopTerminalRepository terminalRepository;
+    private final LayoutBuildingRepository buildingRepository;
+    private final LayoutFloorRepository floorRepository;
+    private final LayoutRackRepository rackRepository;
 
     public LayoutService(LayoutSettingsRepository settingsRepository, LayoutNodeRepository nodeRepository,
-                         PopTerminalRepository terminalRepository) {
+                         PopTerminalRepository terminalRepository, LayoutBuildingRepository buildingRepository,
+                         LayoutFloorRepository floorRepository, LayoutRackRepository rackRepository) {
         this.settingsRepository = settingsRepository;
         this.nodeRepository = nodeRepository;
         this.terminalRepository = terminalRepository;
+        this.buildingRepository = buildingRepository;
+        this.floorRepository = floorRepository;
+        this.rackRepository = rackRepository;
     }
 
     public LayoutResponse get() {
@@ -30,10 +44,18 @@ public class LayoutService {
                 // 시드가 없으면 지도를 그릴 수 없다. 0×0 같은 값을 만들어 내보내면 화면이
                 // 조용히 비어 원인을 찾기 어려우므로 여기서 끊는다.
                 .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND,
-                        "평면도 설정이 없습니다. V7 마이그레이션이 적용됐는지 확인하세요."));
+                        "평면도 설정이 없습니다. V9 마이그레이션이 적용됐는지 확인하세요."));
 
-        return LayoutResponse.of(settings,
+        Map<Long, List<LayoutFloor>> floorsByBuilding = floorRepository.findAllByOrderByBuildingIdAscFloorNoAsc()
+                .stream()
+                .collect(Collectors.groupingBy(LayoutFloor::getBuildingId));
+
+        return LayoutResponse.of(
+                settings,
+                buildingRepository.findAllByOrderByDisplayOrderAsc(),
+                floorsByBuilding,
                 nodeRepository.findAllByOrderByNodeCodeAsc(),
-                terminalRepository.findAllByOrderByTerminalCodeAsc());
+                terminalRepository.findAllByOrderByTerminalCodeAsc(),
+                rackRepository.findAllByOrderByRackCodeAsc());
     }
 }

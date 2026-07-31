@@ -16,14 +16,19 @@ import org.springframework.stereotype.Component;
  * 막지 않아 동시 주행이 늘고, 실제 공장 배치에도 가깝다.
  *
  * <pre>
- *      x=3     11    18    25    32    41
- *       │      │     │     │     │     │      ← 세로 연결로
- *  y=5.5       ○A1   ○A2   ○A3   ○A4          ← 상단 하역
- *  y=8.5 ══╪═══╪═════╪═════╪═════╪═════╪══    ← 상단 통로
- *  y=12  [창고]                        [출하]
- *  y=15.5 ═╪═══╪═════╪═════╪═════╪═════╪══    ← 하단 통로
- *  y=18.5      ○B1   ○B2   ○B3   ○B4          ← 하단 하역
+ *   창고동(1~19)         생산동(23~55)              품질동(59~67)
+ *      x=4  9  14      27    34    41    48          62
+ *       │   │  │        │     │     │     │           │   ← 세로 연결로
+ *  y=6  ○도크○입고     ○A1   ○A2   ○A3   ○A4        ○QC-OUT
+ *  y=9 ═╪═══╪══╪════════╪═════╪═════╪═════╪═══════════╪══  ← 상단 통로
+ *  y=13     ○피킹존
+ *  y=18 ╪═══╪══╪════════╪═════╪═════╪═════╪═══════════╪══  ← 하단 통로
+ *  y=21 ○도크   ○출하   ○B1   ○B2   ○B3   ○B4        ○QC-IN
  * </pre>
+ *
+ * <p><b>통로가 건물을 관통한다.</b> 경로 규칙(수직→통로→수평→수직)이 고정이므로, 통로가 벽을
+ * 지나는 자리를 출입구로 삼아야 로봇이 벽을 뚫지 않는다. 평면도(V9)가 그 전제로 그려져 있다 —
+ * 모든 노드는 아래 커넥터 x 위에, 통로 y에서 벗어난 자리에 있다.
  *
  * <p>구간(segment)은 점유 단위다. 가로는 통로별·연결로 사이 구간(AU/AL), 세로는 통로를
  * 기준으로 위·중간·아래 대역(top/mid/bot)으로 나눈다.
@@ -32,14 +37,19 @@ import org.springframework.stereotype.Component;
 public class LaneGraph {
 
     /** 상단 가로 통로 y. */
-    public static final double AISLE_UPPER_Y = 8.5;
+    public static final double AISLE_UPPER_Y = 9.0;
     /** 하단 가로 통로 y. */
-    public static final double AISLE_LOWER_Y = 15.5;
+    public static final double AISLE_LOWER_Y = 18.0;
     /** 두 통로의 경계 — 목적지가 어느 쪽 통로를 쓸지 가른다. */
     private static final double MID_Y = (AISLE_UPPER_Y + AISLE_LOWER_Y) / 2;
 
-    /** 세로 연결로가 있는 x좌표들(정렬 상태 유지). */
-    private static final double[] CONNECTOR_X = {3, 11, 18, 25, 32, 41};
+    /**
+     * 세로 연결로가 있는 x좌표들(정렬 상태 유지).
+     *
+     * <p><b>모든 노드의 x가 여기 있어야 한다.</b> 벗어나면 웨이포인트는 노드로 가는데 점유는
+     * 다른 레인에 걸려, 통제되지 않은 통로를 달리게 된다(구간 ID가 {@code %.0f}라 정수로 둔다).
+     */
+    private static final double[] CONNECTOR_X = {4, 9, 14, 27, 34, 41, 48, 62};
 
     private final LocationRegistry locations;
 

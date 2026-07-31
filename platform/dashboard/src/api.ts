@@ -18,6 +18,15 @@ const AUTH = '/api/auth'
 const FACTORY = '/api/factory'
 const FLEET = '/api/fleet'
 const QMS = '/api/qms'
+const WMS = '/api/wms'
+
+/** WMS 재고 한 줄 — 로케이션(=렉) × 품목. */
+export interface Stock {
+  id: number
+  locationCode: string
+  itemCode: string
+  quantity: number
+}
 
 // 게이트웨이 중앙 인증(P6) — 토큰 하나로 모든 모듈에 접근한다.
 // 모듈들이 같은 서명 키를 쓰므로 로그인은 한 번이면 되고, 게이트웨이가 관문에서 검증한다.
@@ -102,6 +111,11 @@ export const api = {
     terminalPresence: () => request<TerminalPresence[]>(FACTORY, '/terminals/presence'),
     /** 내게 배정된 작업지시(인증된 사용자 기준). POP·현장용. */
     myWorkOrders: () => request<WorkOrder[]>(FACTORY, '/work-orders/my'),
+  },
+
+  /** 창고(WMS) — 재고. 로케이션 코드가 곧 렉 코드라 지도의 적재율이 여기서 나온다. */
+  wms: {
+    stocks: () => request<Stock[]>(WMS, '/stocks'),
   },
 
   /** 품질(QMS) — 검사·부적합·MRB 심의·발송함. */

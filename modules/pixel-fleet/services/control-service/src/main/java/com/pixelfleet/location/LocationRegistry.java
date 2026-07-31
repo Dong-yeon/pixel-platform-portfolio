@@ -40,26 +40,32 @@ public class LocationRegistry {
 
     private static final Logger log = LoggerFactory.getLogger(LocationRegistry.class);
 
-    private static final double MAX_X = 44.0;
-    private static final double MAX_Y = 24.0;
+    private static final double MAX_X = 68.0;
+    private static final double MAX_Y = 26.0;
 
     /**
-     * factory에서 못 받았을 때 쓰는 폴백. V7 마이그레이션 시드와 같은 값이다.
+     * factory에서 못 받았을 때 쓰는 폴백. V9 마이그레이션 시드와 같은 값이다.
      * 마스터를 바꾸면 여기도 함께 고친다(또는 factory가 항상 떠 있게 해서 안 쓰이게 한다).
      */
     private static final Map<String, double[]> FALLBACK_NODES = Map.ofEntries(
-            Map.entry("DOCK-1", new double[]{3, 3}),
-            Map.entry("DOCK-2", new double[]{3, 21}),
-            Map.entry("WAREHOUSE", new double[]{3, 12}),
-            Map.entry("STATION-A1", new double[]{11, 5.5}),
-            Map.entry("STATION-A2", new double[]{18, 5.5}),
-            Map.entry("STATION-A3", new double[]{25, 5.5}),
-            Map.entry("STATION-A4", new double[]{32, 5.5}),
-            Map.entry("STATION-B1", new double[]{11, 18.5}),
-            Map.entry("STATION-B2", new double[]{18, 18.5}),
-            Map.entry("STATION-B3", new double[]{25, 18.5}),
-            Map.entry("STATION-B4", new double[]{32, 18.5}),
-            Map.entry("SHIPPING", new double[]{41, 12})
+            // 창고동
+            Map.entry("WH-DOCK-1", new double[]{4, 6}),
+            Map.entry("WH-DOCK-2", new double[]{4, 21}),
+            Map.entry("WH-RECV", new double[]{9, 6}),
+            Map.entry("WH-PICK", new double[]{9, 13}),
+            Map.entry("WH-SHIP", new double[]{14, 21}),
+            // 생산동
+            Map.entry("PROD-A1", new double[]{27, 6}),
+            Map.entry("PROD-A2", new double[]{34, 6}),
+            Map.entry("PROD-A3", new double[]{41, 6}),
+            Map.entry("PROD-A4", new double[]{48, 6}),
+            Map.entry("PROD-B1", new double[]{27, 21}),
+            Map.entry("PROD-B2", new double[]{34, 21}),
+            Map.entry("PROD-B3", new double[]{41, 21}),
+            Map.entry("PROD-B4", new double[]{48, 21}),
+            // 품질동 — 가공이 끝난 물건은 무조건 여기를 거친다
+            Map.entry("QC-IN", new double[]{62, 21}),
+            Map.entry("QC-OUT", new double[]{62, 6})
     );
 
     private final Map<String, double[]> nodes = new ConcurrentHashMap<>(FALLBACK_NODES);

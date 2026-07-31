@@ -11,5 +11,10 @@ public enum LayoutNodeType {
     /** 설비 옆 하역 지점 */
     STATION,
     /** 출하장 */
-    SHIPPING
+    SHIPPING,
+    /**
+     * 검사 기착지 — 가공이 끝난 물건은 무조건 여기를 거친다.
+     * 합격이면 창고동으로, 불합격이면 생산동으로 되돌아간다.
+     */
+    INSPECTION
 }

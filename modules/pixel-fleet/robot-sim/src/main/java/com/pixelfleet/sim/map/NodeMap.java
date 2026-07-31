@@ -5,23 +5,31 @@ import java.util.Map;
 import org.springframework.stereotype.Component;
 
 /**
- * 공장 평면도(44 × 24). 통로는 둘이다 — 라인마다 하나씩.
+ * 공장 평면도(68 × 26) — 건물 3채. 통로는 둘이고, <b>세 건물을 관통한다</b>.
  *
  * <pre>
- *   [CNC-01][CNC-02][CNC-03][MCT-01]      ← LINE-1 설비(대시보드가 그린다)
- *     ○A1     ○A2     ○A3     ○A4         ← 하역 지점
- *   ══════════ 상단 통로 (y=8.5) ══════════
- *   [창고]                        [출하]
- *   ══════════ 하단 통로 (y=15.5) ═════════
- *     ○B1     ○B2     ○B3     ○B4
- *   [ASM-01][ASM-02][INS-01][PKG-01]      ← LINE-2 설비
+ *   창고동(1~19)          생산동(23~55)                품질동(59~67)
+ *   [렉][렉][렉]     [CNC-01][CNC-02][CNC-03][MCT-01]
+ *   ○입고  ○도크1      ○A1    ○A2    ○A3    ○A4        ○QC-OUT(판정 출고)
+ *   ══════════════ 상단 통로 (y=9) ══════════════════════════════
+ *   [렉] ○피킹존
+ *   ══════════════ 하단 통로 (y=18) ═════════════════════════════
+ *   [렉] ○출하 ○도크2   ○B1    ○B2    ○B3    ○B4        ○QC-IN(검사 입고)
+ *                    [ASM-01][ASM-02][INS-01][PKG-01]
  * </pre>
+ *
+ * <p><b>왜 통로가 건물을 관통하나.</b> 경로 규칙(수직→통로→수평→수직)이 고정이라, 통로가
+ * 벽을 지나는 자리를 출입구로 삼아야 로봇이 벽을 뚫지 않는다. 모든 노드는 커넥터 x 위,
+ * 통로 밖에 있다.
+ *
+ * <p>물류 흐름: 창고동(자재) → 생산동(가공) → <b>품질동(전수 검사)</b> →
+ * 합격이면 창고동 입고 / 불합격이면 생산동 재작업.
  *
  * <p><b>좌표의 주인은 pixel-factory다</b>(layout_nodes / layout_settings). 여기는 그 값을
  * 받아 오지 않고 자기 복사본을 갖는다 — 시뮬레이터는 물리 세계를 흉내내는 쪽이라 실제 설비처럼
  * 서버가 알려주는 대로 위치를 바꾸지 않아야 하고, 서버가 죽어도 계속 돌아야 한다.
  *
- * <p>대신 {@code NodeMapLayoutConsistencyTest}가 서버 마스터(V7 마이그레이션)와 대조해
+ * <p>대신 {@code NodeMapLayoutConsistencyTest}가 서버 마스터(V9 마이그레이션)와 대조해
  * <b>어긋나면 빌드를 깨뜨린다.</b> 런타임 의존을 만들지 않으면서 조용한 불일치를 막는 방법이다.
  * 좌표를 바꿀 일이 있으면 마스터를 고치고 여기를 맞춘다(순서가 반대면 테스트가 잡아 준다).
  */
@@ -29,32 +37,39 @@ import org.springframework.stereotype.Component;
 public class NodeMap {
 
     /** 평면도 가로. 서버 마스터(layout_settings.width)와 같아야 한다 — 대조 테스트가 확인한다. */
-    public static final double MAX_X = 44.0;
+    public static final double MAX_X = 68.0;
     /** 평면도 세로. 서버 마스터(layout_settings.height)와 같아야 한다. */
-    public static final double MAX_Y = 24.0;
+    public static final double MAX_Y = 26.0;
 
     private static final Map<String, double[]> NODES = Map.ofEntries(
-            Map.entry("DOCK-1", new double[]{3, 3}),
-            Map.entry("DOCK-2", new double[]{3, 21}),
-            Map.entry("WAREHOUSE", new double[]{3, 12}),
-            Map.entry("STATION-A1", new double[]{11, 5.5}),
-            Map.entry("STATION-A2", new double[]{18, 5.5}),
-            Map.entry("STATION-A3", new double[]{25, 5.5}),
-            Map.entry("STATION-A4", new double[]{32, 5.5}),
-            Map.entry("STATION-B1", new double[]{11, 18.5}),
-            Map.entry("STATION-B2", new double[]{18, 18.5}),
-            Map.entry("STATION-B3", new double[]{25, 18.5}),
-            Map.entry("STATION-B4", new double[]{32, 18.5}),
-            Map.entry("SHIPPING", new double[]{41, 12})
+            // 창고동
+            Map.entry("WH-DOCK-1", new double[]{4, 6}),
+            Map.entry("WH-DOCK-2", new double[]{4, 21}),
+            Map.entry("WH-RECV", new double[]{9, 6}),
+            Map.entry("WH-PICK", new double[]{9, 13}),
+            Map.entry("WH-SHIP", new double[]{14, 21}),
+            // 생산동
+            Map.entry("PROD-A1", new double[]{27, 6}),
+            Map.entry("PROD-A2", new double[]{34, 6}),
+            Map.entry("PROD-A3", new double[]{41, 6}),
+            Map.entry("PROD-A4", new double[]{48, 6}),
+            Map.entry("PROD-B1", new double[]{27, 21}),
+            Map.entry("PROD-B2", new double[]{34, 21}),
+            Map.entry("PROD-B3", new double[]{41, 21}),
+            Map.entry("PROD-B4", new double[]{48, 21}),
+            // 품질동
+            Map.entry("QC-IN", new double[]{62, 21}),
+            Map.entry("QC-OUT", new double[]{62, 6})
     );
 
-    private static final List<String> DOCKS = List.of("DOCK-1", "DOCK-2");
+    private static final List<String> DOCKS = List.of("WH-DOCK-1", "WH-DOCK-2");
 
     /** 유휴 로봇이 순찰할 지점 — 도크는 충전 자리이지 목적지가 아니므로 제외한다. */
     private static final List<String> ROAM_NODES = List.of(
-            "WAREHOUSE", "SHIPPING",
-            "STATION-A1", "STATION-A2", "STATION-A3", "STATION-A4",
-            "STATION-B1", "STATION-B2", "STATION-B3", "STATION-B4");
+            "WH-RECV", "WH-PICK", "WH-SHIP",
+            "PROD-A1", "PROD-A2", "PROD-A3", "PROD-A4",
+            "PROD-B1", "PROD-B2", "PROD-B3", "PROD-B4",
+            "QC-IN", "QC-OUT");
 
     /** 이 시뮬레이터가 아는 노드 코드들. 서버 마스터와 대조하는 테스트가 쓴다. */
     public java.util.Set<String> knownNodeCodes() {
@@ -91,10 +106,10 @@ public class NodeMap {
         return ROAM_NODES.get(rng.nextInt(ROAM_NODES.size()));
     }
 
-    /** 상단 통로 — LINE-1(A열) 담당. control-service LaneGraph와 같아야 한다. */
-    public static final double UPPER_AISLE_Y = 8.5;
-    /** 하단 통로 — LINE-2(B열) 담당. */
-    public static final double LOWER_AISLE_Y = 15.5;
+    /** 상단 통로 — A열 담당. control-service LaneGraph와 같아야 한다. */
+    public static final double UPPER_AISLE_Y = 9.0;
+    /** 하단 통로 — B열 담당. */
+    public static final double LOWER_AISLE_Y = 18.0;
     private static final double MID_Y = (UPPER_AISLE_Y + LOWER_AISLE_Y) / 2;
 
     /**

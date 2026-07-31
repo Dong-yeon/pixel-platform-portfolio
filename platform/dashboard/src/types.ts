@@ -71,7 +71,7 @@ export interface FleetEvent extends TimelineEvent {
 // control-service LocationRegistry · robot-sim NodeMap 과 3중으로 겹쳐서 한 곳만 고치면
 // 배차 거리 비교나 화면 표시가 **조용히** 틀어졌다. 설비 좌표는 Equipment 에 실려 온다.
 
-export type LayoutNodeType = 'DOCK' | 'WAREHOUSE' | 'STATION' | 'SHIPPING'
+export type LayoutNodeType = 'DOCK' | 'WAREHOUSE' | 'STATION' | 'SHIPPING' | 'INSPECTION'
 
 export interface LayoutNode {
   nodeCode: string
@@ -80,6 +80,43 @@ export interface LayoutNode {
   posX: number
   posY: number
 }
+
+/**
+ * 건물 — 생산동 / 창고동(3층) / 품질동.
+ *
+ * 설비·노드·단말이 어느 건물인지는 서버가 따로 주지 않는다. 건물은 사각형이고 대상은 점이라
+ * **좌표가 곧 소속**이며, 지도는 건물을 골랐을 때 그 사각형으로 확대하는 것만으로 충분하다.
+ * 소속 필드를 더하면 좌표와 어긋날 수 있는 두 번째 진실이 생긴다.
+ */
+export interface LayoutBuilding {
+  buildingCode: string
+  name: string
+  posX: number
+  posY: number
+  width: number
+  height: number
+  floorCount: number
+  floors: LayoutFloor[]
+}
+
+export interface LayoutFloor {
+  floorNo: number
+  name: string
+}
+
+/** 렉(선반). `capacityQty`는 만재 수량이고 실제 수량은 WMS 재고에서 온다. */
+export interface LayoutRack {
+  rackCode: string
+  buildingCode: string
+  floorNo: number
+  posX: number
+  posY: number
+  orientation: string
+  columnsCount: number
+  levelsCount: number
+  capacityQty: number
+}
+
 
 /** POP 단말 — layout에 실려 오는 마스터(코드·이름·좌표). */
 export interface LayoutTerminal {
@@ -105,12 +142,14 @@ export interface TerminalPresence {
 export interface Layout {
   width: number
   height: number
-  /** 상단 가로 통로 y — LINE-1(A열) 담당. */
+  /** 상단 가로 통로 y — A열 담당. 건물 3채를 관통한다(벽과 만나는 자리가 출입구). */
   upperAisleY: number
-  /** 하단 가로 통로 y — LINE-2(B열) 담당. */
+  /** 하단 가로 통로 y — B열 담당. */
   lowerAisleY: number
+  buildings: LayoutBuilding[]
   nodes: LayoutNode[]
   terminals: LayoutTerminal[]
+  racks: LayoutRack[]
 }
 
 /** 노드 코드 → 좌표. 지도·경로 계산이 쓰기 쉬운 형태로 바꿔 둔다. */

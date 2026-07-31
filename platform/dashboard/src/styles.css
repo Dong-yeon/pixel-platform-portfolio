@@ -224,16 +224,37 @@ button.mini { padding: 3px 10px; font-size: 12px; margin-left: auto; }
 .umap-badge-name { font-size: 1.05px; fill: #fff; font-weight: 700; }
 .umap-badge-wo { font-size: 0.9px; fill: #cbc4e6; }
 
-/* 지도 레이어 토글 */
-.umap-layers { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 10px; font-size: 12px; }
+/* 지도 조작 — 건물·층 선택 + 레이어 토글 */
+.umap-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 16px; margin-top: 10px; }
+.umap-view-pick { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); }
+.umap-view-pick select {
+  padding: 5px 8px; border: 1px solid var(--line); border-radius: 8px;
+  background: var(--card); color: var(--ink); font-size: 12.5px;
+}
+.umap-layers { display: flex; flex-wrap: wrap; gap: 12px; font-size: 12px; }
 .umap-layer-toggle { display: inline-flex; align-items: center; gap: 5px; color: var(--ink); cursor: pointer; user-select: none; }
 .umap-layer-toggle input { accent-color: #2d7ff9; }
 
-/* ===== 품질(QMS) — 사무실 박스 · 정보 흐름 · MRB ===== */
-/* 사무실은 평면도 바깥 — 바닥 오브젝트가 아니라 정보의 목적지다. */
-.umap-office { fill: #fdf3f0; stroke: #d95d39; stroke-width: 0.18; }
-.umap-office-label { font-size: 1.1px; fill: #a53d20; font-weight: 700; }
-.umap-office-sub { font-size: 0.9px; fill: #a53d20; }
+/* ===== 건물 · 렉 ===== */
+/* 건물은 구역이다 — 채움은 아주 옅게, 벽만 또렷하게. */
+.umap-building-fill { fill: #f7f9fc; }
+.umap-wall { stroke: #9aa5b4; stroke-width: 0.28; stroke-linecap: round; }
+.umap-building-label { font-size: 1.15px; fill: #4a5566; font-weight: 700; }
+.umap-nameplate rect { fill: #ffffff; stroke: #9aa5b4; stroke-width: 0.12; }
+.b-QC .umap-nameplate rect { stroke: #d95d39; }
+.b-QC .umap-building-fill { fill: #fdf7f5; }
+.b-QC .umap-wall { stroke: #d95d39; }
+.b-QC .umap-building-label { fill: #a53d20; }
+.b-WH .umap-building-fill { fill: #f5f8f6; }
+
+/* 렉 — 단(levels)만큼 가로줄을 그어 선반처럼. 색은 적재율. */
+.umap-rack { stroke: #7d8b9c; stroke-width: 0.1; }
+.umap-rack-divider { stroke: #ffffff; stroke-width: 0.08; opacity: 0.75; }
+.umap-rack-g { cursor: help; }
+
+/* ===== 품질(QMS) — 품질동 배지 · 정보 흐름 · MRB ===== */
+/* 품질동은 이제 평면도 안의 건물이다(예전엔 바깥에 떠 있는 박스였다). */
+.umap-office-sub { font-size: 0.95px; fill: #a53d20; font-weight: 600; }
 .umap-office-badge { fill: #d95d39; }
 /* 정보 흐름 — 현장 설비 → 사무실. 운송 경로(파랑)와 다른 색 점선(지도 시각 규칙). */
 .umap-quality-flow { fill: none; stroke: #d95d39; stroke-width: 0.22; stroke-dasharray: 0.5 0.5; opacity: 0.8; }

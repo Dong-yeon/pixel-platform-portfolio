@@ -4,8 +4,10 @@ import type {
   Equipment, EquipmentOee, Layout, ModuleKey, MrbOpenSummary, Robot, Task,
   TerminalPresence, TimelineEvent, WorkOrder,
 } from '../types'
+import { useRackStock } from '../useRackStock'
 import { EventTimeline } from './EventTimeline'
-import { UnifiedMap, type MapLayers } from './UnifiedMap'
+import { MapControls } from './MapControls'
+import { ALL_VIEW, UnifiedMap, type MapLayers, type MapView } from './UnifiedMap'
 
 function Stat({ label, value, sub, tone }: { label: string; value: string; sub?: string; tone?: string }) {
   return (
@@ -57,6 +59,11 @@ export function OverviewView({
     equipment: true, amr: true, routes: true, pop: true, quality: true,
   })
   const toggleLayer = (key: keyof MapLayers) => setLayers((prev) => ({ ...prev, [key]: !prev[key] }))
+
+  // 보고 있는 건물·층. 기본은 공장 전경.
+  const [view, setView] = useState<MapView>(ALL_VIEW)
+  // 렉 적재율 — 용량은 평면도, 수량은 WMS. 코드로 맞춘다.
+  const rackStock = useRackStock()
 
   // 품질관리실 배지 — 열려 있는 MRB. QMS가 없으면 조용히 비워 둔다(컴포저블).
   const [mrbOpen, setMrbOpen] = useState<MrbOpenSummary | null>(null)
@@ -136,16 +143,18 @@ export function OverviewView({
           tasks={tasks}
           presence={presence}
           mrbOpen={mrbOpen}
+          rackStock={rackStock}
+          view={view}
           layers={layers}
         />
-        <div className="umap-layers">
-          {LAYER_LABEL.map(({ key, label }) => (
-            <label key={key} className="umap-layer-toggle">
-              <input type="checkbox" checked={layers[key]} onChange={() => toggleLayer(key)} />
-              {label}
-            </label>
-          ))}
-        </div>
+        <MapControls
+          layout={layout}
+          view={view}
+          onViewChange={setView}
+          layers={layers}
+          onToggleLayer={toggleLayer}
+          layerLabels={LAYER_LABEL}
+        />
         <div className="umap-legend">
           <span><i className="lg-swatch" style={{ background: '#27ae60' }} />설비 가동</span>
           <span><i className="lg-swatch" style={{ background: '#9aa5b4' }} />대기</span>
@@ -156,6 +165,9 @@ export function OverviewView({
           <span><i className="lg-swatch" style={{ background: '#c8912f' }} />적재(파렛트)</span>
           <span style={{ color: '#2d7ff9' }}>┈ 운송 경로</span>
           <span><i className="lg-swatch" style={{ background: '#7b61ff' }} />POP 단말</span>
+          <span><i className="lg-swatch" style={{ background: '#2f8f5b' }} />렉 만재</span>
+          <span><i className="lg-swatch" style={{ background: '#cfe6d5' }} />렉 여유</span>
+          <span style={{ color: '#d95d39' }}>┈ 품질 정보 흐름</span>
         </div>
       </section>
 

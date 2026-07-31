@@ -29,30 +29,41 @@ public class DemoTaskGenerator {
     private static final Logger log = LoggerFactory.getLogger(DemoTaskGenerator.class);
 
     /**
-     * 실제 공장의 자재 흐름을 따른다: <b>창고 → 가공(A열) → 조립·검사(B열) → 출하.</b>
+     * 실제 공장의 자재 흐름을 따른다:
+     * <b>창고동 → 가공(A열) → 조립·검사(B열) → 품질동(전수 검사) → 합격은 창고동 / 불합격은 재작업.</b>
      *
      * <p>처음에는 아무 두 지점이나 이었는데, 그러면 한 작업이 공장을 가로질러 경로가 길어지고
      * 서로 겹쳐 동시 주행이 1대로 묶였다(실측). 흐름대로 만들면 경로가 짧아지고, 특히
      * A열↔B열 이송은 같은 세로 연결로만 쓰므로 열이 다르면 <b>서로 전혀 간섭하지 않는다.</b>
+     *
+     * <p><b>가공품은 예외 없이 품질동을 거친다.</b> 그래서 B열 → QC-IN 이 네 개 다 있고,
+     * 출하장으로 곧장 가는 흐름은 없다 — 검사를 건너뛴 물건이 나가는 그림을 만들지 않는다.
      */
     private record Flow(String origin, String destination) {}
 
     private static final List<Flow> FLOWS = List.of(
-            // 자재 투입: 창고 → 가공 라인
-            new Flow("WAREHOUSE", "STATION-A1"),
-            new Flow("WAREHOUSE", "STATION-A2"),
-            new Flow("WAREHOUSE", "STATION-A3"),
-            new Flow("WAREHOUSE", "STATION-A4"),
+            // 자재 투입: 창고동 피킹존 → 가공 라인
+            new Flow("WH-PICK", "PROD-A1"),
+            new Flow("WH-PICK", "PROD-A2"),
+            new Flow("WH-PICK", "PROD-A3"),
+            new Flow("WH-PICK", "PROD-A4"),
             // 공정 이송: 가공 → 바로 아래 조립·검사 (같은 열 = 서로 간섭 없음)
-            new Flow("STATION-A1", "STATION-B1"),
-            new Flow("STATION-A2", "STATION-B2"),
-            new Flow("STATION-A3", "STATION-B3"),
-            new Flow("STATION-A4", "STATION-B4"),
-            // 출하: 조립·검사 → 출하장
-            new Flow("STATION-B1", "SHIPPING"),
-            new Flow("STATION-B2", "SHIPPING"),
-            new Flow("STATION-B3", "SHIPPING"),
-            new Flow("STATION-B4", "SHIPPING"));
+            new Flow("PROD-A1", "PROD-B1"),
+            new Flow("PROD-A2", "PROD-B2"),
+            new Flow("PROD-A3", "PROD-B3"),
+            new Flow("PROD-A4", "PROD-B4"),
+            // 검사 입고: 조립·검사가 끝난 물건은 무조건 품질동으로
+            new Flow("PROD-B1", "QC-IN"),
+            new Flow("PROD-B2", "QC-IN"),
+            new Flow("PROD-B3", "QC-IN"),
+            new Flow("PROD-B4", "QC-IN"),
+            // 판정 후: 합격이면 창고동 입고
+            new Flow("QC-OUT", "WH-RECV"),
+            new Flow("QC-OUT", "WH-RECV"),
+            // 판정 후: 불합격이면 생산동으로 되돌려 재작업
+            new Flow("QC-OUT", "PROD-B1"),
+            // 출하: 창고에 들어온 완제품을 출하장으로
+            new Flow("WH-PICK", "WH-SHIP"));
 
     /**
      * 대기 작업이 이 수를 넘으면 새로 만들지 않는다.

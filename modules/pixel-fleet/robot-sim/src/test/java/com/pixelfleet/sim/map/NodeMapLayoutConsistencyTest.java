@@ -22,8 +22,9 @@ import org.junit.jupiter.api.Test;
  * 자기 좌표를 그대로 갖고, 대신 서버 마스터와 <b>같은지 검사</b>한다 — 런타임 의존을 만들지
  * 않으면서 조용한 불일치를 막는 방법이다.
  *
- * <p>대조 기준은 pixel-factory의 V7 마이그레이션 SQL이다. DB 시드가 곧 마스터의 정의이고,
- * 실행 중인 서버 없이 읽을 수 있다.
+ * <p>대조 기준은 pixel-factory의 <b>최신</b> 평면도 마이그레이션 SQL이다. DB 시드가 곧 마스터의
+ * 정의이고, 실행 중인 서버 없이 읽을 수 있다. 평면도를 다시 그리는 마이그레이션을 추가하면
+ * (V7 → V9처럼) <b>이 경로도 함께 옮겨야 한다</b> — 안 그러면 옛 시드와 대조하며 조용히 통과한다.
  *
  * <p>파일을 못 찾으면 <b>실패</b>시킨다(건너뛰지 않는다). 경로가 바뀌었는데 테스트가 조용히
  * 통과하면 이 검사가 있으나 마나이기 때문이다.
@@ -33,9 +34,9 @@ class NodeMapLayoutConsistencyTest {
     /** robot-sim 모듈 디렉터리 기준 상대 경로(Gradle 테스트의 작업 디렉터리). */
     private static final Path MIGRATION = Path.of(
             "..", "..", "pixel-factory", "services", "oee-service",
-            "src", "main", "resources", "db", "migration", "V7__layout_master.sql");
+            "src", "main", "resources", "db", "migration", "V9__factory_floor_v2.sql");
 
-    /** ('DOCK-1', '1번 충전 도크', 'DOCK', 3, 3, now(), now()) */
+    /** ('WH-DOCK-1', '1번 충전 도크', 'DOCK', 4, 6, now(), now()) */
     private static final Pattern NODE_ROW = Pattern.compile(
             "\\('([A-Z0-9-]+)',\\s*'[^']*',\\s*'([A-Z_]+)',\\s*([0-9.]+),\\s*([0-9.]+)");
 
