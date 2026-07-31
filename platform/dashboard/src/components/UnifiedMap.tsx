@@ -57,6 +57,21 @@ const EQUIP_COLOR: Record<EquipmentStatus, string> = {
 /** 진행 중인 운송만 흐름선으로 그린다(대기/완료는 제외). */
 const ACTIVE_TASK = new Set(['ASSIGNED', 'IN_PROGRESS'])
 
+/**
+ * 로봇별 경로 색.
+ *
+ * <p>전부 같은 파랑이면 선이 겹칠 때 어느 로봇 것인지 못 읽는다. 로봇 코드에서 번호를 뽑아
+ * 고정 색을 준다 — 매번 같은 로봇이 같은 색이어야 화면을 보며 눈이 따라갈 수 있다.
+ */
+const ROUTE_PALETTE = ['#2d7ff9', '#8e44ad', '#e08a00', '#0f9b8e', '#c0392b', '#3b5bdb']
+
+function routeColorFor(robotCode: string | undefined): string {
+  if (!robotCode) return '#9aa5b4' // 아직 배차 안 된 작업
+  const digits = robotCode.replace(/\D/g, '')
+  const index = digits ? Number(digits) : robotCode.length
+  return ROUTE_PALETTE[index % ROUTE_PALETTE.length]
+}
+
 /** 적재율 색 — 빈 곳/여유/적정/포화가 한눈에 갈리게. */
 function rackFill(ratio: number): string {
   if (ratio <= 0) return '#eef1f6'
@@ -128,6 +143,8 @@ export function UnifiedMap({
 
   const activeTasks = tasks.filter((t) => ACTIVE_TASK.has(t.status))
   const robotById = new Map(robots.map((r) => [r.id, r]))
+  // 일을 맡은 로봇에만 경로 색 테를 두른다 — 쉬는 로봇까지 두르면 화면만 시끄럽다.
+  const workingRobotIds = new Set(activeTasks.map((t) => t.assignedRobotId).filter(Boolean))
   const presenceByTerminal = new Map(presence.map((p) => [p.terminalCode, p]))
   const equipByCode = new Map(equipments.map((e) => [e.equipmentCode, e]))
   const NODES = nodeIndex(layout)
@@ -197,24 +214,56 @@ export function UnifiedMap({
           <RackShape key={rack.rackCode} rack={rack} quantity={rackStock[rack.rackCode] ?? 0} />
         ))}
 
-      {/* ---- AMR 이동 경로 ---- 설비/로봇보다 아래에 깔린다. */}
+      {/* ---- AMR 이동 경로 ---- 설비/로봇보다 아래에 깔린다.
+             **앞으로 갈 길만 그린다.** 로봇이 아직 짐을 싣지 않았으면 목적지로 직행하는 게
+             아니라 픽업 지점을 먼저 들른다 — 그 구간을 빼먹으면 그려진 선이 실제 주행과
+             어긋나 "지나간 경로"처럼 보인다. */}
       {showGround && layers.routes && activeTasks.map((t) => {
         const to = NODES[t.destinationNode]
+        const origin = NODES[t.originNode]
         if (!to) return null
+
         const robot = t.assignedRobotId ? robotById.get(t.assignedRobotId) : undefined
-        const from: [number, number] | undefined = robot
-          ? [robot.posX, robot.posY]
-          : NODES[t.originNode]
-        if (!from) return null
+        const color = routeColorFor(robot?.robotCode)
+
         // 실제 주행과 같은 통로 경유 경로로 그린다(직선으로 그리면 벽을 관통하는 것처럼 보인다).
-        const pts = routePoints(layout, from, to)
+        let points: [number, number][]
+        let pickup: [number, number] | null = null
+
+        if (robot && !robot.laden && origin) {
+          // 아직 가지러 가는 중 — 로봇 → 픽업 → 도착. 두 다리를 이어 붙인다(이음매 중복 제거).
+          const leg1 = routePoints(layout, [robot.posX, robot.posY], origin)
+          const leg2 = routePoints(layout, origin, to)
+          points = [...leg1, ...leg2.slice(1)]
+          pickup = origin
+        } else {
+          const from: [number, number] | undefined = robot ? [robot.posX, robot.posY] : origin
+          if (!from) return null
+          points = routePoints(layout, from, to)
+        }
+
         return (
           <g key={`route-${t.id}`}>
-            <polyline points={pts.map((p) => `${p[0]},${p[1]}`).join(' ')} className="umap-route" />
-            {pts.slice(1, -1).map((p, i) => (
-              <circle key={`wp-${t.id}-${i}`} cx={p[0]} cy={p[1]} r={0.35} className="umap-waypoint" />
+            <polyline
+              points={points.map((p) => `${p[0]},${p[1]}`).join(' ')}
+              className="umap-route"
+              stroke={color}
+            />
+            {points.slice(1, -1).map((p, i) => (
+              <circle key={`wp-${t.id}-${i}`} cx={p[0]} cy={p[1]} r={0.35}
+                      className="umap-waypoint" stroke={color} />
             ))}
-            <circle cx={to[0]} cy={to[1]} r={1.5} className="umap-route-target" />
+            {/* 픽업 지점 — 여기서 싣고 나서 도착지로 간다 */}
+            {pickup && (
+              <g className="umap-route-pickup">
+                <circle cx={pickup[0]} cy={pickup[1]} r={1.0} stroke={color} />
+                <text x={pickup[0]} y={pickup[1] - 1.5} textAnchor="middle"
+                      className="umap-route-tag" style={fs(0.8)} fill={color}>
+                  픽업
+                </text>
+              </g>
+            )}
+            <circle cx={to[0]} cy={to[1]} r={1.5} className="umap-route-target" stroke={color} />
           </g>
         )
       })}
@@ -326,6 +375,10 @@ export function UnifiedMap({
           {/* 적재 중이면 파렛트를 얹어 그린다 — "가지러 가는 중"과 "옮기는 중"의 구분이
               물류 화면에서 가장 먼저 읽혀야 하는 정보다. 로봇 뒤에 깔아 원을 가리지 않는다. */}
           {r.laden && <rect x={-1.15} y={-1.15} width={2.3} height={2.3} rx={0.2} className="umap-pallet" />}
+          {/* 자기 경로와 같은 색 테 — 선이 겹쳐도 어느 로봇 것인지 눈으로 잇는다. */}
+          {workingRobotIds.has(r.id) && (
+            <circle r={1.45} fill="none" stroke={routeColorFor(r.robotCode)} strokeWidth={0.26} opacity={0.9} />
+          )}
           <circle r={0.95} fill={ROBOT_COLOR[r.status]} stroke="#fff" strokeWidth={0.18} />
           <text y={0.38} className="umap-robot-label" textAnchor="middle" style={fs(1.1)}>
             {r.robotCode.slice(-1)}
