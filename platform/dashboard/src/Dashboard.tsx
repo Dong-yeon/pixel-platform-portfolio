@@ -25,6 +25,17 @@ const TAB_LABEL: Record<ModuleKey, string> = {
   master: '기준정보 (차종·BOM)',
 }
 
+/** 좁은 폭에서 라벨을 접었을 때 무엇인지 알아볼 수 있게. */
+const TAB_ICON: Record<ModuleKey, string> = {
+  overview: '▦',
+  factory: '⚙',
+  fleet: '➜',
+  pop: '▤',
+  inspection: '✓',
+  outbox: '✉',
+  master: '⌗',
+}
+
 // 역할별 진입 화면·접근 범위(P12-4). 배열 첫 항목이 진입 탭이다.
 //   ADMIN → 통합현황(전체) · OPERATOR → POP · INSPECTOR → 품질 · DISPATCHER → Fleet 관제
 // 프론트 게이팅이 1차 차단이다(operator는 관제 탭이 아예 없다). 서버측 강제는 모듈 몫.
@@ -162,37 +173,50 @@ export function Dashboard({ user, onLogout }: { user: AuthUser; onLogout: () => 
 
   return (
     <div className="app">
-      <header className="topbar">
+      {/*
+        메뉴는 **왼쪽 세로**다. 가로 탭이던 시절 항목이 6개로 늘자 좁은 폭에서 라벨이
+        한 글자씩 세로로 쪼개졌다("기준정보 (차종·BOM)" 같은 긴 한글 이름이 특히). 세로 목록은
+        항목이 늘어도 접히지 않고, 관제 화면처럼 넓은 모니터에 오래 띄우는 용도에도 맞는다.
+      */}
+      <aside className="sidebar">
         <div className="brand">
           Pixel<span className="brand-accent">Platform</span>
-          <span className={connected ? 'pill up' : 'pill down'}>
-            {connected
-              ? '실시간 연결됨'
-              : partial
-                ? `일부 연결 (${fleetConnected ? '물류' : '공장'}만)`
-                : '연결 끊김'}
-          </span>
         </div>
-        <nav className="tabs">
+        <span className={connected ? 'pill up' : 'pill down'}>
+          {connected
+            ? '실시간 연결됨'
+            : partial
+              ? `일부 연결 (${fleetConnected ? '물류' : '공장'}만)`
+              : '연결 끊김'}
+        </span>
+
+        <nav className="side-nav">
           {allowedTabs.map((key) => (
             <button
               key={key}
-              className={tab === key ? 'tab active' : 'tab'}
+              className={tab === key ? 'side-tab active' : 'side-tab'}
               onClick={() => setTab(key)}
+              // 좁은 폭에서는 라벨을 숨기므로(아이콘만 남는다) 이름을 따로 준다 —
+              // 안 그러면 그 상태에서 이름 없는 버튼이 되고, 마우스로도 무엇인지 알 수 없다.
+              aria-label={TAB_LABEL[key]}
+              title={TAB_LABEL[key]}
             >
-              {TAB_LABEL[key]}
+              <span className="side-tab-icon" aria-hidden="true">{TAB_ICON[key]}</span>
+              <span className="side-tab-label">{TAB_LABEL[key]}</span>
             </button>
           ))}
         </nav>
-        <div className="user">
-          <span>
+
+        {/* 사용자·로그아웃은 맨 아래 — 자주 누르는 것이 아니라 확인용이다. */}
+        <div className="side-user">
+          <span className="side-user-name">
             {user.name} <span className="muted">({user.role})</span>
           </span>
           <button className="ghost" onClick={onLogout}>
             로그아웃
           </button>
         </div>
-      </header>
+      </aside>
 
       <main className="content">
         {tab === 'overview' && (
