@@ -11,6 +11,8 @@ import org.springframework.stereotype.Component;
 /**
  * Default matching rule:
  * <ol>
+ *   <li>다른 층 로봇은 후보에서 뺀다 — 로봇은 층을 오가지 못한다(엘리베이터는 화물용).
+ *       거리로만 고르면 좌표가 겹치는 위층 로봇이 "가장 가깝다"고 뽑힌다.</li>
  *   <li>Skip robots below {@link #MIN_BATTERY_PERCENT} — they should be charging, not
  *       picking up work.</li>
  *   <li>Among the rest, pick the one closest to the task's origin node (least travel to
@@ -43,6 +45,7 @@ public class NearestBatteryAwareAssignmentPolicy implements AssignmentPolicy {
     public Optional<RobotResponse> selectRobot(TransportTask task, List<RobotResponse> candidates) {
         double[] origin = locations.resolve(task.getOriginNode());
         return candidates.stream()
+                .filter(robot -> robot.floorNo() == task.getFloorNo())
                 .filter(robot -> robot.batteryPercent() >= MIN_BATTERY_PERCENT)
                 .min(Comparator
                         .comparingDouble((RobotResponse robot) -> distanceSquared(robot, origin))

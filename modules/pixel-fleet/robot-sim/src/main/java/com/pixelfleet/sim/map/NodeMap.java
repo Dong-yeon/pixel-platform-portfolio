@@ -81,12 +81,18 @@ public class NodeMap {
      */
     private static final List<String> DOCKS = List.of("WH-DOCK-1", "WH-DOCK-2", "WH-DOCK-3", "WH-DOCK-4");
 
-    /** 유휴 로봇이 순찰할 지점 — 도크는 충전 자리이지 목적지가 아니므로 제외한다(지상만). */
-    private static final List<String> ROAM_NODES = List.of(
-            "WH-RECV", "WH-PICK", "WH-SHIP", "WH-ELEV-1F",
-            "PROD-A1", "PROD-A2", "PROD-A3", "PROD-A4",
-            "PROD-B1", "PROD-B2", "PROD-B3", "PROD-B4",
-            "QC-IN", "QC-OUT");
+    /**
+     * 유휴 로봇이 순찰할 지점 — 도크는 충전 자리이지 목적지가 아니므로 제외한다.
+     * <b>층별로 나눠 둔다</b> — 로봇은 층을 오가지 못하므로 남의 층 노드로 순찰하면 안 된다.
+     */
+    private static final Map<Integer, List<String>> ROAM_NODES_BY_FLOOR = Map.of(
+            1, List.of(
+                    "WH-RECV", "WH-PICK", "WH-SHIP", "WH-ELEV-1F",
+                    "PROD-A1", "PROD-A2", "PROD-A3", "PROD-A4",
+                    "PROD-B1", "PROD-B2", "PROD-B3", "PROD-B4",
+                    "QC-IN", "QC-OUT"),
+            2, List.of("WH-2F-P1", "WH-2F-P2", "WH-ELEV-2F"),
+            3, List.of("WH-3F-P1", "WH-3F-P2", "WH-ELEV-3F"));
 
     /** 이 시뮬레이터가 아는 노드 코드들. 서버 마스터와 대조하는 테스트가 쓴다. */
     public java.util.Set<String> knownNodeCodes() {
@@ -119,8 +125,9 @@ public class NodeMap {
         return best;
     }
 
-    public String randomRoamNode(java.util.random.RandomGenerator rng) {
-        return ROAM_NODES.get(rng.nextInt(ROAM_NODES.size()));
+    public String randomRoamNode(java.util.random.RandomGenerator rng, int floor) {
+        List<String> nodes = ROAM_NODES_BY_FLOOR.getOrDefault(floor, ROAM_NODES_BY_FLOOR.get(1));
+        return nodes.get(rng.nextInt(nodes.size()));
     }
 
     /** 상단 통로 — A열 담당. control-service LaneGraph와 같아야 한다. */

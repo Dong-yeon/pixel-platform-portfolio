@@ -38,6 +38,10 @@ public class DemoTaskGenerator {
      *
      * <p><b>가공품은 예외 없이 품질동을 거친다.</b> 그래서 B열 → QC-IN 이 네 개 다 있고,
      * 출하장으로 곧장 가는 흐름은 없다 — 검사를 건너뛴 물건이 나가는 그림을 만들지 않는다.
+     *
+     * <p>창고동 위층(2·3층)이 섞여 있는 흐름은 <b>출발지와 목적지의 층이 다르다.</b>
+     * 그건 여기서 신경 쓰지 않는다 — {@code TaskService}가 엘리베이터에서 두 구간으로 끊는다.
+     * 여기는 "물건이 어디서 어디로 가야 하는가"만 말한다.
      */
     private record Flow(String origin, String destination) {}
 
@@ -63,13 +67,27 @@ public class DemoTaskGenerator {
             // 판정 후: 불합격이면 생산동으로 되돌려 재작업
             new Flow("QC-OUT", "PROD-B1"),
             // 출하: 창고에 들어온 완제품을 출하장으로
-            new Flow("WH-PICK", "WH-SHIP"));
+            new Flow("WH-PICK", "WH-SHIP"),
+            // 위층 보관: 1층에 다 못 두는 물량은 2·3층에 올린다.
+            // 층이 다르므로 TaskService가 엘리베이터에서 두 구간으로 끊는다 —
+            // 앞 구간은 1층 로봇이 승강장까지, 뒷 구간은 그 층 로봇이 이어받는다.
+            new Flow("WH-RECV", "WH-2F-P1"),
+            new Flow("WH-RECV", "WH-3F-P1"),
+            // 위층 재고를 내려 출하
+            new Flow("WH-2F-P2", "WH-SHIP"),
+            new Flow("WH-3F-P2", "WH-SHIP"),
+            // 층 안에서의 재배치 — 위층 로봇이 자기 층에서 하는 일
+            new Flow("WH-2F-P1", "WH-2F-P2"),
+            new Flow("WH-3F-P1", "WH-3F-P2"));
 
     /**
      * 대기 작업이 이 수를 넘으면 새로 만들지 않는다.
      * 통로를 둘로 나눠 동시 주행이 늘었으므로, 큐가 마르지 않도록 함께 올렸다.
+     *
+     * <p>층이 생기면서 한 번 더 올렸다. 배차가 <b>층별로 갈리므로</b> 큐가 한 층 작업으로
+     * 차면 다른 층 로봇은 큐가 비어 있는 것과 같아진다 — 큐 하나를 셋이 나눠 쓰는 셈이다.
      */
-    private static final int MAX_PENDING = 6;
+    private static final int MAX_PENDING = 9;
 
     private final TaskService taskService;
     private final TransportTaskRepository taskRepository;

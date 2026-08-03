@@ -155,8 +155,12 @@ export function UnifiedMap({
     ? layout.buildings.find((b) => b.buildingCode === view.buildingCode) ?? null
     : null
 
-  // 위층을 보고 있으면 지상의 것(설비·노드·로봇·단말·경로)은 그리지 않는다 — 그 층에 없다.
+  // 위층을 보고 있으면 지상에만 있는 것(설비·통로·POP 단말·품질 흐름)은 그리지 않는다.
   const showGround = view.floorNo === 1
+  // AMR과 운송 경로는 층마다 따로 있다 — 로봇은 층을 오가지 못하고(엘리베이터는 화물용),
+  // 위층 노드는 아래층과 좌표가 겹치므로 걸러 내지 않으면 3개 층이 한 자리에 뭉친다.
+  const floorRobots = robots.filter((r) => r.floorNo === view.floorNo)
+  const floorTasks = activeTasks.filter((t) => t.floorNo === view.floorNo)
   const qcBuilding = layout.buildings.find((b) => b.buildingCode === 'QC') ?? null
 
   // 건물을 고르면 그 외곽으로 확대한다. 여백을 둬 벽이 잘리지 않게.
@@ -218,7 +222,7 @@ export function UnifiedMap({
              **앞으로 갈 길만 그린다.** 로봇이 아직 짐을 싣지 않았으면 목적지로 직행하는 게
              아니라 픽업 지점을 먼저 들른다 — 그 구간을 빼먹으면 그려진 선이 실제 주행과
              어긋나 "지나간 경로"처럼 보인다. */}
-      {showGround && layers.routes && activeTasks.map((t) => {
+      {layers.routes && floorTasks.map((t) => {
         const to = NODES[t.destinationNode]
         const origin = NODES[t.originNode]
         if (!to) return null
@@ -398,8 +402,8 @@ export function UnifiedMap({
         </g>
       )}
 
-      {/* ---- AMR ---- 항상 맨 위 */}
-      {showGround && layers.amr && robots.map((r) => (
+      {/* ---- AMR ---- 항상 맨 위. 보고 있는 층의 로봇만(층마다 따로 있다) */}
+      {layers.amr && floorRobots.map((r) => (
         <g
           key={r.robotCode}
           className="umap-robot"

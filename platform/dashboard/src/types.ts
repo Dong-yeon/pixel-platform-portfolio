@@ -40,6 +40,11 @@ export interface Robot {
    * 구분하지 않으면 지도에서 그냥 원이 돌아다니는 것으로만 보인다.
    */
   laden: boolean
+  /**
+   * 일하는 층. 로봇은 층을 오가지 못한다(창고동 엘리베이터는 화물용이라 물건만 태운다).
+   * 위층 노드는 아래층과 **좌표가 겹치므로** 지도는 이 값으로 걸러 그린다.
+   */
+  floorNo: number
   lastHeartbeatAt: string | null
 }
 
@@ -55,6 +60,15 @@ export interface Task {
   status: TaskStatus
   assignedRobotId: number | null
   retryCount: number
+  /** 이 작업이 벌어지는 층 — 같은 층 로봇에게만 배차된다. */
+  floorNo: number
+  /**
+   * 채워져 있으면 이 구간이 끝난 뒤 물건이 화물 엘리베이터를 타고 여기로 간다.
+   * 층이 다른 이송은 승강장에서 두 구간으로 끊긴다(로봇이 층을 따라갈 수 없어서).
+   */
+  handoffDestination: string | null
+  /** 채워져 있으면 이 구간은 엘리베이터에서 물건을 이어받은 뒷 구간이다(앞 구간의 작업코드). */
+  handoffOf: string | null
   finishedAt: string | null
   failureReason: string | null
 }

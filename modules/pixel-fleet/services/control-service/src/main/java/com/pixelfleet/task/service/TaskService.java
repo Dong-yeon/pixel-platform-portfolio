@@ -8,6 +8,7 @@ import com.pixelfleet.event.domain.FleetEventType;
 import com.pixelfleet.event.domain.SourceType;
 import com.pixelfleet.event.domain.TargetType;
 import com.pixelfleet.event.service.FleetEventService;
+import com.pixelfleet.location.LocationRegistry;
 import com.pixelfleet.robot.domain.RobotStatus;
 import com.pixelfleet.robot.dto.RobotResponse;
 import com.pixelfleet.robot.service.RobotService;
@@ -19,11 +20,12 @@ import com.pixelfleet.task.domain.TaskStatus;
 import com.pixelfleet.task.domain.TransportTask;
 import com.pixelfleet.task.event.TaskLifecycleChanged;
 import com.pixelfleet.task.repository.TransportTaskRepository;
-import java.util.ArrayList;
+import java.time.LocalDateTime;
 import java.util.Comparator;
 import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -65,7 +67,11 @@ public class TaskService {
     private final AssignmentPolicy assignmentPolicy;
     private final LaneGraph laneGraph;
     private final TrafficController trafficController;
+    private final LocationRegistry locations;
     private final ApplicationEventPublisher eventPublisher;
+
+    /** 화물 엘리베이터가 한 층에서 다른 층으로 물건을 옮기는 데 걸리는 시간. */
+    private final int elevatorTravelSeconds;
 
     public TaskService(
             TransportTaskRepository taskRepository,
@@ -75,8 +81,12 @@ public class TaskService {
             AssignmentPolicy assignmentPolicy,
             LaneGraph laneGraph,
             TrafficController trafficController,
-            ApplicationEventPublisher eventPublisher
+            LocationRegistry locations,
+            ApplicationEventPublisher eventPublisher,
+            @Value("${fleet.elevator.travel-seconds:12}") int elevatorTravelSeconds
     ) {
+        this.locations = locations;
+        this.elevatorTravelSeconds = elevatorTravelSeconds;
         this.taskRepository = taskRepository;
         this.robotService = robotService;
         this.fleetEventService = fleetEventService;
@@ -104,15 +114,61 @@ public class TaskService {
             throw new BusinessException(ErrorCode.INVALID_REQUEST, "이미 존재하는 작업 코드입니다: " + taskCode);
         });
 
-        TransportTask task = taskRepository.save(
-                new TransportTask(taskCode, originNode, destinationNode, priority));
+        short originFloor = locations.floorOf(originNode);
+        short destinationFloor = locations.floorOf(destinationNode);
+
+        // 층이 다르면 **로봇이 따라갈 수 없다** — 엘리베이터는 화물용이라 물건만 태운다.
+        // 그래서 출발 층 안에서 승강장까지만 나르는 작업으로 끊고, 최종 목적지는 인수인계로 달아 둔다.
+        // 나머지 절반(승강장 → 목적지)은 물건이 그 층에 도착한 뒤 만들어진다.
+        boolean crossFloor = originFloor != destinationFloor;
+        String legDestination = crossFloor ? elevatorNode(originFloor) : destinationNode;
+
+        TransportTask task = new TransportTask(taskCode, originNode, legDestination, priority, originFloor);
+        if (crossFloor) {
+            task.handOffTo(destinationNode);
+        }
+        taskRepository.save(task);
+
         fleetEventService.record(
                 FleetEventType.TASK_CREATED,
                 SourceType.OPERATOR, null,
                 TargetType.TASK, task.getId(),
                 task.getId(), EventSeverity.INFO,
-                "Task " + taskCode + " created (" + originNode + " -> " + destinationNode + ")", null);
+                "Task " + taskCode + " created (" + originNode + " -> " + legDestination + ")"
+                        + (crossFloor ? " [엘리베이터로 " + destinationFloor + "층 " + destinationNode + "까지]" : ""),
+                null);
         return task;
+    }
+
+    /** 층이 다른 이송이 끝난 뒤, 물건이 도착한 층에서 이어받을 작업을 만든다. */
+    private void createHandoffLeg(TransportTask finished) {
+        String finalDestination = finished.getHandoffDestination();
+        short arrivalFloor = locations.floorOf(finalDestination);
+        String pickupNode = elevatorNode(arrivalFloor);
+
+        // 코드가 겹치지 않게 앞 구간 코드에 층을 덧붙인다(코드에 unique 제약이 있다).
+        String code = finished.getTaskCode() + "-F" + arrivalFloor;
+        if (taskRepository.findByTaskCode(code).isPresent()) {
+            return; // 완료 보고가 두 번 오더라도 뒷 구간은 하나만 만든다.
+        }
+
+        TransportTask leg = new TransportTask(
+                code, pickupNode, finalDestination, finished.getPriority(), arrivalFloor);
+        leg.continues(finished.getTaskCode(), LocalDateTime.now().plusSeconds(elevatorTravelSeconds));
+        taskRepository.save(leg);
+
+        fleetEventService.record(
+                FleetEventType.TASK_CREATED,
+                SourceType.SYSTEM, null,
+                TargetType.TASK, leg.getId(),
+                leg.getId(), EventSeverity.INFO,
+                "엘리베이터: " + finished.getTaskCode() + " 화물이 " + arrivalFloor + "층으로 이동 중 "
+                        + "(" + elevatorTravelSeconds + "초 후 " + pickupNode + "에서 인수)", null);
+    }
+
+    /** 승강장 노드 코드 — 평면도 시드 규칙(WH-ELEV-1F/2F/3F)을 따른다. */
+    private String elevatorNode(short floor) {
+        return "WH-ELEV-" + floor + "F";
     }
 
     /**
@@ -127,16 +183,15 @@ public class TaskService {
      */
     @Transactional
     public TransportTask dispatchOnce() {
-        List<TransportTask> pending = taskRepository.findByStatusOrderByIdAsc(TaskStatus.PENDING);
+        LocalDateTime now = LocalDateTime.now();
+        // 엘리베이터를 기다리는 뒷 구간은 아직 배차하지 않는다 — 물건이 그 층에 도착하기 전에
+        // 로봇을 승강장으로 보내면 빈손으로 서서 자리만 차지한다.
+        List<TransportTask> pending = taskRepository.findByStatusOrderByIdAsc(TaskStatus.PENDING).stream()
+                .filter(t -> t.isDispatchable(now))
+                .toList();
         if (pending.isEmpty()) {
             return null;
         }
-        // pending is already id-ascending (FIFO); a stable ordering by descending priority
-        // keeps FIFO within each priority band.
-        TransportTask next = pending.stream()
-                .min(Comparator.comparingInt((TransportTask t) -> -t.getPriority().getWeight())
-                        .thenComparingLong(TransportTask::getId))
-                .orElseThrow();
 
         // 로봇 상태(텔레메트리)만 믿지 않는다. 배차 직후 로봇이 아직 MOVING을 보고하기 전이면
         // 상태로는 IDLE로 보여 같은 로봇에 두 번 배차될 수 있다. 진행 중 작업 유무(DB)가
@@ -145,11 +200,41 @@ public class TaskService {
                 .filter(r -> !taskRepository.existsByAssignedRobotIdAndStatusIn(
                         r.id(), List.of(TaskStatus.ASSIGNED, TaskStatus.IN_PROGRESS)))
                 .toList();
+        if (available.isEmpty()) {
+            return null;
+        }
+
+        // pending is already id-ascending (FIFO); a stable ordering by descending priority
+        // keeps FIFO within each priority band.
+        //
+        // **맨 앞 하나만 시도하고 끝내지 않는다.** 예전엔 최우선 작업 하나를 골라 로봇을 못 찾으면
+        // 그대로 돌아갔다. 로봇 풀이 하나였을 땐 "아무도 못 하니 아무도 못 한다"가 맞았지만,
+        // 배차가 층별로 갈리면서 틀린 말이 됐다 — 1층 작업이 큐 앞을 채우면 2·3층 로봇은
+        // 자기 층 작업이 밀려 있어도 영원히 놀았다(실측: 2층 대기 2건, 완료 0건, 로봇은 IDLE).
+        // 앞에서부터 훑어 **배차 가능한 첫 작업**을 내보낸다.
+        List<TransportTask> ordered = pending.stream()
+                .sorted(Comparator.comparingInt((TransportTask t) -> -t.getPriority().getWeight())
+                        .thenComparingLong(TransportTask::getId))
+                .toList();
+
+        for (TransportTask candidate : ordered) {
+            TransportTask dispatched = tryDispatch(candidate, available);
+            if (dispatched != null) {
+                return dispatched;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * 작업 하나를 배차해 본다. 맞는 로봇이 없거나 레인을 못 잡으면 {@code null} —
+     * 부작용 없이 돌아가므로 호출한 쪽이 다음 작업으로 넘어가도 된다.
+     */
+    private TransportTask tryDispatch(TransportTask next, List<RobotResponse> available) {
         RobotResponse robot = assignmentPolicy.selectRobot(next, available).orElse(null);
         if (robot == null) {
             return null;
         }
-
 
         // 경로는 서버가 정한다. **픽업까지(leg1)만 예약하고 보낸다** — 하역까지 통째로 잡으면
         // 픽업이 먼 로봇이 공장을 가로지르는 구간 전체를 요구해 다른 로봇이 거의 못 움직인다.
@@ -273,8 +358,22 @@ public class TaskService {
                 TargetType.TASK, task.getId(),
                 task.getId(), EventSeverity.INFO,
                 "Task " + taskCode + " completed", null);
-        // 모듈 밖에도 알린다(커밋 후 MQTT 발행). fleet은 누가 듣는지 모른다.
-        eventPublisher.publishEvent(TaskLifecycleChanged.completed(taskCode));
+
+        // 승강장까지 나른 물건은 여기서 로봇을 떠난다 — 엘리베이터가 받아 다른 층으로 올린다.
+        // 뒷 구간은 그 층 로봇이 이어받는다(로봇은 층을 오가지 못한다).
+        //
+        // **이 구간이 끝난 것을 밖에 알리지 않는다.** 듣는 쪽(WMS)에게 완료는 "물건이 목적지에
+        // 도착했다"는 뜻이고, 그걸 근거로 출고지시를 정리하며 재고를 뺀다. 승강장은 목적지가
+        // 아니다 — 여기서 알리면 아직 옮기는 중인 물건을 도착한 것으로 처리한다.
+        if (task.getHandoffDestination() != null) {
+            createHandoffLeg(task);
+            return;
+        }
+
+        // 모듈 밖에는 **처음 만들어진 작업코드로** 알린다. 층을 넘느라 구간이 쪼개진 건
+        // fleet 안의 사정이고, 밖에서는 자기가 낸 코드 하나로 결과를 기다리고 있다.
+        eventPublisher.publishEvent(TaskLifecycleChanged.completed(
+                task.getHandoffOf() != null ? task.getHandoffOf() : taskCode));
     }
 
     /**
@@ -310,7 +409,9 @@ public class TaskService {
 
         // 재시도가 남아 있으면 아직 진행 중인 작업이다 — 최종 실패일 때만 밖에 알린다.
         // (재시도할 작업을 실패로 알리면 받은 쪽이 전표를 성급히 정리한다.)
-        eventPublisher.publishEvent(TaskLifecycleChanged.failed(taskCode, reason));
+        // 완료와 마찬가지로 밖에는 처음 만들어진 코드로 알린다.
+        eventPublisher.publishEvent(TaskLifecycleChanged.failed(
+                task.getHandoffOf() != null ? task.getHandoffOf() : taskCode, reason));
     }
 
     private TransportTask requireByCode(String taskCode) {

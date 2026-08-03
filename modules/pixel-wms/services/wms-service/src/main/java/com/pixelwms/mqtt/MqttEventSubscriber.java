@@ -2,6 +2,8 @@ package com.pixelwms.mqtt;
 
 import jakarta.annotation.PreDestroy;
 import java.nio.charset.StandardCharsets;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import org.eclipse.paho.client.mqttv3.IMqttDeliveryToken;
 import org.eclipse.paho.client.mqttv3.MqttCallbackExtended;
 import org.eclipse.paho.client.mqttv3.MqttClient;
@@ -28,6 +30,9 @@ public class MqttEventSubscriber implements MqttCallbackExtended {
 
     private final MqttProperties properties;
     private final MqttMessageHandler messageHandler;
+    /** 구독 호출을 콜백 스레드에서 떼어내기 위한 전용 스레드 — 이유는 connectComplete 주석 참고. */
+    private final ExecutorService subscribeExecutor =
+            Executors.newSingleThreadExecutor(r -> new Thread(r, "mqtt-subscribe"));
     private MqttClient client;
 
     public MqttEventSubscriber(MqttProperties properties, MqttMessageHandler messageHandler) {
@@ -60,12 +65,21 @@ public class MqttEventSubscriber implements MqttCallbackExtended {
 
     @Override
     public void connectComplete(boolean reconnect, String serverUri) {
-        try {
-            client.subscribe(properties.getTopicFilter(), 1);
-            log.info("Subscribed to {} (reconnect={})", properties.getTopicFilter(), reconnect);
-        } catch (MqttException e) {
-            log.error("Failed to subscribe to {}", properties.getTopicFilter(), e);
-        }
+        // 구독은 콜백 스레드가 아닌 다른 스레드에서 한다. subscribe()는 SUBACK을 기다리는
+        // 블로킹 호출인데, 그 SUBACK을 처리할 주체가 바로 지금 막혀 있는 콜백 스레드라서 교착이 된다.
+        //
+        // **실측:** 이 자리에서 바로 부르면 "Failed to subscribe to fleet/tasks/# — 응답을
+        // 기다리는 중 제한시간 초과"가 나고, 구독이 없으니 완료 통지가 한 건도 안 들어와
+        // 출고지시가 전부 IN_TRANSIT에 멈춰 있었다(단일 구간 1층 주문까지). fleet control-service가
+        // 같은 교착을 먼저 겪고 같은 방법으로 고쳤는데 여기만 빠져 있었다.
+        subscribeExecutor.execute(() -> {
+            try {
+                client.subscribe(properties.getTopicFilter(), 1);
+                log.info("Subscribed to {} on {} (reconnect={})", properties.getTopicFilter(), serverUri, reconnect);
+            } catch (MqttException e) {
+                log.error("Failed to subscribe to {}", properties.getTopicFilter(), e);
+            }
+        });
     }
 
     @Override
@@ -91,6 +105,7 @@ public class MqttEventSubscriber implements MqttCallbackExtended {
 
     @PreDestroy
     public void disconnect() {
+        subscribeExecutor.shutdownNow();
         if (client == null) {
             return;
         }

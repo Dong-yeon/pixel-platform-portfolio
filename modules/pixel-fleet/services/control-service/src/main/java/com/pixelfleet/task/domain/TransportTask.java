@@ -53,6 +53,30 @@ public class TransportTask extends BaseEntity {
     @Column(nullable = false)
     private int retryCount;
 
+    /**
+     * 이 작업이 벌어지는 층 — 출발지 노드가 속한 층이다. 같은 층 로봇에게만 배차된다.
+     * (로봇은 층을 오가지 못한다. 층을 넘는 이송은 엘리베이터에서 두 작업으로 끊긴다.)
+     */
+    @Column(nullable = false)
+    private short floorNo;
+
+    /**
+     * 엘리베이터 인수인계 — 이 작업이 끝나면 물건이 승강해서 여기로 간다.
+     * null이면 층을 넘지 않는 보통 작업이다.
+     */
+    @Column(length = 30)
+    private String handoffDestination;
+
+    /**
+     * 엘리베이터가 도착하는 시각. 그 전에는 배차하지 않는다 —
+     * 물건이 아직 안 왔는데 로봇을 승강장으로 보내면 빈손으로 서 있게 된다.
+     */
+    private LocalDateTime availableAt;
+
+    /** 어느 작업을 이어받았는가(앞 구간의 작업코드). 화면에서 한 흐름으로 읽으려고 남긴다. */
+    @Column(length = 50)
+    private String handoffOf;
+
     private LocalDateTime assignedAt;
     private LocalDateTime startedAt;
     private LocalDateTime finishedAt;
@@ -60,13 +84,31 @@ public class TransportTask extends BaseEntity {
     @Column(length = 500)
     private String failureReason;
 
-    public TransportTask(String taskCode, String originNode, String destinationNode, TaskPriority priority) {
+    public TransportTask(String taskCode, String originNode, String destinationNode,
+                         TaskPriority priority, short floorNo) {
         this.taskCode = taskCode;
         this.originNode = originNode;
         this.destinationNode = destinationNode;
         this.priority = priority;
         this.status = TaskStatus.PENDING;
         this.retryCount = 0;
+        this.floorNo = floorNo;
+    }
+
+    /** 앞 구간에 "여기까지 오면 물건은 엘리베이터를 타고 최종 목적지로 간다"를 달아 둔다. */
+    public void handOffTo(String finalDestination) {
+        this.handoffDestination = finalDestination;
+    }
+
+    /** 뒷 구간 — 엘리베이터가 도착할 때까지 배차 대기시킨다. */
+    public void continues(String previousTaskCode, LocalDateTime elevatorArrivesAt) {
+        this.handoffOf = previousTaskCode;
+        this.availableAt = elevatorArrivesAt;
+    }
+
+    /** 지금 배차해도 되는가 — 엘리베이터를 기다리는 중이면 아직 아니다. */
+    public boolean isDispatchable(LocalDateTime now) {
+        return availableAt == null || !availableAt.isAfter(now);
     }
 
     public void assignTo(Long robotId) {

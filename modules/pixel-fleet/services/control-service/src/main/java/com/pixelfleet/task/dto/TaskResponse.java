@@ -14,6 +14,12 @@ public record TaskResponse(
         TaskStatus status,
         Long assignedRobotId,
         int retryCount,
+        /** 이 작업이 벌어지는 층 — 같은 층 로봇에게만 배차된다. */
+        short floorNo,
+        /** 채워져 있으면 이 구간이 끝난 뒤 물건이 엘리베이터를 타고 여기로 간다. */
+        String handoffDestination,
+        /** 채워져 있으면 이 구간은 엘리베이터에서 물건을 이어받은 뒷 구간이다. */
+        String handoffOf,
         LocalDateTime assignedAt,
         LocalDateTime startedAt,
         LocalDateTime finishedAt,
@@ -30,6 +36,9 @@ public record TaskResponse(
                 t.getStatus(),
                 t.getAssignedRobotId(),
                 t.getRetryCount(),
+                t.getFloorNo(),
+                t.getHandoffDestination(),
+                t.getHandoffOf(),
                 t.getAssignedAt(),
                 t.getStartedAt(),
                 t.getFinishedAt(),

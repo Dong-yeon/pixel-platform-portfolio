@@ -22,25 +22,34 @@ sim:
   # 유휴 순찰은 기본으로 끈다. 서버가 구간 점유로 교통을 통제하는데, 로봇이 제멋대로
   # 돌아다니면 통제 밖 이동이 생겨 충돌 회피 보장이 깨진다.
   roam: false
+  # 로봇은 층을 오가지 못한다(창고동 엘리베이터는 화물용이라 물건만 태운다).
+  # 그래서 층은 배치다 — **관제 서버 robots.floor_no(V5 마이그레이션)와 같아야 한다.**
+  # 1층은 창고·생산·품질을 다 돌아야 하므로 4대, 위층은 그 층 안에서만 일하므로 1대씩.
   robots:
     - code: AMR-01
       name: 1호기
       home: WH-DOCK-1
+      floor: 1
     - code: AMR-02
       name: 2호기
       home: WH-DOCK-2
+      floor: 1
     - code: AMR-03
       name: 3호기
       home: WH-DOCK-3
+      floor: 1
     - code: AMR-04
       name: 4호기
       home: WH-DOCK-4
+      floor: 1
     - code: AMR-05
       name: 5호기
-      home: WH-DOCK-1
+      home: WH-DOCK-2F
+      floor: 2
     - code: AMR-06
       name: 6호기
-      home: WH-DOCK-3
+      home: WH-DOCK-3F
+      floor: 3
 
 logging:
   level:

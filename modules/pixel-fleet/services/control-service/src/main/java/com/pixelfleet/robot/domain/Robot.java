@@ -32,8 +32,16 @@ public class Robot extends BaseEntity {
     @Column(nullable = false, length = 50)
     private String name;
 
-    public Robot(String robotCode, String name) {
+    /**
+     * 이 로봇이 일하는 층. <b>로봇은 층을 오가지 못한다</b> — 창고동 엘리베이터는 화물용이라
+     * 물건만 태운다. 그래서 층은 라이브 상태가 아니라 마스터(변하지 않는 배치)다.
+     */
+    @Column(nullable = false)
+    private short floorNo;
+
+    public Robot(String robotCode, String name, short floorNo) {
         this.robotCode = robotCode;
         this.name = name;
+        this.floorNo = floorNo;
     }
 }

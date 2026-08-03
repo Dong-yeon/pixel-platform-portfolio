@@ -23,9 +23,23 @@ public class SimProperties {
         private String code;
         private String name;
         private String home = "DOCK-1";
+        /**
+         * 이 로봇이 사는 층. <b>관제 서버 robots.floor_no 와 같아야 한다</b> —
+         * 다르면 배차는 그 층으로 가는데 로봇은 딴 층 좌표에 서 있게 된다.
+         * 층이 다른 로봇은 좌표가 겹쳐도 서로 겹친 것이 아니다(위아래로 떨어져 있다).
+         */
+        private int floor = 1;
 
         public String getCode() {
             return code;
+        }
+
+        public int getFloor() {
+            return floor;
+        }
+
+        public void setFloor(int floor) {
+            this.floor = floor;
         }
 
         public void setCode(String code) {

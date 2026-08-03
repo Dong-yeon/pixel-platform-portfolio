@@ -75,6 +75,13 @@ public class LocationRegistry {
     );
 
     private final Map<String, double[]> nodes = new ConcurrentHashMap<>(FALLBACK_NODES);
+
+    /**
+     * 노드 → 층. 좌표만으로는 층을 알 수 없다 — 위층 노드는 아래층과 <b>같은 자리</b>에 있다
+     * (WH-DOCK-1과 WH-DOCK-2F는 둘 다 4,3). 배차가 "같은 층 로봇"을 고르려면 이 표가 필요하다.
+     * 폴백 노드는 전부 1층이라 초기값이 없다 — 여기 없는 노드는 1층으로 본다.
+     */
+    private final Map<String, Short> floors = new ConcurrentHashMap<>();
     private volatile boolean loadedFromMaster = false;
 
     private final HttpClient httpClient = HttpClient.newBuilder()
@@ -119,10 +126,12 @@ public class LocationRegistry {
             JsonNode data = objectMapper.readTree(response.body()).path("data");
 
             Map<String, double[]> loaded = new HashMap<>();
+            Map<String, Short> loadedFloors = new HashMap<>();
             for (JsonNode node : data.path("nodes")) {
                 String code = node.path("nodeCode").asText(null);
                 if (code != null) {
                     loaded.put(code, new double[]{node.path("posX").asDouble(), node.path("posY").asDouble()});
+                    loadedFloors.put(code, (short) node.path("floorNo").asInt(1));
                 }
             }
 
@@ -134,6 +143,8 @@ public class LocationRegistry {
             // 마스터에서 사라진 노드는 캐시에서도 지운다(폴백 값이 유령으로 남지 않게).
             nodes.keySet().retainAll(loaded.keySet());
             nodes.putAll(loaded);
+            floors.keySet().retainAll(loadedFloors.keySet());
+            floors.putAll(loadedFloors);
 
             if (!loadedFromMaster) {
                 log.info("Loaded {} layout nodes from {}", loaded.size(), layoutUrl);
@@ -178,6 +189,15 @@ public class LocationRegistry {
                             + "factory({})가 떠 있는지 확인할 것. 마스터와 어긋나면 배차 거리 비교가 틀어진다.",
                     reason, layoutUrl);
         }
+    }
+
+    /**
+     * 이 노드가 몇 층인가. 모르는 노드는 1층으로 본다 — 지상이 기본이고, 1층으로 잘못 봐도
+     * 배차가 헛돌 뿐 위층 로봇이 아래층에 나타나지는 않는다.
+     */
+    public short floorOf(String node) {
+        Short known = floors.get(node);
+        return known == null ? 1 : known;
     }
 
     public double[] resolve(String node) {

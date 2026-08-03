@@ -60,6 +60,13 @@ public class Simulator {
     private final Map<String, Integer> lastBatteryPercent = new HashMap<>();
     /** 로봇 코드 → 찜해 둔 정차 자리. 같은 자리를 두 대가 고르는 것을 막는다. */
     private final Map<String, double[]> claimedSpot = new HashMap<>();
+    /**
+     * 로봇 코드 → 사는 층. 위층 노드는 아래층과 <b>좌표가 같으므로</b>(WH-DOCK-2F도 4,3)
+     * 층을 모르면 2층 로봇과 1층 로봇이 겹쳐 보인다 — 실제로는 위아래로 떨어져 있다.
+     */
+    private final Map<String, Integer> floorByCode = new HashMap<>();
+    /** 로봇 코드 → 집(충전 베이). 위층은 층마다 베이가 하나뿐이라 충전은 늘 자기 집으로 간다. */
+    private final Map<String, String> homeByCode = new HashMap<>();
     /** 하트비트 카운터 — 주기적으로 상태를 다시 알린다(아래 tick 참고). */
     private int tickCount = 0;
 
@@ -73,6 +80,11 @@ public class Simulator {
     @EventListener(ApplicationReadyEvent.class)
     public void start() {
         synchronized (lock) {
+            // 층·집은 자리를 잡기 <b>전에</b> 다 채워 둔다 — spot()의 간격 검사가 층을 보기 때문이다.
+            for (SimProperties.RobotDef def : properties.getRobots()) {
+                floorByCode.put(def.getCode(), def.getFloor());
+                homeByCode.put(def.getCode(), def.getHome());
+            }
             for (SimProperties.RobotDef def : properties.getRobots()) {
                 double[] home = spot(def.getHome(), def.getCode());
                 VirtualRobot robot = new VirtualRobot(def.getCode(), def.getName(), home[0], home[1]);
@@ -183,11 +195,10 @@ public class Simulator {
 
     private void tickIdle(VirtualRobot robot) {
         if (robot.getBattery() < properties.getLowBatteryThreshold()) {
-            String dock = nodeMap.nearestDock(robot.getX(), robot.getY());
-            robot.startChargeRun(nodeMap.route(robot.position(), spot(dock, robot.getCode())));
+            robot.startChargeRun(nodeMap.route(robot.position(), spot(dock(robot), robot.getCode())));
             publishStatus(robot); // now MOVING toward the dock
         } else if (properties.isRoam() && ThreadLocalRandom.current().nextDouble() < ROAM_PROBABILITY) {
-            String node = nodeMap.randomRoamNode(ThreadLocalRandom.current());
+            String node = nodeMap.randomRoamNode(ThreadLocalRandom.current(), floorOf(robot.getCode()));
             robot.startRoam(nodeMap.route(robot.position(), spot(node, robot.getCode())));
             publishStatus(robot); // now MOVING to a roam target
         }
@@ -245,6 +256,20 @@ public class Simulator {
         return roomiest;
     }
 
+    /**
+     * 충전하러 갈 베이.
+     *
+     * <p>1층은 충전존에 베이가 넷이라 가까운 곳을 고르지만, 위층은 층마다 하나뿐이다.
+     * {@code nearestDock}은 지상 베이만 알고 있어서(층이 다른 베이는 좌표가 겹쳐 구분되지 않는다)
+     * 위층 로봇에게 물으면 <b>1층 베이</b>를 답한다 — 로봇이 층을 넘어 사라지는 그림이 된다.
+     */
+    private String dock(VirtualRobot robot) {
+        if (floorOf(robot.getCode()) == 1) {
+            return nodeMap.nearestDock(robot.getX(), robot.getY());
+        }
+        return homeByCode.getOrDefault(robot.getCode(), nodeMap.nearestDock(robot.getX(), robot.getY()));
+    }
+
     /** 가로 통로 위인가 — 정차 자리로 쓰면 안 된다. */
     private boolean onAisle(double y) {
         return Math.abs(y - NodeMap.UPPER_AISLE_Y) < AISLE_KEEP_OUT
@@ -259,15 +284,24 @@ public class Simulator {
      * 고른다 — 실측으로 AMR-03·06이 둘 다 (4, 21)에 섰다. 찜해 둔 자리를 함께 보면 안 겹친다.
      */
     private double nearestOccupiedDistance(double[] candidate, String robotCode) {
+        int floor = floorOf(robotCode);
         double nearest = Double.MAX_VALUE;
         for (VirtualRobot other : robots) {
             if (other.getCode().equals(robotCode)) {
+                continue;
+            }
+            // 층이 다르면 좌표가 같아도 겹친 것이 아니다 — 위아래로 떨어져 있다.
+            if (floorOf(other.getCode()) != floor) {
                 continue;
             }
             double[] taken = claimedSpot.getOrDefault(other.getCode(), other.position());
             nearest = Math.min(nearest, Math.hypot(taken[0] - candidate[0], taken[1] - candidate[1]));
         }
         return nearest;
+    }
+
+    private int floorOf(String robotCode) {
+        return floorByCode.getOrDefault(robotCode, 1);
     }
 
     private int defIndex(String robotCode) {
