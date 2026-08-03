@@ -71,7 +71,10 @@ export interface FleetEvent extends TimelineEvent {
 // control-service LocationRegistry · robot-sim NodeMap 과 3중으로 겹쳐서 한 곳만 고치면
 // 배차 거리 비교나 화면 표시가 **조용히** 틀어졌다. 설비 좌표는 Equipment 에 실려 온다.
 
-export type LayoutNodeType = 'DOCK' | 'WAREHOUSE' | 'STATION' | 'SHIPPING' | 'INSPECTION'
+export type LayoutNodeType =
+  | 'DOCK' | 'WAREHOUSE' | 'STATION' | 'SHIPPING' | 'INSPECTION'
+  /** 엘리베이터 승강장 — 노드 사각형 대신 샤프트로 따로 그린다. */
+  | 'ELEVATOR'
 
 export interface LayoutNode {
   nodeCode: string
@@ -79,6 +82,31 @@ export interface LayoutNode {
   nodeType: LayoutNodeType
   posX: number
   posY: number
+  buildingCode: string
+  /** 몇 층의 자리인가. 위층 노드는 아래층과 **좌표가 겹치므로** 층으로만 구분된다. */
+  floorNo: number
+}
+
+/** 화물 엘리베이터 — 물건만 오르내린다. AMR은 자기 층에 머물며 승강장에서 싣고 내린다. */
+export interface LayoutElevator {
+  elevatorCode: string
+  buildingCode: string
+  name: string
+  posX: number
+  posY: number
+  servesFloors: number[]
+}
+
+/** 충전존 — 충전 베이(DOCK 노드)를 감싸는 구역. 렉을 비워 둔 자리다. */
+export interface LayoutChargingZone {
+  zoneCode: string
+  buildingCode: string
+  floorNo: number
+  name: string
+  posX: number
+  posY: number
+  width: number
+  height: number
 }
 
 /**
@@ -150,6 +178,8 @@ export interface Layout {
   nodes: LayoutNode[]
   terminals: LayoutTerminal[]
   racks: LayoutRack[]
+  elevators: LayoutElevator[]
+  chargingZones: LayoutChargingZone[]
 }
 
 /** 노드 코드 → 좌표. 지도·경로 계산이 쓰기 쉬운 형태로 바꿔 둔다. */

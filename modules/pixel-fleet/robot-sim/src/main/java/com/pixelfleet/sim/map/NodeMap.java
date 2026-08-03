@@ -42,12 +42,25 @@ public class NodeMap {
     public static final double MAX_Y = 26.0;
 
     private static final Map<String, double[]> NODES = Map.ofEntries(
-            // 창고동
-            Map.entry("WH-DOCK-1", new double[]{4, 6}),
-            Map.entry("WH-DOCK-2", new double[]{4, 21}),
+            // 창고동 1층 — 충전 베이는 충전존 안에 나란히(렉을 비운 자리다)
+            Map.entry("WH-DOCK-1", new double[]{4, 3}),
+            Map.entry("WH-DOCK-2", new double[]{4, 5}),
+            Map.entry("WH-DOCK-3", new double[]{4, 21}),
+            Map.entry("WH-DOCK-4", new double[]{4, 23}),
             Map.entry("WH-RECV", new double[]{9, 6}),
             Map.entry("WH-PICK", new double[]{9, 13}),
             Map.entry("WH-SHIP", new double[]{14, 21}),
+            Map.entry("WH-ELEV-1F", new double[]{14, 13}),
+            // 창고동 2·3층 — **1층과 좌표가 겹친다**(샤프트·베이가 수직으로 같은 자리다).
+            // 지상 로봇은 여기 오지 않는다(층을 오가지 못한다). 층별 AMR이 생기면 쓰인다.
+            Map.entry("WH-DOCK-2F", new double[]{4, 3}),
+            Map.entry("WH-2F-P1", new double[]{9, 6}),
+            Map.entry("WH-2F-P2", new double[]{9, 13}),
+            Map.entry("WH-ELEV-2F", new double[]{14, 13}),
+            Map.entry("WH-DOCK-3F", new double[]{4, 3}),
+            Map.entry("WH-3F-P1", new double[]{9, 6}),
+            Map.entry("WH-3F-P2", new double[]{9, 13}),
+            Map.entry("WH-ELEV-3F", new double[]{14, 13}),
             // 생산동
             Map.entry("PROD-A1", new double[]{27, 6}),
             Map.entry("PROD-A2", new double[]{34, 6}),
@@ -62,11 +75,15 @@ public class NodeMap {
             Map.entry("QC-OUT", new double[]{62, 6})
     );
 
-    private static final List<String> DOCKS = List.of("WH-DOCK-1", "WH-DOCK-2");
+    /**
+     * 충전 베이 — <b>지상(1층)만</b>. 위층 베이는 좌표가 1층과 같아서 넣으면 "가장 가까운 도크"가
+     * 층을 넘나드는 엉뚱한 답을 준다. 지상 로봇은 층을 오가지 못한다.
+     */
+    private static final List<String> DOCKS = List.of("WH-DOCK-1", "WH-DOCK-2", "WH-DOCK-3", "WH-DOCK-4");
 
-    /** 유휴 로봇이 순찰할 지점 — 도크는 충전 자리이지 목적지가 아니므로 제외한다. */
+    /** 유휴 로봇이 순찰할 지점 — 도크는 충전 자리이지 목적지가 아니므로 제외한다(지상만). */
     private static final List<String> ROAM_NODES = List.of(
-            "WH-RECV", "WH-PICK", "WH-SHIP",
+            "WH-RECV", "WH-PICK", "WH-SHIP", "WH-ELEV-1F",
             "PROD-A1", "PROD-A2", "PROD-A3", "PROD-A4",
             "PROD-B1", "PROD-B2", "PROD-B3", "PROD-B4",
             "QC-IN", "QC-OUT");

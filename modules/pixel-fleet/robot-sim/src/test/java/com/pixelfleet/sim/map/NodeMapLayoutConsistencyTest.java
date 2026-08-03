@@ -34,7 +34,7 @@ class NodeMapLayoutConsistencyTest {
     /** robot-sim 모듈 디렉터리 기준 상대 경로(Gradle 테스트의 작업 디렉터리). */
     private static final Path MIGRATION = Path.of(
             "..", "..", "pixel-factory", "services", "oee-service",
-            "src", "main", "resources", "db", "migration", "V9__factory_floor_v2.sql");
+            "src", "main", "resources", "db", "migration", "V12__elevator_and_charging_zone.sql");
 
     /** ('WH-DOCK-1', '1번 충전 도크', 'DOCK', 4, 6, now(), now()) */
     private static final Pattern NODE_ROW = Pattern.compile(

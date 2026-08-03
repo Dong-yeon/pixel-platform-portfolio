@@ -44,16 +44,22 @@ public class LocationRegistry {
     private static final double MAX_Y = 26.0;
 
     /**
-     * factory에서 못 받았을 때 쓰는 폴백. V9 마이그레이션 시드와 같은 값이다.
+     * factory에서 못 받았을 때 쓰는 폴백. V12 마이그레이션 시드와 같은 값이다.
      * 마스터를 바꾸면 여기도 함께 고친다(또는 factory가 항상 떠 있게 해서 안 쓰이게 한다).
+     *
+     * <p>위층(2·3층) 노드는 넣지 않는다 — 지상 AMR은 층을 오가지 못하므로 배차 대상이 아니고,
+     * 좌표가 1층과 겹쳐 폴백에 섞으면 "가장 가까운 노드" 계산만 흐려진다.
      */
     private static final Map<String, double[]> FALLBACK_NODES = Map.ofEntries(
-            // 창고동
-            Map.entry("WH-DOCK-1", new double[]{4, 6}),
-            Map.entry("WH-DOCK-2", new double[]{4, 21}),
+            // 창고동 1층 — 충전 베이 4개는 충전존 안에 나란히
+            Map.entry("WH-DOCK-1", new double[]{4, 3}),
+            Map.entry("WH-DOCK-2", new double[]{4, 5}),
+            Map.entry("WH-DOCK-3", new double[]{4, 21}),
+            Map.entry("WH-DOCK-4", new double[]{4, 23}),
             Map.entry("WH-RECV", new double[]{9, 6}),
             Map.entry("WH-PICK", new double[]{9, 13}),
             Map.entry("WH-SHIP", new double[]{14, 21}),
+            Map.entry("WH-ELEV-1F", new double[]{14, 13}),
             // 생산동
             Map.entry("PROD-A1", new double[]{27, 6}),
             Map.entry("PROD-A2", new double[]{34, 6}),

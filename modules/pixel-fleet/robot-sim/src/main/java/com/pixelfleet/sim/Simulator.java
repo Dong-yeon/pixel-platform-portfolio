@@ -32,12 +32,17 @@ public class Simulator {
 
     private static final Logger log = LoggerFactory.getLogger(Simulator.class);
     private static final double ROAM_PROBABILITY = 0.15;
-    /** 노드 중심에서 이만큼 떨어진 자리에 정차한다(로봇끼리 포개지지 않도록). */
-    private static final double PARK_RADIUS = 1.1;
-    /** 한 노드 둘레에 놓는 자리 수. 안쪽 고리가 차면 두 배 반경의 바깥 고리를 쓴다. */
-    private static final int PARK_SLOTS = 6;
+    /**
+     * 노드가 놓인 세로 연결로를 따라 앞뒤로 서는 자리(노드 중심 기준 y 오프셋).
+     * 간격은 로봇 지름(1.9)이라 줄을 서도 겹치지 않는다.
+     */
+    private static final double[] PARK_OFFSETS = {0, 1.9, -1.9, 3.8, -3.8, 5.7, -5.7};
     /** 로봇 지름. 중심이 이보다 가까우면 지도에서 겹쳐 보인다. */
     private static final double ROBOT_CLEARANCE = 1.9;
+    /** 통로에서 이만큼은 떨어져 세운다 — 통로 위 정차는 남의 길을 막는다. */
+    private static final double AISLE_KEEP_OUT = 1.2;
+    /** 평면도 가장자리에서 이만큼은 안쪽에 세운다(밖으로 밀려나면 지도에서 사라진다). */
+    private static final double MAP_MARGIN = 1.5;
     /** 이 tick 수마다 상태를 다시 발행한다(서버와의 상태 불일치 자가 복구). */
     private static final int HEARTBEAT_TICKS = 10;
     private static final String[] FAILURE_REASONS = {
@@ -53,6 +58,8 @@ public class Simulator {
     private final List<VirtualRobot> robots = new ArrayList<>();
     private final Map<String, VirtualRobot> byCode = new HashMap<>();
     private final Map<String, Integer> lastBatteryPercent = new HashMap<>();
+    /** 로봇 코드 → 찜해 둔 정차 자리. 같은 자리를 두 대가 고르는 것을 막는다. */
+    private final Map<String, double[]> claimedSpot = new HashMap<>();
     /** 하트비트 카운터 — 주기적으로 상태를 다시 알린다(아래 tick 참고). */
     private int tickCount = 0;
 
@@ -195,39 +202,72 @@ public class Simulator {
      *
      * <p><b>자리는 고정이 아니라 "비어 있는 곳"으로 고른다.</b> 로봇마다 고정 각도를 주는 방식은
      * 두 번 깨졌다 — 전체 대수로 각도를 나누면 인접 간격이 로봇 지름(1.9)보다 좁았고, 집(도크)
-     * 기준으로 나누면 <b>집이 아닌 도크</b>에 선 로봇이 남의 자리와 정확히 겹쳤다(실측:
-     * AMR-01·AMR-04가 둘 다 5.1,6.0). 시뮬레이터는 모든 로봇의 위치를 알고 있으니, 실제 현장의
-     * AMR처럼 <b>빈자리를 찾아 선다</b>. 자기 자리부터 훑으므로 붐비지 않으면 늘 같은 자리다.
+     * 기준으로 나누면 <b>집이 아닌 도크</b>에 선 로봇이 남의 자리와 정확히 겹쳤다.
+     *
+     * <p><b>세로로 줄지어 선다(원형이 아니라).</b> 평면도는 "커넥터 선 위"에서만 렉과의 간격을
+     * 보장한다(렉을 커넥터에서 1.75 이상 떨어뜨렸다). 노드 둘레로 흩으면 그 보장을 벗어나
+     * 로봇이 선반 안에 서 있는 그림이 된다 — 실측으로 40샘플 중 22건이 그랬다. 그래서 노드가
+     * 놓인 세로 연결로를 따라 앞뒤로 줄을 선다. 실제 AMR이 통로에 줄 서는 모습과도 같다.
      */
     private double[] spot(String node, String robotCode) {
         double[] p = nodeMap.resolve(node);
         int base = defIndex(robotCode);
 
-        for (double radius : new double[]{PARK_RADIUS, PARK_RADIUS * 2}) {
-            for (int k = 0; k < PARK_SLOTS; k++) {
-                double angle = 2 * Math.PI * ((base + k) % PARK_SLOTS) / PARK_SLOTS;
-                double[] candidate = {p[0] + radius * Math.cos(angle), p[1] + radius * Math.sin(angle)};
-                if (isClear(candidate, robotCode)) {
-                    return candidate;
-                }
+        // 다 막혔을 때를 대비해 "그나마 제일 널널한 자리"를 함께 기억한다. 예전에는 노드
+        // 정중앙으로 되돌아갔는데, 그 폴백이 간격을 무시해서 **자리가 부족할수록 오히려 겹쳤다**
+        // (실측: AMR-03·06이 둘 다 4,21). 붐비면 조금 멀리 세울지언정 포개지 않는다.
+        double[] roomiest = {p[0], p[1]};
+        double roomiestGap = -1;
+
+        for (int k = 0; k < PARK_OFFSETS.length; k++) {
+            double offset = PARK_OFFSETS[(base + k) % PARK_OFFSETS.length];
+            double[] candidate = {p[0], p[1] + offset};
+            // 평면도 밖으로 밀려나면 지도에서 사라진다(실측: y=-0.8, y=26.8에 선 로봇이 있었다).
+            if (candidate[1] < MAP_MARGIN || candidate[1] > NodeMap.MAX_Y - MAP_MARGIN) {
+                continue;
+            }
+            // 통로 위에 세우면 지나가는 로봇을 막는 그림이 된다.
+            if (onAisle(candidate[1])) {
+                continue;
+            }
+            double gap = nearestOccupiedDistance(candidate, robotCode);
+            if (gap >= ROBOT_CLEARANCE) {
+                claimedSpot.put(robotCode, candidate);
+                return candidate;
+            }
+            if (gap > roomiestGap) {
+                roomiestGap = gap;
+                roomiest = candidate;
             }
         }
-        // 여기까지 오면 그 노드가 정말 붐비는 것이다 — 자기 자리로 돌아간다.
-        double angle = 2 * Math.PI * base / PARK_SLOTS;
-        return new double[]{p[0] + PARK_RADIUS * Math.cos(angle), p[1] + PARK_RADIUS * Math.sin(angle)};
+
+        claimedSpot.put(robotCode, roomiest);
+        return roomiest;
     }
 
-    /** 그 자리에 설 수 있는가 — 다른 로봇과 지름만큼은 떨어져야 한다. */
-    private boolean isClear(double[] candidate, String robotCode) {
+    /** 가로 통로 위인가 — 정차 자리로 쓰면 안 된다. */
+    private boolean onAisle(double y) {
+        return Math.abs(y - NodeMap.UPPER_AISLE_Y) < AISLE_KEEP_OUT
+                || Math.abs(y - NodeMap.LOWER_AISLE_Y) < AISLE_KEEP_OUT;
+    }
+
+    /**
+     * 그 자리에 설 수 있는가 — 다른 로봇과 지름만큼은 떨어져야 한다.
+     *
+     * <p><b>현재 위치가 아니라 "가려는 자리"와 견준다.</b> 주차 자리는 출발할 때 정해지는데,
+     * 두 로봇이 비슷한 시점에 같은 노드로 향하면 서로를 아직 <i>예전 위치</i>로 보고 같은 자리를
+     * 고른다 — 실측으로 AMR-03·06이 둘 다 (4, 21)에 섰다. 찜해 둔 자리를 함께 보면 안 겹친다.
+     */
+    private double nearestOccupiedDistance(double[] candidate, String robotCode) {
+        double nearest = Double.MAX_VALUE;
         for (VirtualRobot other : robots) {
             if (other.getCode().equals(robotCode)) {
                 continue;
             }
-            if (Math.hypot(other.getX() - candidate[0], other.getY() - candidate[1]) < ROBOT_CLEARANCE) {
-                return false;
-            }
+            double[] taken = claimedSpot.getOrDefault(other.getCode(), other.position());
+            nearest = Math.min(nearest, Math.hypot(taken[0] - candidate[0], taken[1] - candidate[1]));
         }
-        return true;
+        return nearest;
     }
 
     private int defIndex(String robotCode) {

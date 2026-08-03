@@ -28,19 +28,19 @@ sim:
       home: WH-DOCK-1
     - code: AMR-02
       name: 2호기
-      home: WH-DOCK-1
+      home: WH-DOCK-2
     - code: AMR-03
       name: 3호기
-      home: WH-DOCK-1
+      home: WH-DOCK-3
     - code: AMR-04
       name: 4호기
-      home: WH-DOCK-2
+      home: WH-DOCK-4
     - code: AMR-05
       name: 5호기
-      home: WH-DOCK-2
+      home: WH-DOCK-1
     - code: AMR-06
       name: 6호기
-      home: WH-DOCK-2
+      home: WH-DOCK-3
 
 logging:
   level:

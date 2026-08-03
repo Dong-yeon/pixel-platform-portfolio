@@ -268,15 +268,48 @@ export function UnifiedMap({
         )
       })}
 
-      {/* ---- 하역 지점·도크·검사 기착지 ---- */}
-      {showGround && Object.entries(NODES).map(([code, [x, y]]) => (
-        <g key={code}>
-          <rect x={x - 0.7} y={y - 0.7} width={1.4} height={1.4} className="umap-node" rx={0.25} />
-          <text x={x} y={y + 2} className="umap-node-label" textAnchor="middle" style={fs(0.85)}>
-            {code}
+      {/* ---- 충전존 ---- 충전 베이를 감싸는 구역. 렉을 비워 둔 자리라 로봇이 렉과 겹치지 않는다. */}
+      {layout.chargingZones
+        .filter((zone) => zone.floorNo === view.floorNo)
+        .map((zone) => (
+          <g key={zone.zoneCode} className="umap-charge-zone">
+            <rect x={zone.posX} y={zone.posY} width={zone.width} height={zone.height} rx={0.4} />
+            <text x={zone.posX + zone.width / 2} y={zone.posY + zone.height - 0.4}
+                  textAnchor="middle" className="umap-charge-label" style={fs(0.8)}>
+              충전존
+            </text>
+          </g>
+        ))}
+
+      {/* ---- 엘리베이터 ---- 층마다 같은 자리. **물건만** 오르내린다(AMR은 자기 층에 머문다). */}
+      {layout.elevators.map((elevator) => (
+        <g key={elevator.elevatorCode} className="umap-elevator">
+          <rect x={elevator.posX - 1.3} y={elevator.posY - 1.9} width={2.6} height={3.8} rx={0.3} />
+          <line x1={elevator.posX - 0.7} y1={elevator.posY} x2={elevator.posX + 0.7} y2={elevator.posY} />
+          <text x={elevator.posX} y={elevator.posY - 0.5} textAnchor="middle"
+                className="umap-elevator-mark" style={fs(1.0)}>
+            ⇅
+          </text>
+          <text x={elevator.posX} y={elevator.posY + 1.35} textAnchor="middle"
+                className="umap-elevator-label" style={fs(0.75)}>
+            {elevator.servesFloors.join('·')}층
           </text>
         </g>
       ))}
+
+      {/* ---- 하역 지점·도크·검사 기착지 ---- 보고 있는 층의 것만(위층은 같은 자리를 쓴다) */}
+      {layout.nodes
+        .filter((node) => node.floorNo === view.floorNo && node.nodeType !== 'ELEVATOR')
+        .map((node) => (
+          <g key={node.nodeCode}>
+            <rect x={node.posX - 0.7} y={node.posY - 0.7} width={1.4} height={1.4}
+                  className={`umap-node node-${node.nodeType}`} rx={0.25} />
+            <text x={node.posX} y={node.posY + 2} className="umap-node-label"
+                  textAnchor="middle" style={fs(0.85)}>
+              {node.nodeCode}
+            </text>
+          </g>
+        ))}
 
       {/* ---- 설비 ---- 좌표는 서버가 실어 보낸다(하드코딩 매핑 없음) */}
       {showGround && layers.equipment && equipments.map((e) => {

@@ -158,11 +158,8 @@ public class TaskService {
         double[] pickup = toPickup.waypoints().get(toPickup.waypoints().size() - 1);
         LaneGraph.RoutePlan toDrop = laneGraph.planByNode(pickup, next.getDestinationNode());
 
-        // 레인 구간에 **정차 자리**를 함께 잡는다. 자리를 안 잡으면 두 로봇이 같은 노드로
-        // 배차돼 같은 점에 겹쳐 선다(지도에서 두 대가 한 대처럼 보였다). 자리는 구간과 같은
-        // 전부-아니면-전무 규칙으로 잡히고, 픽업을 떠날 때 leg1과 함께 풀린다.
-        if (!trafficController.tryReserve(robot.id(), withSpot(toPickup.segments(), next.getOriginNode()))) {
-            log.info("Traffic: robot {} cannot take {} — leg1 busy {} (or pickup spot taken)",
+        if (!trafficController.tryReserve(robot.id(), toPickup.segments())) {
+            log.info("Traffic: robot {} cannot take {} — leg1 segments busy {}",
                     robot.robotCode(), next.getTaskCode(), laneGraph.describe(toPickup.segments()));
             return null;
         }
@@ -221,19 +218,6 @@ public class TaskService {
         }
     }
 
-    /**
-     * 레인 구간 목록 뒤에 <b>노드 정차 자리</b>를 붙인다.
-     *
-     * <p>구간은 "지나가는 길"이라 뒤차가 곧바로 쓸 수 있게 점진 반납되지만, 정차 자리는
-     * 로봇이 <b>거기 서 있는 동안</b> 잡고 있어야 한다. 그래서 목록 <b>맨 뒤</b>에 둔다 —
-     * {@code progress()}는 현재 구간보다 앞선 것만 놓으므로 맨 뒤 항목은 조기 반납되지 않는다.
-     */
-    private List<String> withSpot(List<String> segments, String node) {
-        List<String> all = new ArrayList<>(segments);
-        all.add("SPOT:" + node);
-        return all;
-    }
-
     private void grantSecondLeg(TransportTask task) {
         LaneGraph.RoutePlan leg2 = pendingSecondLeg.get(task.getTaskCode());
         if (leg2 == null || task.getAssignedRobotId() == null) {
@@ -241,9 +225,8 @@ public class TaskService {
         }
         // 이 시점에 로봇은 아무 구간도 쥐고 있지 않다(markPickedUp에서 놓았다).
         // 확보 실패해도 남의 길을 막지 않으므로 그냥 기다렸다 다음 패스에서 재시도한다.
-        if (!trafficController.tryReserve(
-                task.getAssignedRobotId(), withSpot(leg2.segments(), task.getDestinationNode()))) {
-            log.debug("Traffic: {} waiting at pickup — leg2 busy {} (or drop spot taken)",
+        if (!trafficController.tryReserve(task.getAssignedRobotId(), leg2.segments())) {
+            log.debug("Traffic: {} waiting at pickup — leg2 segments busy {}",
                     task.getTaskCode(), laneGraph.describe(leg2.segments()));
             return;
         }

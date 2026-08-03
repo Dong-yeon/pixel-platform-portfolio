@@ -48,11 +48,27 @@ public class LayoutNode extends BaseEntity {
     @Column(name = "pos_y", nullable = false)
     private Double posY;
 
-    public LayoutNode(String nodeCode, String name, LayoutNodeType nodeType, double posX, double posY) {
+    /**
+     * 소속 건물·층.
+     *
+     * <p>예전에는 좌표만으로 소속을 알았다(건물은 사각형, 노드는 점). 층이 생기면서 소속이
+     * <b>기능</b>이 됐다 — 배차는 같은 층 로봇에게만 가야 하고, 위층 노드는 아래층과 좌표가
+     * 겹치므로 좌표로는 구분할 수 없다.
+     */
+    @Column(nullable = false, length = 30)
+    private String buildingCode;
+
+    @Column(nullable = false)
+    private Short floorNo;
+
+    public LayoutNode(String nodeCode, String name, LayoutNodeType nodeType, double posX, double posY,
+                      String buildingCode, short floorNo) {
         this.nodeCode = nodeCode;
         this.name = name;
         this.nodeType = nodeType;
         this.posX = posX;
         this.posY = posY;
+        this.buildingCode = buildingCode;
+        this.floorNo = floorNo;
     }
 }

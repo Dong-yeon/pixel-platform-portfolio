@@ -1,6 +1,8 @@
 package com.pixelfactory.layout.dto;
 
 import com.pixelfactory.layout.domain.LayoutBuilding;
+import com.pixelfactory.layout.domain.LayoutChargingZone;
+import com.pixelfactory.layout.domain.LayoutElevator;
 import com.pixelfactory.layout.domain.LayoutFloor;
 import com.pixelfactory.layout.domain.LayoutNode;
 import com.pixelfactory.layout.domain.LayoutNodeType;
@@ -32,14 +34,49 @@ public record LayoutResponse(
         List<Building> buildings,
         List<Node> nodes,
         List<Terminal> terminals,
-        List<Rack> racks
+        List<Rack> racks,
+        List<Elevator> elevators,
+        List<ChargingZone> chargingZones
 ) {
 
-    public record Node(String nodeCode, String name, LayoutNodeType nodeType, double posX, double posY) {
+    /**
+     * @param floorNo 몇 층의 자리인가. 위층 노드는 아래층과 <b>좌표가 겹치므로</b>
+     *                층을 함께 보지 않으면 구분할 수 없다.
+     */
+    public record Node(String nodeCode, String name, LayoutNodeType nodeType,
+                       double posX, double posY, String buildingCode, int floorNo) {
 
         public static Node from(LayoutNode node) {
             return new Node(node.getNodeCode(), node.getName(), node.getNodeType(),
-                    node.getPosX(), node.getPosY());
+                    node.getPosX(), node.getPosY(), node.getBuildingCode(), node.getFloorNo());
+        }
+    }
+
+    /**
+     * 화물 엘리베이터 — <b>물건만</b> 오르내린다. AMR은 자기 층에 머물며 승강장에서 싣고 내린다.
+     * 샤프트가 수직으로 관통하므로 층이 달라도 같은 자리에 그린다.
+     */
+    public record Elevator(String elevatorCode, String buildingCode, String name,
+                           double posX, double posY, List<Integer> servesFloors) {
+
+        public static Elevator from(LayoutElevator elevator) {
+            List<Integer> floors = java.util.Arrays.stream(elevator.getServesFloors().split(","))
+                    .map(String::trim)
+                    .filter(s -> !s.isEmpty())
+                    .map(Integer::valueOf)
+                    .toList();
+            return new Elevator(elevator.getElevatorCode(), elevator.getBuildingCode(), elevator.getName(),
+                    elevator.getPosX(), elevator.getPosY(), floors);
+        }
+    }
+
+    /** 충전존 — 충전 베이(DOCK 노드)들을 감싸는 구역. 렉을 비워 둔 자리다. */
+    public record ChargingZone(String zoneCode, String buildingCode, int floorNo, String name,
+                               double posX, double posY, double width, double height) {
+
+        public static ChargingZone from(LayoutChargingZone zone) {
+            return new ChargingZone(zone.getZoneCode(), zone.getBuildingCode(), zone.getFloorNo(),
+                    zone.getName(), zone.getPosX(), zone.getPosY(), zone.getWidth(), zone.getHeight());
         }
     }
 
@@ -101,7 +138,9 @@ public record LayoutResponse(
             Map<Long, List<LayoutFloor>> floorsByBuilding,
             List<LayoutNode> nodes,
             List<PopTerminal> terminals,
-            List<LayoutRack> racks
+            List<LayoutRack> racks,
+            List<LayoutElevator> elevators,
+            List<LayoutChargingZone> chargingZones
     ) {
         return new LayoutResponse(
                 settings.getWidth(),
@@ -122,7 +161,9 @@ public record LayoutResponse(
                         .toList(),
                 nodes.stream().map(Node::from).toList(),
                 terminals.stream().map(Terminal::from).toList(),
-                racks.stream().map(Rack::from).toList()
+                racks.stream().map(Rack::from).toList(),
+                elevators.stream().map(Elevator::from).toList(),
+                chargingZones.stream().map(ChargingZone::from).toList()
         );
     }
 }
