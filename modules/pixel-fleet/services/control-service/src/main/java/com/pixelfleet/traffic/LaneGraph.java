@@ -64,6 +64,11 @@ public class LaneGraph {
         return plan(from, locations.resolve(toNode));
     }
 
+    /** 노드의 좌표. "그 자리에 누가 서 있는가"를 실제 위치로 판단할 때 쓴다. */
+    public double[] nodePosition(String node) {
+        return locations.resolve(node);
+    }
+
     /**
      * {@code from}에서 {@code to}까지 통로를 경유하는 경로를 만든다.
      *

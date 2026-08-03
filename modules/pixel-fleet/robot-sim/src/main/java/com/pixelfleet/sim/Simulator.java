@@ -34,6 +34,10 @@ public class Simulator {
     private static final double ROAM_PROBABILITY = 0.15;
     /** 노드 중심에서 이만큼 떨어진 자리에 정차한다(로봇끼리 포개지지 않도록). */
     private static final double PARK_RADIUS = 1.1;
+    /** 한 노드 둘레에 놓는 자리 수. 안쪽 고리가 차면 두 배 반경의 바깥 고리를 쓴다. */
+    private static final int PARK_SLOTS = 6;
+    /** 로봇 지름. 중심이 이보다 가까우면 지도에서 겹쳐 보인다. */
+    private static final double ROBOT_CLEARANCE = 1.9;
     /** 이 tick 수마다 상태를 다시 발행한다(서버와의 상태 불일치 자가 복구). */
     private static final int HEARTBEAT_TICKS = 10;
     private static final String[] FAILURE_REASONS = {
@@ -63,7 +67,7 @@ public class Simulator {
     public void start() {
         synchronized (lock) {
             for (SimProperties.RobotDef def : properties.getRobots()) {
-                double[] home = spot(def.getHome(), robots.size());
+                double[] home = spot(def.getHome(), def.getCode());
                 VirtualRobot robot = new VirtualRobot(def.getCode(), def.getName(), home[0], home[1]);
                 robots.add(robot);
                 byCode.put(def.getCode(), robot);
@@ -173,11 +177,11 @@ public class Simulator {
     private void tickIdle(VirtualRobot robot) {
         if (robot.getBattery() < properties.getLowBatteryThreshold()) {
             String dock = nodeMap.nearestDock(robot.getX(), robot.getY());
-            robot.startChargeRun(nodeMap.route(robot.position(), spot(dock, indexOf(robot))));
+            robot.startChargeRun(nodeMap.route(robot.position(), spot(dock, robot.getCode())));
             publishStatus(robot); // now MOVING toward the dock
         } else if (properties.isRoam() && ThreadLocalRandom.current().nextDouble() < ROAM_PROBABILITY) {
             String node = nodeMap.randomRoamNode(ThreadLocalRandom.current());
-            robot.startRoam(nodeMap.route(robot.position(), spot(node, indexOf(robot))));
+            robot.startRoam(nodeMap.route(robot.position(), spot(node, robot.getCode())));
             publishStatus(robot); // now MOVING to a roam target
         }
     }
@@ -187,14 +191,74 @@ public class Simulator {
      *
      * <p>노드 좌표를 그대로 목적지로 삼으면 같은 노드를 고른 로봇들이 <b>정확히 같은 점</b>에
      * 멈춰 지도에서 완전히 포개진다. 실제 현장에서도 여러 대가 한 지점에 겹쳐 서지 않으므로,
-     * 인덱스에 따라 노드 주변에 원형으로 흩어 놓는다(항상 같은 자리 = 재현 가능).
+     * 노드 주변에 원형으로 흩어 놓는다(항상 같은 자리 = 재현 가능).
+     *
+     * <p><b>자리는 고정이 아니라 "비어 있는 곳"으로 고른다.</b> 로봇마다 고정 각도를 주는 방식은
+     * 두 번 깨졌다 — 전체 대수로 각도를 나누면 인접 간격이 로봇 지름(1.9)보다 좁았고, 집(도크)
+     * 기준으로 나누면 <b>집이 아닌 도크</b>에 선 로봇이 남의 자리와 정확히 겹쳤다(실측:
+     * AMR-01·AMR-04가 둘 다 5.1,6.0). 시뮬레이터는 모든 로봇의 위치를 알고 있으니, 실제 현장의
+     * AMR처럼 <b>빈자리를 찾아 선다</b>. 자기 자리부터 훑으므로 붐비지 않으면 늘 같은 자리다.
      */
-    private double[] spot(String node, int robotIndex) {
+    private double[] spot(String node, String robotCode) {
         double[] p = nodeMap.resolve(node);
-        int n = Math.max(1, properties.getRobots().size());
-        double angle = 2 * Math.PI * robotIndex / n;
+        int base = defIndex(robotCode);
+
+        for (double radius : new double[]{PARK_RADIUS, PARK_RADIUS * 2}) {
+            for (int k = 0; k < PARK_SLOTS; k++) {
+                double angle = 2 * Math.PI * ((base + k) % PARK_SLOTS) / PARK_SLOTS;
+                double[] candidate = {p[0] + radius * Math.cos(angle), p[1] + radius * Math.sin(angle)};
+                if (isClear(candidate, robotCode)) {
+                    return candidate;
+                }
+            }
+        }
+        // 여기까지 오면 그 노드가 정말 붐비는 것이다 — 자기 자리로 돌아간다.
+        double angle = 2 * Math.PI * base / PARK_SLOTS;
         return new double[]{p[0] + PARK_RADIUS * Math.cos(angle), p[1] + PARK_RADIUS * Math.sin(angle)};
     }
+
+    /** 그 자리에 설 수 있는가 — 다른 로봇과 지름만큼은 떨어져야 한다. */
+    private boolean isClear(double[] candidate, String robotCode) {
+        for (VirtualRobot other : robots) {
+            if (other.getCode().equals(robotCode)) {
+                continue;
+            }
+            if (Math.hypot(other.getX() - candidate[0], other.getY() - candidate[1]) < ROBOT_CLEARANCE) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private int defIndex(String robotCode) {
+        List<SimProperties.RobotDef> defs = properties.getRobots();
+        for (int i = 0; i < defs.size(); i++) {
+            if (defs.get(i).getCode().equals(robotCode)) {
+                return i;
+            }
+        }
+        return 0;
+    }
+
+    /**
+     * 서버 경로의 <b>마지막 점만</b> 그 로봇의 정차 자리로 바꾼다.
+     *
+     * <p>서버는 경로를 노드 <b>정중앙</b>으로 끝낸다(구간 점유 계산의 기준점이라 그래야 한다).
+     * 그대로 서면 같은 노드에 온 로봇들이 정확히 한 점에 포개진다 — 지도에서 두 대가 한 대처럼
+     * 보였던 원인이다. 마지막 점만 살짝 옮기면 점유 통제(중간 구간)는 그대로 두면서 겹침만 없앤다.
+     *
+     * <p>중간 웨이포인트는 손대지 않는다 — 그것들이 예약한 레인이고, 옮기면 통제되지 않은
+     * 자리를 달리게 된다.
+     */
+    private List<double[]> parkAtOwnSlot(List<double[]> waypoints, String node, String robotCode) {
+        if (waypoints.isEmpty() || node == null || node.isBlank()) {
+            return waypoints;
+        }
+        List<double[]> adjusted = new ArrayList<>(waypoints);
+        adjusted.set(adjusted.size() - 1, spot(node, robotCode));
+        return adjusted;
+    }
+
 
     /** 서버가 보낸 waypoints 배열을 읽는다. 없거나 형식이 다르면 빈 목록. */
     private List<double[]> readWaypoints(JsonNode json) {
@@ -209,10 +273,6 @@ public class Simulator {
             }
         }
         return out;
-    }
-
-    private int indexOf(VirtualRobot robot) {
-        return Math.max(0, robots.indexOf(robot));
     }
 
     /** Handle a downlink command: {@code fleet/{robotCode}/command} with a GOTO payload. */
@@ -245,7 +305,7 @@ public class Simulator {
             if (taskCode.equals(robot.getCurrentTaskCode()) && robot.isAwaitingSecondLeg()) {
                 List<double[]> leg2 = readWaypoints(json);
                 if (!leg2.isEmpty()) {
-                    robot.appendSecondLeg(leg2);
+                    robot.appendSecondLeg(parkAtOwnSlot(leg2, json.path("destination").asText(), robotCode));
                     log.info("Robot {} got second leg for {} ({} waypoints)", robotCode, taskCode, leg2.size());
                 }
                 return;
@@ -263,15 +323,14 @@ public class Simulator {
             List<double[]> waypoints = readWaypoints(json);
             if (waypoints.isEmpty()) {
                 // 하위 호환: 웨이포인트 없이 온 GOTO는 로봇이 직접 경로를 만든다.
-                int idx = indexOf(robot);
-                double[] origin = spot(json.path("origin").asText(), idx);
-                double[] destination = spot(json.path("destination").asText(), idx);
+                double[] origin = spot(json.path("origin").asText(), robotCode);
+                double[] destination = spot(json.path("destination").asText(), robotCode);
                 robot.assignTask(taskCode,
                         nodeMap.route(robot.position(), origin),
                         nodeMap.route(origin, destination));
             } else {
                 // 서버가 준 경로는 픽업까지(leg1)다. 하역까지는 픽업 도착 후 따로 받는다.
-                robot.assignFirstLeg(taskCode, waypoints);
+                robot.assignFirstLeg(taskCode, parkAtOwnSlot(waypoints, json.path("origin").asText(), robotCode));
             }
             publishStatus(robot);           // now MOVING
             publishTask(robot, "started", null);
