@@ -50,6 +50,17 @@ sim:
       name: 6호기
       home: WH-DOCK-3F
       floor: 3
+    # 위층 증차분 — 층간 이송이 늘면서 층당 1대가 병목이 됐다(fleet V6과 짝).
+    # 도크는 층에 하나라 같은 집을 쓴다 — 정차 자리는 spot()이 세로로 줄 세워 갈라 준다.
+    # 위층 충전 베이는 층마다 하나뿐이라 집을 같이 쓴다 — 정차 슬롯이 앞뒤로 갈라 세운다.
+    - code: AMR-07
+      name: 7호기
+      home: WH-DOCK-2F
+      floor: 2
+    - code: AMR-08
+      name: 8호기
+      home: WH-DOCK-3F
+      floor: 3
 
 logging:
   level:
