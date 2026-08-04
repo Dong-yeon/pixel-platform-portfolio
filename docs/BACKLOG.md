@@ -292,3 +292,35 @@ jjwt를 직접 가져왔다.
   트리 깊이가 고정(4단)이고 순환이 없으면 재귀 CTE로 끝난다.
 - 그래프가 필요해지는 지점은 "불량 → 원인 공정 → 자재 → 설계 특성"처럼
   **경로가 가변이고 역방향 탐색이 주가 될 때**다. 그때 판단한다.
+
+---
+
+### P19. M4 호환 Fleet API — pixel-fleet를 실물 관제 서버 규격에 맞추기
+
+> [CUSTOMER] 현장은 WMS가 **M4**(상용 AMR 군집관제 서버)를 거쳐 실물 로봇을 부린다.
+> 근거 문서: `D:\happyeon\05.[CUSTOMER]\Book\M4 Fleet API.pdf` (HTTP + WebSocket, 176쪽).
+> pixel-fleet control-service는 이미 작은 관제 서버다(주문·배차·교통통제·텔레메트리).
+> 여기에 **M4 호환 API 파사드**를 씌우면, M4를 향해 짠 통합 코드([CUSTOMER] WMS 등)를
+> 그대로 pixel-platform에 붙여 시험할 수 있다 — "M4 서버를 만든다"의 실속 있는 형태.
+
+방향만 기록 (전면 구현이 아니라 **[CUSTOMER] WMS가 실제로 쓰는 부분집합**부터)
+
+- **1단 — 읽기 표면**: `GET /api/fleet/robots/all-all`, `GET /api/fleet/scenes/list`,
+  주문 조회(`query-order-detail`), WebSocket `/wsm`
+  (요청 봉투 `id/action/content` → 응답 `action::Reply/replyToId`,
+  `Fleet3::RobotsPositionOnly::Query` 등) + `xyy-app-id`/`xyy-app-key` 헤더 인증.
+  scene ↔ layout, robot ↔ robots 마스터로 매핑하면 새 상태 저장 없이 끝난다.
+- **2단 — 주문 쓰기**: `POST /api/fleet/orders/create`(+cancel/suspend).
+  externalId ↔ taskCode, priority(Int) ↔ TaskPriority 매핑.
+- **3단(별도 결정) — 스텝 모델 일반화**: M4 주문은 다단 스텝
+  (location + rbkArgs + 승강 동작, add/update/delete-steps, stepFixed 봉인)인데
+  transport_tasks는 출발→도착 단일 이송이다. 내부적으로 이미 2구간(픽업+하역,
+  엘리베이터 인수인계)을 쓰고 있으므로 스텝 리스트로 일반화할 토대는 있다.
+  다만 이건 fleet 도메인 자체의 개편이라 파사드와 분리해서 결정한다.
+
+주의
+
+- **176쪽 전량 커버리지를 좇지 않는다.** DI/DO, soft-EMC, 지도 리소스 잠금 등
+  로봇 하드웨어 제어 계열은 robot-sim에 대응물이 없다 — 스텁으로 두거나 뺀다.
+- 인증 체계가 다르다(M4는 app-id/key, 플랫폼은 JWT). 파사드는 M4 방식을 따라야
+  기존 클라이언트가 붙는다 — 게이트웨이 밖 별도 포트로 여는 게 깔끔하다.
