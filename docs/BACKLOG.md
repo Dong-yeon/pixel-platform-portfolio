@@ -295,32 +295,39 @@ jjwt를 직접 가져왔다.
 
 ---
 
-### P19. M4 호환 Fleet API — pixel-fleet를 실물 관제 서버 규격에 맞추기
+### P19. Fleet API를 M4 모양으로 — 현장 규격을 기본기로 삼는다
 
 > [CUSTOMER] 현장은 WMS가 **M4**(상용 AMR 군집관제 서버)를 거쳐 실물 로봇을 부린다.
 > 근거 문서: `D:\happyeon\05.[CUSTOMER]\Book\M4 Fleet API.pdf` (HTTP + WebSocket, 176쪽).
-> pixel-fleet control-service는 이미 작은 관제 서버다(주문·배차·교통통제·텔레메트리).
-> 여기에 **M4 호환 API 파사드**를 씌우면, M4를 향해 짠 통합 코드([CUSTOMER] WMS 등)를
-> 그대로 pixel-platform에 붙여 시험할 수 있다 — "M4 서버를 만든다"의 실속 있는 형태.
+>
+> **목적은 호환 레이어가 아니다.** 남의 클라이언트를 받으려고 M4를 흉내내는 게 아니라,
+> 현장에서 검증된 API 모양새를 **pixel-fleet 자체 API의 기본형**으로 삼는다.
+> 실물 관제 서버가 왜 그 개념들을 갖는지(스텝, 봉인, 씬, 요청-응답 봉투)를
+> 내 손으로 구현하면서 체득하는 것이 목표다. 그 결과로 자연히 M4를 쓰는 현장
+> 통합 코드와도 대화가 통하게 되면 덤이다.
 
-방향만 기록 (전면 구현이 아니라 **[CUSTOMER] WMS가 실제로 쓰는 부분집합**부터)
+M4에서 가져올 뼈대 (fleet API를 이 모양으로 개편)
 
-- **1단 — 읽기 표면**: `GET /api/fleet/robots/all-all`, `GET /api/fleet/scenes/list`,
-  주문 조회(`query-order-detail`), WebSocket `/wsm`
-  (요청 봉투 `id/action/content` → 응답 `action::Reply/replyToId`,
-  `Fleet3::RobotsPositionOnly::Query` 등) + `xyy-app-id`/`xyy-app-key` 헤더 인증.
-  scene ↔ layout, robot ↔ robots 마스터로 매핑하면 새 상태 저장 없이 끝난다.
-- **2단 — 주문 쓰기**: `POST /api/fleet/orders/create`(+cancel/suspend).
-  externalId ↔ taskCode, priority(Int) ↔ TaskPriority 매핑.
-- **3단(별도 결정) — 스텝 모델 일반화**: M4 주문은 다단 스텝
-  (location + rbkArgs + 승강 동작, add/update/delete-steps, stepFixed 봉인)인데
-  transport_tasks는 출발→도착 단일 이송이다. 내부적으로 이미 2구간(픽업+하역,
-  엘리베이터 인수인계)을 쓰고 있으므로 스텝 리스트로 일반화할 토대는 있다.
-  다만 이건 fleet 도메인 자체의 개편이라 파사드와 분리해서 결정한다.
+- **주문 = 다단 스텝.** `orders/create`가 steps 리스트(location + 동작)를 받고,
+  미봉인 주문에 `add/update/delete-steps`, `stepFixed`(봉인) 개념까지.
+  transport_tasks의 출발→도착 단일 이송을 스텝 리스트로 일반화한다 — 내부적으로
+  이미 2구간(픽업+하역, 엘리베이터 인수인계)을 쓰고 있어 토대는 있다.
+  **이게 P19의 몸통이다.** 지금의 handoff 특수 처리가 "스텝 2개짜리 주문"으로 녹는다.
+- **주문 생애주기 동사를 넓힌다**: cancel(-batch)/suspend/unsuspend/
+  complete-order(수동 완결)/retry-failed. 지금은 재시도만 자동이고 운영 개입 동사가 없다.
+- **externalId 관례**: 상류(WMS)가 자기 번호를 실어 보내고 완료 통지에서 그걸로 되찾는
+  구조 — 이미 taskCode로 하고 있으니 이름과 자리만 규격에 맞춘다.
+- **WS 요청-응답 봉투**: `id/action/content` → `action::Reply` + `replyToId`.
+  지금의 단방향 push(STOMP broadcast)에 "질의"가 없다 — 위치만 골라 묻는
+  `RobotsPositionOnly::Query` 같은 걸 이 봉투로 연다.
+- **로봇 운영 동사**: off-duty(배차 제외)/disabled/clear-alarm — 지금은 로봇을
+  운영에서 뺄 방법이 시뮬레이터를 끄는 것뿐이다.
 
 주의
 
-- **176쪽 전량 커버리지를 좇지 않는다.** DI/DO, soft-EMC, 지도 리소스 잠금 등
-  로봇 하드웨어 제어 계열은 robot-sim에 대응물이 없다 — 스텁으로 두거나 뺀다.
-- 인증 체계가 다르다(M4는 app-id/key, 플랫폼은 JWT). 파사드는 M4 방식을 따라야
-  기존 클라이언트가 붙는다 — 게이트웨이 밖 별도 포트로 여는 게 깔끔하다.
+- **176쪽 전량을 좇지 않는다.** DI/DO, soft-EMC, rbk-request, 지도 리소스 잠금 등
+  하드웨어 제어 계열은 robot-sim에 대응물이 없다 — 개념만 문서로 남기고 뺀다.
+- scene은 당장 1개(우리 공장)다. 다중 scene 구조를 미리 파지 말고,
+  API 시그니처에 sceneId 자리만 잡아 둔다.
+- 스텝 일반화는 fleet 도메인 개편이라 **마이그레이션·배차·교통통제가 다 닿는다.**
+  착수 전에 계획을 먼저 세우고 승인 받는다(작업 규칙).
