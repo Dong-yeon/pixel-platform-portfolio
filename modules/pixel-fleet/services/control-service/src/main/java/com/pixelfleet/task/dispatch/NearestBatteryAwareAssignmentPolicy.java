@@ -1,8 +1,8 @@
 package com.pixelfleet.task.dispatch;
 
 import com.pixelfleet.location.LocationRegistry;
+import com.pixelfleet.order.domain.FleetOrder;
 import com.pixelfleet.robot.dto.RobotResponse;
-import com.pixelfleet.task.domain.TransportTask;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
@@ -42,10 +42,10 @@ public class NearestBatteryAwareAssignmentPolicy implements AssignmentPolicy {
     }
 
     @Override
-    public Optional<RobotResponse> selectRobot(TransportTask task, List<RobotResponse> candidates) {
-        double[] origin = locations.resolve(task.getOriginNode());
+    public Optional<RobotResponse> selectRobot(FleetOrder order, List<RobotResponse> candidates) {
+        double[] origin = locations.resolve(order.getSteps().get(0).getLocationNode());
         return candidates.stream()
-                .filter(robot -> robot.floorNo() == task.getFloorNo())
+                .filter(robot -> robot.floorNo() == order.getFloorNo())
                 .filter(robot -> robot.batteryPercent() >= MIN_BATTERY_PERCENT)
                 .min(Comparator
                         .comparingDouble((RobotResponse robot) -> distanceSquared(robot, origin))

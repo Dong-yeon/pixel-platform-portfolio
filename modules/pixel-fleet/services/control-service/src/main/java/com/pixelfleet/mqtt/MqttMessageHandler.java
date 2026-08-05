@@ -2,9 +2,9 @@ package com.pixelfleet.mqtt;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.pixelfleet.order.service.OrderService;
 import com.pixelfleet.robot.domain.RobotStatus;
 import com.pixelfleet.robot.service.RobotService;
-import com.pixelfleet.task.service.TaskService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -22,12 +22,12 @@ public class MqttMessageHandler {
     private static final Logger log = LoggerFactory.getLogger(MqttMessageHandler.class);
 
     private final RobotService robotService;
-    private final TaskService taskService;
+    private final OrderService orderService;
     private final ObjectMapper objectMapper;
 
-    public MqttMessageHandler(RobotService robotService, TaskService taskService, ObjectMapper objectMapper) {
+    public MqttMessageHandler(RobotService robotService, OrderService orderService, ObjectMapper objectMapper) {
         this.robotService = robotService;
-        this.taskService = taskService;
+        this.orderService = orderService;
         this.objectMapper = objectMapper;
     }
 
@@ -82,15 +82,15 @@ public class MqttMessageHandler {
     }
 
     private void handleTask(JsonNode json) {
-        String taskCode = json.path("taskCode").asText();
+        String orderCode = json.path("orderCode").asText();
         String event = json.path("event").asText();
         switch (event) {
-            case "started" -> taskService.markStarted(taskCode);
-            // 픽업 도착 — 서버가 이때 두 번째 구간을 예약해 내준다(traffic 패키지 참고).
-            case "picked" -> taskService.markPickedUp(taskCode);
-            case "completed" -> taskService.markCompleted(taskCode);
-            case "failed" -> taskService.markFailed(taskCode, json.path("reason").asText("unknown"));
-            default -> log.debug("Ignoring unsupported task event '{}' for {}", event, taskCode);
+            case "started" -> orderService.markStarted(orderCode);
+            // 스텝 도착 — 서버가 이때 다음 레그를 예약해 내준다(traffic 패키지 참고).
+            // 마지막 스텝이었다면 주문을 닫고 ORDER_DONE으로 로봇을 풀어 준다.
+            case "step-done" -> orderService.markStepDone(orderCode, json.path("stepIndex").asInt(-1));
+            case "failed" -> orderService.markFailed(orderCode, json.path("reason").asText("unknown"));
+            default -> log.debug("Ignoring unsupported task event '{}' for {}", event, orderCode);
         }
     }
 }

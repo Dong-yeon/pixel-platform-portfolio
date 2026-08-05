@@ -1,9 +1,9 @@
 package com.pixelfleet.task.scheduler;
 
-import com.pixelfleet.task.domain.TaskPriority;
-import com.pixelfleet.task.domain.TaskStatus;
-import com.pixelfleet.task.repository.TransportTaskRepository;
-import com.pixelfleet.task.service.TaskService;
+import com.pixelfleet.order.domain.OrderStatus;
+import com.pixelfleet.order.repository.FleetOrderRepository;
+import com.pixelfleet.order.service.OrderService;
+import com.pixelfleet.order.service.OrderService.StepSpec;
 import java.util.List;
 import java.util.concurrent.ThreadLocalRandom;
 import org.slf4j.Logger;
@@ -86,20 +86,21 @@ public class DemoTaskGenerator {
      *
      * <p>층이 생기면서 한 번 더 올렸다. 배차가 <b>층별로 갈리므로</b> 큐가 한 층 작업으로
      * 차면 다른 층 로봇은 큐가 비어 있는 것과 같아진다 — 큐 하나를 셋이 나눠 쓰는 셈이다.
+     * 위층 증차(8대)에 맞춰 대수보다 여유 있게 둔다 — 큐가 로봇보다 얕으면 증차가 헛돈다.
      */
-    private static final int MAX_PENDING = 9;
+    private static final int MAX_PENDING = 12;
 
-    private final TaskService taskService;
-    private final TransportTaskRepository taskRepository;
+    private final OrderService orderService;
+    private final FleetOrderRepository orderRepository;
 
-    public DemoTaskGenerator(TaskService taskService, TransportTaskRepository taskRepository) {
-        this.taskService = taskService;
-        this.taskRepository = taskRepository;
+    public DemoTaskGenerator(OrderService orderService, FleetOrderRepository orderRepository) {
+        this.orderService = orderService;
+        this.orderRepository = orderRepository;
     }
 
     @Scheduled(fixedDelayString = "${demo.task-generator.interval-ms:15000}")
     public void generate() {
-        if (taskRepository.findByStatusOrderByIdAsc(TaskStatus.PENDING).size() >= MAX_PENDING) {
+        if (orderRepository.countByStatus(OrderStatus.TO_BE_ALLOCATED) >= MAX_PENDING) {
             return;
         }
 
@@ -108,21 +109,26 @@ public class DemoTaskGenerator {
 
         String code = "T-" + System.currentTimeMillis() % 1_000_000;
         try {
-            taskService.create(code, flow.origin(), flow.destination(), randomPriority(rnd));
-            log.debug("Demo task {} created: {} -> {}", code, flow.origin(), flow.destination());
+            // 데모 흐름은 전부 "싣고 → 내리는" 2스텝 주문이다. 층이 다르면
+            // OrderService가 승강장에서 체인으로 끊는다 — 여기는 신경 쓰지 않는다.
+            orderService.create(code, null,
+                    List.of(StepSpec.load(flow.origin()), StepSpec.unload(flow.destination())),
+                    randomPriority(rnd), true);
+            log.debug("Demo order {} created: {} -> {}", code, flow.origin(), flow.destination());
         } catch (Exception e) {
-            log.debug("Skipped demo task creation: {}", e.getMessage());
+            log.debug("Skipped demo order creation: {}", e.getMessage());
         }
     }
 
-    private TaskPriority randomPriority(ThreadLocalRandom rnd) {
+    /** M4처럼 정수 — 1=NORMAL 2=HIGH 3=URGENT. */
+    private int randomPriority(ThreadLocalRandom rnd) {
         int r = rnd.nextInt(100);
         if (r < 10) {
-            return TaskPriority.URGENT;
+            return 3;
         }
         if (r < 30) {
-            return TaskPriority.HIGH;
+            return 2;
         }
-        return TaskPriority.NORMAL;
+        return 1;
     }
 }

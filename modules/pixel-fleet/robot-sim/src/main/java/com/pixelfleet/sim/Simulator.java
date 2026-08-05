@@ -123,6 +123,13 @@ public class Simulator {
                     publishStatus(robot);
                     publishBattery(robot, true);
                     publishPosition(robot);
+                    // 다음 레그를 기다리는 중이면 step-done을 다시 알린다 — 그 한 건이
+                    // 유실되면 서버는 로봇이 아직 달리는 줄 알고, 로봇은 영원히 기다린다
+                    // (워치독은 진행 보고가 "끊긴" 것만 본다). 서버는 중복을 무시하거나,
+                    // 이미 닫힌 주문이면 ORDER_DONE을 재송신해 로봇을 풀어 준다.
+                    if (robot.isAwaitingNextLeg()) {
+                        publishTask(robot, "step-done", null);
+                    }
                 }
             }
 
@@ -151,42 +158,29 @@ public class Simulator {
         publishPosition(robot);
         publishBattery(robot, false);
 
-        // A task can fail mid-route; this exercises the control server's retry path.
-        if (robot.hasTask() && ThreadLocalRandom.current().nextDouble() < properties.getFailureRate()) {
+        // An order can fail mid-route; this exercises the control server's retry path.
+        if (robot.hasOrder() && ThreadLocalRandom.current().nextDouble() < properties.getFailureRate()) {
             String reason = FAILURE_REASONS[ThreadLocalRandom.current().nextInt(FAILURE_REASONS.length)];
             publishTask(robot, "failed", reason);
-            robot.abortTask();
+            robot.clearOrder();
             setState(robot, RobotState.IDLE);
             return;
         }
 
-        if (!reached) {
-            return;
+        if (!reached || robot.hasPath()) {
+            return; // 레그 중간 웨이포인트 — 계속 간다.
         }
-        if (robot.hasPath()) {
-            // Reached the pickup (origin) leg; keep going to the destination.
-            return;
-        }
-        // Final arrival.
-        if (robot.hasTask()) {
-            if (!robot.isPickedUp()) {
-                // leg1 완료 — 픽업 도착을 알리고 서버가 leg2 경로를 줄 때까지 기다린다.
-                // IDLE로 내리지 않는다(다른 작업이 배차되면 안 되므로). 경로만 빈 채 MOVING 유지.
-                robot.markPickedUp();
-                // 적재 상태가 바뀌었으니 즉시 알린다 — 위치 채널에 실려 가므로 지도에 파렛트가
-                // 바로 나타난다(하트비트를 기다리면 최대 10초 늦다).
-                publishPosition(robot);
-                publishTask(robot, "picked", null);
-                return;
-            }
-            publishTask(robot, "completed", null);
-            robot.abortTask();
-            setState(robot, RobotState.IDLE);
-            // 하역 완료 — 파렛트를 내렸음을 즉시 알린다. 이걸 빼면 로봇이 멈춘 뒤로 위치
-            // 발행이 없어, 하트비트(10초)까지 지도에 파렛트가 남아 있는다.
+        // 레그 목적지 도착.
+        if (robot.hasOrder()) {
+            // 스텝 완료 — 싣기/내리기를 적재 상태에 반영하고 서버에 보고한 뒤,
+            // 다음 레그(또는 ORDER_DONE)를 기다린다. IDLE로 내리지 않는다(주문을 쥔 채다).
+            robot.completeLeg();
+            // 적재 상태가 바뀌었을 수 있으니 즉시 알린다 — 위치 채널에 실려 가므로
+            // 지도에 파렛트가 바로 나타나거나 사라진다(하트비트를 기다리면 최대 10초 늦다).
             publishPosition(robot);
+            publishTask(robot, "step-done", null);
         } else if (robot.isChargingIntent()) {
-            robot.abortTask();
+            robot.clearOrder();
             setState(robot, RobotState.CHARGING);
         } else {
             setState(robot, RobotState.IDLE);
@@ -349,7 +343,7 @@ public class Simulator {
         return out;
     }
 
-    /** Handle a downlink command: {@code fleet/{robotCode}/command} with a GOTO payload. */
+    /** Handle a downlink command: {@code fleet/{robotCode}/command} — GOTO(레그) 또는 ORDER_DONE. */
     private void onCommand(String topic, String payload) {
         String[] parts = topic.split("/");
         if (parts.length != 3) {
@@ -363,54 +357,70 @@ public class Simulator {
             log.warn("Malformed command payload on {}: {}", topic, payload);
             return;
         }
-        if (!"GOTO".equals(json.path("command").asText())) {
-            return;
-        }
 
         synchronized (lock) {
             VirtualRobot robot = byCode.get(robotCode);
             if (robot == null) {
-                log.warn("GOTO for unknown robot '{}'. Ignoring.", robotCode);
+                log.warn("Command for unknown robot '{}'. Ignoring.", robotCode);
                 return;
             }
-            String taskCode = json.path("taskCode").asText();
-
-            // 같은 작업의 두 번째 구간(leg2)이면 이어 붙인다 — 픽업에서 기다리던 로봇이 출발한다.
-            if (taskCode.equals(robot.getCurrentTaskCode()) && robot.isAwaitingSecondLeg()) {
-                List<double[]> leg2 = readWaypoints(json);
-                if (!leg2.isEmpty()) {
-                    robot.appendSecondLeg(parkAtOwnSlot(leg2, json.path("destination").asText(), robotCode));
-                    log.info("Robot {} got second leg for {} ({} waypoints)", robotCode, taskCode, leg2.size());
-                }
-                return;
+            switch (json.path("command").asText()) {
+                case "GOTO" -> onGoto(robot, robotCode, json);
+                case "ORDER_DONE" -> onOrderDone(robot, json);
+                default -> { /* 모르는 명령은 무시 */ }
             }
-
-            // Accept unless the robot is already executing a task or charging. In particular a
-            // roaming robot (MOVING with no task) must yield: roaming is cosmetic idle motion, and
-            // rejecting the GOTO here would orphan the task the server already marked ASSIGNED.
-            if (robot.hasTask() || robot.getState() == RobotState.CHARGING) {
-                log.warn("Robot {} busy ({}, hasTask={}); ignoring GOTO for {}.",
-                        robotCode, robot.getState(), robot.hasTask(), taskCode);
-                return;
-            }
-            // 경로는 서버가 정해서 보낸다(구간 점유 통제 때문). 로봇은 그대로 따라갈 뿐이다.
-            List<double[]> waypoints = readWaypoints(json);
-            if (waypoints.isEmpty()) {
-                // 하위 호환: 웨이포인트 없이 온 GOTO는 로봇이 직접 경로를 만든다.
-                double[] origin = spot(json.path("origin").asText(), robotCode);
-                double[] destination = spot(json.path("destination").asText(), robotCode);
-                robot.assignTask(taskCode,
-                        nodeMap.route(robot.position(), origin),
-                        nodeMap.route(origin, destination));
-            } else {
-                // 서버가 준 경로는 픽업까지(leg1)다. 하역까지는 픽업 도착 후 따로 받는다.
-                robot.assignFirstLeg(taskCode, parkAtOwnSlot(waypoints, json.path("origin").asText(), robotCode));
-            }
-            publishStatus(robot);           // now MOVING
-            publishTask(robot, "started", null);
-            log.info("Robot {} accepted task {} ({} -> {})",
-                    robotCode, taskCode, json.path("origin").asText(), json.path("destination").asText());
         }
+    }
+
+    private void onGoto(VirtualRobot robot, String robotCode, JsonNode json) {
+        String orderCode = json.path("orderCode").asText();
+        int stepIndex = json.path("stepIndex").asInt(-1);
+        String location = json.path("location").asText();
+        List<double[]> waypoints = readWaypoints(json);
+        if (waypoints.isEmpty()) {
+            log.warn("GOTO without waypoints for {} (order {}). Ignoring.", robotCode, orderCode);
+            return;
+        }
+
+        // 같은 주문의 다음 레그 — 스텝을 마치고 기다리던 로봇이 출발한다.
+        if (orderCode.equals(robot.getCurrentOrderCode())) {
+            if (stepIndex == robot.getCurrentStepIndex()) {
+                return; // QoS1 중복 전달 — 이미 이 레그를 받았다.
+            }
+            robot.assignLeg(orderCode, stepIndex,
+                    json.path("forLoad").asBoolean(false), json.path("forUnload").asBoolean(false),
+                    parkAtOwnSlot(waypoints, location, robotCode));
+            log.info("Robot {} got step {} of {} ({} waypoints)", robotCode, stepIndex, orderCode, waypoints.size());
+            return;
+        }
+
+        // Accept unless the robot is already executing an order or charging. In particular a
+        // roaming robot (MOVING with no order) must yield: roaming is cosmetic idle motion, and
+        // rejecting the GOTO here would orphan the order the server already marked ALLOCATED.
+        if (robot.hasOrder() || robot.getState() == RobotState.CHARGING) {
+            log.warn("Robot {} busy ({}, hasOrder={}); ignoring GOTO for {}.",
+                    robotCode, robot.getState(), robot.hasOrder(), orderCode);
+            return;
+        }
+        robot.assignLeg(orderCode, stepIndex,
+                json.path("forLoad").asBoolean(false), json.path("forUnload").asBoolean(false),
+                parkAtOwnSlot(waypoints, location, robotCode));
+        publishStatus(robot);           // now MOVING
+        publishTask(robot, "started", null);
+        log.info("Robot {} accepted order {} (step {} -> {})", robotCode, orderCode, stepIndex, location);
+    }
+
+    /**
+     * 주문 종료 — <b>서버만이 안다.</b> 미봉인 주문은 스텝이 이어질 수 있어서, 로봇은
+     * 자기가 마지막 스텝을 달렸는지 스스로 판단하지 않고 이 명령으로 풀려난다.
+     */
+    private void onOrderDone(VirtualRobot robot, JsonNode json) {
+        if (!json.path("orderCode").asText().equals(robot.getCurrentOrderCode())) {
+            return;
+        }
+        robot.clearOrder();
+        setState(robot, RobotState.IDLE);
+        publishPosition(robot); // 파렛트가 사라진 것을 즉시 알린다.
     }
 
     // --- publishing helpers (topic/payload contract in docs/mqtt-topics.md) ---
@@ -437,7 +447,7 @@ public class Simulator {
     private void publishPosition(VirtualRobot robot) {
         mqtt.publish("fleet/" + robot.getCode() + "/position",
                 Map.of("x", round(robot.getX()), "y", round(robot.getY()),
-                        "laden", robot.isPickedUp()));
+                        "laden", robot.isLaden()));
     }
 
     /** Publish battery only when the whole-percent value changed (or when forced), to limit noise. */
@@ -452,8 +462,11 @@ public class Simulator {
 
     private void publishTask(VirtualRobot robot, String event, String reason) {
         Map<String, Object> payload = new HashMap<>();
-        payload.put("taskCode", robot.getCurrentTaskCode());
+        payload.put("orderCode", robot.getCurrentOrderCode());
         payload.put("event", event);
+        if ("step-done".equals(event)) {
+            payload.put("stepIndex", robot.getCurrentStepIndex());
+        }
         if (reason != null) {
             payload.put("reason", reason);
         }

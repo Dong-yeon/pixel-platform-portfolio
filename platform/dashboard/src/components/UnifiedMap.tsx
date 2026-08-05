@@ -63,7 +63,8 @@ const ACTIVE_TASK = new Set(['ASSIGNED', 'IN_PROGRESS'])
  * <p>전부 같은 파랑이면 선이 겹칠 때 어느 로봇 것인지 못 읽는다. 로봇 코드에서 번호를 뽑아
  * 고정 색을 준다 — 매번 같은 로봇이 같은 색이어야 화면을 보며 눈이 따라갈 수 있다.
  */
-const ROUTE_PALETTE = ['#2d7ff9', '#8e44ad', '#e08a00', '#0f9b8e', '#c0392b', '#3b5bdb']
+// 팔레트 크기는 로봇 대수 이상으로 유지한다 — 나머지 연산으로 접히면 두 로봇이 같은 색이 된다.
+const ROUTE_PALETTE = ['#2d7ff9', '#8e44ad', '#e08a00', '#0f9b8e', '#c0392b', '#3b5bdb', '#5f8b1e', '#b3486e']
 
 function routeColorFor(robotCode: string | undefined): string {
   if (!robotCode) return '#9aa5b4' // 아직 배차 안 된 작업

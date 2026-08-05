@@ -57,29 +57,41 @@ public class MqttRobotCommandPublisher implements RobotCommandPublisher {
     @Override
     public void sendGoto(
             String robotCode,
-            String taskCode,
-            String origin,
-            String destination,
+            String orderCode,
+            int stepIndex,
+            String location,
+            boolean forLoad,
+            boolean forUnload,
             java.util.List<double[]> waypoints) {
+        publish(robotCode, Map.of(
+                "command", "GOTO",
+                "orderCode", orderCode,
+                "stepIndex", stepIndex,
+                "location", location,
+                "forLoad", forLoad,
+                "forUnload", forUnload,
+                // 서버가 정한 경로. 로봇은 이 점들을 순서대로 지난다(구간 점유 통제를 위해).
+                "waypoints", waypoints));
+        log.debug("Sent GOTO to {} for order {} step {} -> {}", robotCode, orderCode, stepIndex, location);
+    }
+
+    @Override
+    public void sendOrderDone(String robotCode, String orderCode) {
+        publish(robotCode, Map.of("command", "ORDER_DONE", "orderCode", orderCode));
+        log.debug("Sent ORDER_DONE to {} for order {}", robotCode, orderCode);
+    }
+
+    private void publish(String robotCode, Map<String, Object> body) {
         if (client == null || !client.isConnected()) {
-            log.warn("Downlink not connected; skipping GOTO for robot {} (task {}).", robotCode, taskCode);
+            log.warn("Downlink not connected; skipping {} for robot {}.", body.get("command"), robotCode);
             return;
         }
-        String topic = "fleet/" + robotCode + "/command";
         try {
-            byte[] payload = objectMapper.writeValueAsBytes(Map.of(
-                    "command", "GOTO",
-                    "taskCode", taskCode,
-                    "origin", origin,
-                    "destination", destination,
-                    // 서버가 정한 경로. 로봇은 이 점들을 순서대로 지난다(구간 점유 통제를 위해).
-                    "waypoints", waypoints));
-            MqttMessage message = new MqttMessage(payload);
+            MqttMessage message = new MqttMessage(objectMapper.writeValueAsBytes(body));
             message.setQos(1);
-            client.publish(topic, message);
-            log.debug("Sent GOTO to {} for task {} ({} -> {})", robotCode, taskCode, origin, destination);
+            client.publish("fleet/" + robotCode + "/command", message);
         } catch (Exception e) {
-            log.error("Failed to publish GOTO to {} for task {}", robotCode, taskCode, e);
+            log.error("Failed to publish {} to robot {}", body.get("command"), robotCode, e);
         }
     }
 

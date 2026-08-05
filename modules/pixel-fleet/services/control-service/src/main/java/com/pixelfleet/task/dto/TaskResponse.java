@@ -1,24 +1,28 @@
 package com.pixelfleet.task.dto;
 
-import com.pixelfleet.task.domain.TaskPriority;
-import com.pixelfleet.task.domain.TaskStatus;
-import com.pixelfleet.task.domain.TransportTask;
+import com.pixelfleet.order.domain.FleetOrder;
+import com.pixelfleet.order.domain.OrderStep;
 import java.time.LocalDateTime;
+import java.util.List;
 
+/**
+ * <b>호환 어댑터 뷰</b> — 주문(다단 스텝)을 예전 "작업(출발→도착)" 모양으로 눕혀서 보여준다.
+ *
+ * <p>P19-1은 엔진만 바꾸고 겉(REST 계약)은 그대로 두는 단계라, 대시보드·WMS가 아는
+ * 필드명(taskCode/originNode/destinationNode/상태 문자열)을 유지한다. P19-2에서 M4형
+ * 주문 API로 소비자를 옮기면 이 파일은 컨트롤러와 함께 삭제된다.
+ */
 public record TaskResponse(
         Long id,
         String taskCode,
         String originNode,
         String destinationNode,
-        TaskPriority priority,
-        TaskStatus status,
+        String priority,
+        String status,
         Long assignedRobotId,
         int retryCount,
-        /** 이 작업이 벌어지는 층 — 같은 층 로봇에게만 배차된다. */
         short floorNo,
-        /** 채워져 있으면 이 구간이 끝난 뒤 물건이 엘리베이터를 타고 여기로 간다. */
         String handoffDestination,
-        /** 채워져 있으면 이 구간은 엘리베이터에서 물건을 이어받은 뒷 구간이다. */
         String handoffOf,
         LocalDateTime assignedAt,
         LocalDateTime startedAt,
@@ -26,23 +30,49 @@ public record TaskResponse(
         String failureReason
 ) {
 
-    public static TaskResponse from(TransportTask t) {
+    public static TaskResponse from(FleetOrder order) {
+        List<OrderStep> steps = order.getSteps();
+        String origin = steps.isEmpty() ? "?" : steps.get(0).getLocationNode();
+        String destination = steps.isEmpty() ? "?" : steps.get(steps.size() - 1).getLocationNode();
         return new TaskResponse(
-                t.getId(),
-                t.getTaskCode(),
-                t.getOriginNode(),
-                t.getDestinationNode(),
-                t.getPriority(),
-                t.getStatus(),
-                t.getAssignedRobotId(),
-                t.getRetryCount(),
-                t.getFloorNo(),
-                t.getHandoffDestination(),
-                t.getHandoffOf(),
-                t.getAssignedAt(),
-                t.getStartedAt(),
-                t.getFinishedAt(),
-                t.getFailureReason()
+                order.getId(),
+                order.getOrderCode(),
+                origin,
+                destination,
+                priorityName(order.getPriority()),
+                legacyStatus(order),
+                order.getAssignedRobotId(),
+                order.getFailureNum(),
+                order.getFloorNo(),
+                order.getHandoffDestination(),
+                order.getHandoffOf(),
+                order.getAssignedAt(),
+                order.getStartedAt(),
+                order.getFinishedAt(),
+                order.getFailureReason()
         );
+    }
+
+    private static String priorityName(int priority) {
+        return switch (priority) {
+            case 0 -> "LOW";
+            case 1 -> "NORMAL";
+            case 2 -> "HIGH";
+            default -> "URGENT";
+        };
+    }
+
+    /** fault(동결)는 예전 어휘로 FAILED다 — 대시보드 배지 색이 그 이름을 안다. */
+    private static String legacyStatus(FleetOrder order) {
+        if (order.isFault()) {
+            return "FAILED";
+        }
+        return switch (order.getStatus()) {
+            case TO_BE_ALLOCATED -> "PENDING";
+            case ALLOCATED -> "ASSIGNED";
+            case EXECUTING, PENDING -> "IN_PROGRESS";
+            case DONE -> "COMPLETED";
+            case CANCELLED -> "CANCELLED";
+        };
     }
 }

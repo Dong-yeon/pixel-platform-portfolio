@@ -19,10 +19,18 @@ public class VirtualRobot {
     private RobotState state = RobotState.OFFLINE;
 
     private final Deque<double[]> path = new ArrayDeque<>();
-    private String currentTaskCode;
+    private String currentOrderCode;
     private boolean chargingIntent;
-    /** 픽업 지점을 지났는지. leg1 완료와 leg2 완료를 구분한다. */
-    private boolean pickedUp;
+    /** 지금 달리고 있(었)는 스텝. -1 = 주문 없음. */
+    private int currentStepIndex = -1;
+    /**
+     * 적재 여부 — 스텝의 forLoad/forUnload를 <b>완료 시점에</b> 반영한 결과.
+     * 예전엔 "픽업을 지났는가"로 추론했는데, 그건 스텝이 2개일 때만 맞는 우연이었다.
+     */
+    private boolean laden;
+    /** 지금 레그의 목적지에서 싣는가/내리는가 — 도착했을 때 laden에 반영한다. */
+    private boolean forLoadAtTarget;
+    private boolean forUnloadAtTarget;
 
     public VirtualRobot(String code, String name, double x, double y) {
         this.code = code;
@@ -52,57 +60,52 @@ public class VirtualRobot {
     }
 
     /**
-     * 경로를 웨이포인트 목록으로 받는다. 통로를 따라 꺾어 가는 경로라 중간 지점이 여럿이다
-     * (NodeMap#route 참고) — 직선 한 번이 아니라 실제 주행처럼 움직인다.
-     */
-    public void assignTask(String taskCode, List<double[]> toOrigin, List<double[]> toDestination) {
-        path.clear();
-        path.addAll(toOrigin);
-        path.addAll(toDestination);
-        this.currentTaskCode = taskCode;
-        this.chargingIntent = false;
-        this.pickedUp = false;
-        this.state = RobotState.MOVING;
-    }
-
-    /**
-     * 픽업까지(leg1)만 받는다. 하역까지의 경로(leg2)는 픽업 도착을 보고한 뒤 서버가 따로 준다.
+     * 스텝 하나(레그)를 받는다 — 첫 레그든 이어지는 레그든 같은 API다.
      *
-     * <p>이렇게 나누는 이유: 서버가 "현재 위치 → 픽업 → 하역"을 통째로 예약하면 픽업이 먼
-     * 로봇은 공장을 가로지르는 구간 전체를 한 번에 요구해 다른 로봇이 거의 못 움직인다.
+     * <p>서버는 레그 단위로만 경로를 내준다: 주문 전체를 통째로 예약하면 먼 로봇이
+     * 공장을 가로지르는 구간을 한 번에 요구해 다른 로봇이 거의 못 움직인다.
+     * 경로(웨이포인트)는 통로를 따라 꺾어 가므로 중간 지점이 여럿이다.
      */
-    public void assignFirstLeg(String taskCode, List<double[]> toPickup) {
+    public void assignLeg(String orderCode, int stepIndex, boolean forLoad, boolean forUnload,
+                          List<double[]> waypoints) {
         path.clear();
-        path.addAll(toPickup);
-        this.currentTaskCode = taskCode;
+        path.addAll(waypoints);
+        this.currentOrderCode = orderCode;
+        this.currentStepIndex = stepIndex;
+        this.forLoadAtTarget = forLoad;
+        this.forUnloadAtTarget = forUnload;
         this.chargingIntent = false;
-        this.pickedUp = false;
         this.state = RobotState.MOVING;
     }
 
-    /** 픽업에서 대기하던 로봇에게 하역까지의 경로를 이어 준다. */
-    public void appendSecondLeg(List<double[]> toDestination) {
-        path.addAll(toDestination);
-        this.state = RobotState.MOVING;
+    /** 스텝을 마치고 다음 레그(또는 ORDER_DONE)를 기다리는 중인지. */
+    public boolean isAwaitingNextLeg() {
+        return currentOrderCode != null && path.isEmpty();
     }
 
-    /** 픽업 지점에 도착해 leg2를 기다리는 중인지. */
-    public boolean isAwaitingSecondLeg() {
-        return currentTaskCode != null && pickedUp && path.isEmpty();
+    /** 레그 목적지 도착 — 스텝의 싣기/내리기를 적재 상태에 반영한다. */
+    public void completeLeg() {
+        if (forLoadAtTarget) {
+            this.laden = true;
+        }
+        if (forUnloadAtTarget) {
+            this.laden = false;
+        }
     }
 
-    public void markPickedUp() {
-        this.pickedUp = true;
+    public boolean isLaden() {
+        return laden;
     }
 
-    public boolean isPickedUp() {
-        return pickedUp;
+    public int getCurrentStepIndex() {
+        return currentStepIndex;
     }
 
     public void startRoam(List<double[]> route) {
         path.clear();
         path.addAll(route);
-        this.currentTaskCode = null;
+        this.currentOrderCode = null;
+        this.currentStepIndex = -1;
         this.chargingIntent = false;
         this.state = RobotState.MOVING;
     }
@@ -110,16 +113,21 @@ public class VirtualRobot {
     public void startChargeRun(List<double[]> route) {
         path.clear();
         path.addAll(route);
-        this.currentTaskCode = null;
+        this.currentOrderCode = null;
+        this.currentStepIndex = -1;
         this.chargingIntent = true;
         this.state = RobotState.MOVING;
     }
 
-    public void abortTask() {
+    /** 주문에서 손을 뗀다(ORDER_DONE·실패·중단). 실은 짐도 내려놓은 것으로 본다. */
+    public void clearOrder() {
         path.clear();
-        this.currentTaskCode = null;
+        this.currentOrderCode = null;
+        this.currentStepIndex = -1;
         this.chargingIntent = false;
-        this.pickedUp = false;
+        this.forLoadAtTarget = false;
+        this.forUnloadAtTarget = false;
+        this.laden = false;
     }
 
     public void drain(double amount) {
@@ -139,8 +147,8 @@ public class VirtualRobot {
         return !path.isEmpty();
     }
 
-    public boolean hasTask() {
-        return currentTaskCode != null;
+    public boolean hasOrder() {
+        return currentOrderCode != null;
     }
 
     public boolean isChargingIntent() {
@@ -179,7 +187,7 @@ public class VirtualRobot {
         this.state = state;
     }
 
-    public String getCurrentTaskCode() {
-        return currentTaskCode;
+    public String getCurrentOrderCode() {
+        return currentOrderCode;
     }
 }
