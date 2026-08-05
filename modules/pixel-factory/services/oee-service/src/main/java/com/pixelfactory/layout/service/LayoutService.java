@@ -5,6 +5,7 @@ import com.pixelfactory.layout.domain.LayoutSettings;
 import com.pixelfactory.layout.dto.LayoutResponse;
 import com.pixelfactory.layout.repository.LayoutBuildingRepository;
 import com.pixelfactory.layout.repository.LayoutChargingZoneRepository;
+import com.pixelfactory.layout.repository.LayoutEdgeRepository;
 import com.pixelfactory.layout.repository.LayoutElevatorRepository;
 import com.pixelfactory.layout.repository.LayoutFloorRepository;
 import com.pixelfactory.layout.repository.LayoutNodeRepository;
@@ -31,12 +32,14 @@ public class LayoutService {
     private final LayoutRackRepository rackRepository;
     private final LayoutElevatorRepository elevatorRepository;
     private final LayoutChargingZoneRepository chargingZoneRepository;
+    private final LayoutEdgeRepository edgeRepository;
 
     public LayoutService(LayoutSettingsRepository settingsRepository, LayoutNodeRepository nodeRepository,
                          PopTerminalRepository terminalRepository, LayoutBuildingRepository buildingRepository,
                          LayoutFloorRepository floorRepository, LayoutRackRepository rackRepository,
                          LayoutElevatorRepository elevatorRepository,
-                         LayoutChargingZoneRepository chargingZoneRepository) {
+                         LayoutChargingZoneRepository chargingZoneRepository,
+                         LayoutEdgeRepository edgeRepository) {
         this.settingsRepository = settingsRepository;
         this.nodeRepository = nodeRepository;
         this.terminalRepository = terminalRepository;
@@ -45,6 +48,7 @@ public class LayoutService {
         this.rackRepository = rackRepository;
         this.elevatorRepository = elevatorRepository;
         this.chargingZoneRepository = chargingZoneRepository;
+        this.edgeRepository = edgeRepository;
     }
 
     public LayoutResponse get() {
@@ -66,6 +70,7 @@ public class LayoutService {
                 terminalRepository.findAllByOrderByTerminalCodeAsc(),
                 rackRepository.findAllByOrderByRackCodeAsc(),
                 elevatorRepository.findAllByOrderByElevatorCodeAsc(),
-                chargingZoneRepository.findAllByOrderByZoneCodeAsc());
+                chargingZoneRepository.findAllByOrderByZoneCodeAsc(),
+                edgeRepository.findAllByOrderByIdAsc());
     }
 }

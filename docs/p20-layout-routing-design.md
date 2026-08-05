@@ -1,8 +1,8 @@
 # P20 설계 문서 — 컴포저블 레이아웃 + 그래프 기반 라우팅
 
-> 상태: **승인 대기.** `docs/BACKLOG.md`의 P20 항목이 요구하는 "세부 설계를 먼저 문서로 확정하고
-> 승인받은 뒤 착수한다"의 그 문서다. 이 문서에 적힌 결정에 동의하면 실행 단계(5절)를 순서대로
-> 커밋해 나간다. 동의하지 않는 결정이 있으면 3절을 먼저 다시 논의한다.
+> 상태: **승인됨 (2026-08-06), P20-1 완료.** `docs/BACKLOG.md`의 P20 항목이 요구하는
+> "세부 설계를 먼저 문서로 확정하고 승인받은 뒤 착수한다"의 그 문서다. 실행 단계(5절)를
+> 순서대로 진행 중 — 각 단계 완료 시 체크박스와 검증 근거를 남긴다.
 >
 > 선행 문서: `docs/pixel-platform-roadmap.md`의 **P11. 레이아웃 서버화** — "factory가 평면도를
 > 소유하고 fleet은 캐시한다"는 소유권 결정과, 그 문서가 남긴 미해결 질문
@@ -232,11 +232,23 @@ class GraphCostAwareAssignmentPolicy implements AssignmentPolicy {
 
 ## 5. 실행 단계 (각 단계 검증 후 커밋 — P19 선례를 따름)
 
-### P20-1. 데이터 모델
-- [ ] factory Flyway V13 — `layout_edges`, `layout_nodes.node_type`에 `GATE` 추가,
-      `layout_settings.layout_version/effective_from`
-- [ ] 기존 3개 건물의 통로·연결로를 `layout_edges` 행으로 이관 (값 동일, 표현만 이동)
-- [ ] `LayoutResponse`/`LayoutService`에 `edges` 필드 추가, `GET /api/layout` 응답 확인
+### P20-1. 데이터 모델 ✅ (2026-08-06)
+- [x] factory Flyway V13 — `layout_edges`, `layout_nodes.node_type`에 `GATE`/`JUNCTION` 추가,
+      `layout_settings.layout_version/effective_from` — `V13__layout_edges.sql` 적용 확인
+      (버전은 물리 배치 변경이 아니므로 그대로 1 유지, D8 그대로)
+- [x] 기존 3개 건물의 통로·연결로를 `layout_edges` 행으로 이관 (값 동일, 표현만 이동) —
+      연결로 8개 × 통로 2개 = 교차점(JUNCTION) 노드 16개 신설, 엣지 54개(교차점 간 8+14,
+      명명 노드→교차점 32). `GET /api/layout` 검증: WH-DOCK-1→PROD-A1 경로 비용이
+      기존 `LaneGraph.plan()` 계산값(6+23+3=32)과 정확히 일치(6+5+5+13+3=32)
+- [x] `LayoutResponse`/`LayoutService`에 `edges` 필드 추가, `GET /api/layout` 응답 확인 —
+      노드 42개(기존 26 + 신규 JUNCTION 16), 엣지 54개로 응답됨을 실행 후 확인
+- [x] 회귀 확인 — `oee-service` 전체 테스트 통과, `robot-sim`의
+      `NodeMapLayoutConsistencyTest`는 V12 SQL만 비교 대상이라 영향 없음(통과 확인)
+
+> 노드-교차점 분해 방식(수직 밴드를 JUNCTION 노드로 명시화)은 설계 문서 초안에는 없던
+> 구현 결정이다 — `layout_edges`가 노드-노드 그래프(D3)이려면 통로·연결로 교차점도
+> 실제 노드 행이 있어야 A*가 지나갈 자리가 생긴다. 상세 근거는 `V13__layout_edges.sql`
+> 파일 상단 주석 참고.
 
 ### P20-2. 그래프 라우팅 교체 (기존 3개 건물 범위 안에서 회귀 없이)
 - [ ] `LocationRegistry`가 `edges`까지 캐시

@@ -2,6 +2,7 @@ package com.pixelfactory.layout.dto;
 
 import com.pixelfactory.layout.domain.LayoutBuilding;
 import com.pixelfactory.layout.domain.LayoutChargingZone;
+import com.pixelfactory.layout.domain.LayoutEdge;
 import com.pixelfactory.layout.domain.LayoutElevator;
 import com.pixelfactory.layout.domain.LayoutFloor;
 import com.pixelfactory.layout.domain.LayoutNode;
@@ -36,7 +37,8 @@ public record LayoutResponse(
         List<Terminal> terminals,
         List<Rack> racks,
         List<Elevator> elevators,
-        List<ChargingZone> chargingZones
+        List<ChargingZone> chargingZones,
+        List<Edge> edges
 ) {
 
     /**
@@ -49,6 +51,17 @@ public record LayoutResponse(
         public static Node from(LayoutNode node) {
             return new Node(node.getNodeCode(), node.getName(), node.getNodeType(),
                     node.getPosX(), node.getPosY(), node.getBuildingCode(), node.getFloorNo());
+        }
+    }
+
+    /**
+     * 두 노드 사이의 연결 (P20) — <b>정적 토폴로지만</b> 담는다. 지금 막혀 있는가 같은
+     * 동적 사실은 fleet의 라이브 상태다(설계 근거: {@code docs/p20-layout-routing-design.md} D4).
+     */
+    public record Edge(String fromNode, String toNode, double baseCost, boolean bidirectional) {
+
+        public static Edge from(LayoutEdge edge) {
+            return new Edge(edge.getFromNode(), edge.getToNode(), edge.getBaseCost(), edge.getBidirectional());
         }
     }
 
@@ -140,7 +153,8 @@ public record LayoutResponse(
             List<PopTerminal> terminals,
             List<LayoutRack> racks,
             List<LayoutElevator> elevators,
-            List<LayoutChargingZone> chargingZones
+            List<LayoutChargingZone> chargingZones,
+            List<LayoutEdge> edges
     ) {
         return new LayoutResponse(
                 settings.getWidth(),
@@ -163,7 +177,8 @@ public record LayoutResponse(
                 terminals.stream().map(Terminal::from).toList(),
                 racks.stream().map(Rack::from).toList(),
                 elevators.stream().map(Elevator::from).toList(),
-                chargingZones.stream().map(ChargingZone::from).toList()
+                chargingZones.stream().map(ChargingZone::from).toList(),
+                edges.stream().map(Edge::from).toList()
         );
     }
 }

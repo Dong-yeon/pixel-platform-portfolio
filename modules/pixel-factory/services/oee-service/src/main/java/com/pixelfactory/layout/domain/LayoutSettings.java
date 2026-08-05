@@ -5,6 +5,7 @@ import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import java.time.LocalDateTime;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -41,4 +42,16 @@ public class LayoutSettings extends BaseEntity {
     /** 하단 가로 통로 y — LINE-2(B열) 담당. */
     @Column(name = "lower_aisle_y", nullable = false)
     private Double lowerAisleY;
+
+    /**
+     * 평면도 버전 (P20) — 물리적 배치(좌표·건물)가 바뀌는 마이그레이션에서만 올린다.
+     * 그래프 표현 방식만 바뀌는 변경(P20-1 자체가 그 예)은 버전을 올리지 않는다.
+     * 과거 시점 평면도 재생 같은 소비 기능은 아직 없다 — 지금은 기록만 한다.
+     */
+    @Column(name = "layout_version", nullable = false)
+    private Integer layoutVersion;
+
+    /** 이 버전이 유효해진 시각. */
+    @Column(name = "effective_from", nullable = false)
+    private LocalDateTime effectiveFrom;
 }
