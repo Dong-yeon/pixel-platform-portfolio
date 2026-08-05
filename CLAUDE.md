@@ -1,7 +1,9 @@
 # pixel-platform
 
-PixelFactory(OEE) + PixelFleet(AMR)을 게이트웨이 + 통합 대시보드 아래 묶은 **모노레포**.
-포트: gateway **9000** · factory 9001 · fleet 9002 · dashboard(dev) 9200.
+PixelFactory(OEE) · PixelFleet(AMR) · PixelWMS(창고) · PixelQMS(품질)를
+게이트웨이 + 통합 대시보드 아래 묶은 **모노레포**. 기술적으로 가장 깊은 모듈은 PixelFleet
+(레인 그래프 경로계산·구간 점유·Redis 실시간 상태)이고, PixelFactory가 코드 규모상 가장 크다.
+포트: gateway **9000** · factory 9001 · fleet 9002 · wms 9003 · qms 9004 · dashboard(dev) 9200.
 
 로드맵·단계별 계획: `docs/` 재구성 계획서.
 
