@@ -7,6 +7,8 @@ target/
 node_modules/
 dist/
 *.log
+# scripts/dev-up.ps1 이 서비스별 로그를 여기 남긴다(.log 와 .log.err 둘 다).
+logs/
 
 # ---- IDE ----
 .idea/
