@@ -274,10 +274,31 @@ class GraphCostAwareAssignmentPolicy implements AssignmentPolicy {
 >    실좌표를, 구간 ID는 스냅된 연결로 좌표를 쓰도록 둘을 분리했다(`PathStep.pos` vs
 >    `PathStep.segmentPos`).
 
-### P20-3. Building-A/B 신설 (데이터만으로)
-- [ ] 신규 건물 좌표 구획 확정(기존 68×26과 겹치지 않게, 또는 캔버스 확장)
-- [ ] 신규 노드·엣지·GATE 데이터 insert (코드 변경 없음이 완료 기준)
-- [ ] 로봇이 GATE를 거쳐 건물 간 이동하는 경로가 실제로 계산됨
+### P20-3. Building-A/B 신설 (데이터만으로) ✅ (2026-08-06)
+- [x] 신규 건물 좌표 구획 확정 — 기존 건물 아래·옆이 아니라 <b>x를 멀리 떼어(85~)</b> 오른쪽에
+      배치. 캔버스 확장(width 68→150). 이유: `LaneGraph`의 가상 진입점 탐색이 로봇의 실시간
+      좌표를 처리할 때 "가장 가까운 연결로"를 <b>x만 보고</b> 전역에서 찾는다(y는 안 봄) —
+      새 건물을 바로 옆(y만 다르게)에 붙이면 옛 건물 로봇의 진입점 탐색이 멀리 있는 새
+      연결로를 더 가깝다고 잘못 고를 위험이 있다(P20-2 회귀). x를 충분히 떼면(기존 최대
+      62, 신관 시작 85, 간격 23) 코드를 안 건드리고 데이터 배치만으로 이 위험을 없앤다 —
+      진짜 자유로운 x·y 배치를 하려면 진입점 탐색을 건물 소속 기준으로 바꿔야 한다(범위 밖)
+- [x] `layout_buildings`(BLDG-A/B) · `layout_floors` · `layout_nodes`(GATE 2개 + STATION/
+      WAREHOUSE 4개) · `layout_edges`(6개, QC-OUT→GATE-WH-A→MACH-1→MACH-2→GATE-A-B→
+      ASM-1→LOGI-1 체인) — factory Flyway V14 하나로 끝. **fleet 코드(LaneGraph,
+      LocationRegistry) 무변경** — 이번 phase의 핵심 주장을 실제로 증명
+- [x] `layout_settings.layout_version` 2로 상승(물리 배치가 실제로 바뀐 첫 마이그레이션,
+      D8 그대로: V13은 표현만 옮겨서 안 올렸고 이번엔 진짜 바뀌어서 올림)
+- [x] 로봇이 게이트 2개를 거쳐 건물 간 이동하는 경로가 실제로 계산됨 — factory+fleet+
+      robot-sim 실기동 후 `POST /api/tasks`로 `QC-OUT → LOGI-1` 주문을 직접 생성해 확인:
+      `LocationRegistry`가 48노드/48엣지 로드, 배차→AMR-03 할당→로봇이 실제로 QC-OUT까지
+      이동 후 LOGI-1까지의 다음 스텝(1 waypoints — 전 구간이 일직선이라 꺾인점이 없어서
+      1개로 압축됨, 의도한 동작)을 받아 완료, 예외 없음
+- [x] 회귀 확인 — `oee-service`·`control-service` 전체 테스트 스위트 통과(`LaneGraphTest`
+      포함, P20-2 검증 케이스 무변경으로 계속 통과)
+
+> `DemoTaskGenerator.FLOWS`에 `QC-OUT → LOGI-1` 한 줄을 추가했다 — 이건 P20-1에서 이미
+> "새 건물 추가 시 흐름 몇 줄을 손으로 더하는 정도는 회귀가 아니다"로 정리한 항목이라,
+> 라우팅 코드 무변경 원칙과 별개다(데모 시나리오 데이터일 뿐, 라우팅 알고리즘이 아니다).
 
 ### P20-4. 동적 장애물
 - [ ] `fleet/layout/{buildingCode}/obstacle` 토픽/`FleetEventType` 2종/Redis 캐시

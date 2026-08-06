@@ -78,7 +78,10 @@ public class DemoTaskGenerator {
             new Flow("WH-3F-P2", "WH-SHIP"),
             // 층 안에서의 재배치 — 위층 로봇이 자기 층에서 하는 일
             new Flow("WH-2F-P1", "WH-2F-P2"),
-            new Flow("WH-3F-P1", "WH-3F-P2"));
+            new Flow("WH-3F-P1", "WH-3F-P2"),
+            // P20-3: 신관(Building-A/B) 편입 확인용 — 판정 후 물건이 신관 물류 적재장까지 간다.
+            // 게이트 2개(GATE-WH-A, GATE-A-B)를 거치는 경로가 실제로 계산되는지가 이 흐름의 목적.
+            new Flow("QC-OUT", "LOGI-1"));
 
     /**
      * 대기 작업이 이 수를 넘으면 새로 만들지 않는다.
