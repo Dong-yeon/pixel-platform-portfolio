@@ -74,6 +74,34 @@ fleet/{robotCode}/{kind}
 - 관제 서버는 배차 시 로봇 상태를 낙관적으로 `MOVING` 으로 표시해 같은 로봇이 중복
   배정되지 않게 하고, 이후 실제 상태는 로봇 텔레메트리로 갱신한다.
 
+## 레이아웃 이벤트 (P20-4)
+
+로봇 스코프가 아니라 **레이아웃(그래프 엣지) 스코프**라 토픽 모양이 다르다 — 세그먼트가
+4개다. 누가 보내는지는 계약에서 안 가린다(지금은 robot-sim의 `ObstacleSimulator`가 보내지만,
+컴포저블 원칙상 이 계약만 지키면 무엇이든 발행할 수 있다).
+
+### `fleet/layout/{buildingCode}/obstacle`
+```json
+{ "kind": "OBSTACLE_ADDED", "fromNode": "JCT-14-U", "toNode": "JCT-27-U",
+  "reason": "지게차 통행", "validUntil": "2026-08-06T10:15:00Z" }
+{ "kind": "OBSTACLE_CLEARED", "fromNode": "JCT-14-U", "toNode": "JCT-27-U", "reason": "정리 완료" }
+```
+- `kind` ∈ `OBSTACLE_ADDED` | `OBSTACLE_CLEARED`
+- `fromNode`/`toNode` — 막힌 엣지의 두 끝(순서 무관, 방향과 무관하게 정본 id로 정규화된다 —
+  `LaneGraph.canonicalEdgeId`). factory `layout_edges`에 실재하는 엣지가 아니어도 조용히
+  무시된다(그래프에 없는 엣지는 막을 게 없다).
+- `validUntil` — ISO-8601. 없거나 못 읽으면 기본 2분, 최대 10분으로 자른다.
+- `buildingCode`는 지금은 로깅용일 뿐 라우팅에 쓰이지 않는다(엣지는 노드 쌍만으로 전역 유일).
+
+→ `ObstacleService`가 `ObstacleStore`(Redis, TTL 기반)에 반영하고
+`LAYOUT_OBSTACLE_ADDED`/`LAYOUT_OBSTACLE_CLEARED` 이벤트를 남긴 뒤, 대기 중인 주문의 경로
+캐시를 비운다 — 다음 재시도에서 `LaneGraph`가 새로 계산해 막힌 엣지를 피한다(설계 근거:
+`docs/p20-layout-routing-design.md` D4·D5).
+
+> **factory DB엔 안 쓴다.** `layout_edges`는 정적 토폴로지(무엇과 무엇이 이어져 있는가)만
+> 갖는다 — "지금 막혀 있는가"는 로봇 위치처럼 자주 바뀌는 라이브 상태라 fleet의 Redis에만
+> 있다(DB per module).
+
 ## 설계 노트
 
 - **이벤트가 단일 진실 공급원.** 모든 uplink 는 `fleet_events`에 기록되고, 로봇/작업

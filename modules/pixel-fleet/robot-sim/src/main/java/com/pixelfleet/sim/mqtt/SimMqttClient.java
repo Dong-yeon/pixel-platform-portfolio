@@ -48,6 +48,10 @@ public class SimMqttClient implements MqttCallbackExtended {
             options.setCleanSession(true);
             options.setAutomaticReconnect(true);
             options.setConnectionTimeout(5);
+            // 기본값(10)은 하트비트 한 번에 로봇 8대 × 텔레메트리 3종 = 24건이 한꺼번에 나가는
+            // 이 시뮬레이터엔 낮다(P20-4 이후 obstacle 발행까지 겹치며 실측: "Too many publishes
+            // in progress"로 소리 없이 드롭됨 — 다음 하트비트가 자가 복구하지만 근본 원인을 둔다).
+            options.setMaxInflight(50);
             client.connect(options);
         } catch (MqttException e) {
             log.warn("Could not connect to MQTT broker {}. Start it (docker compose up mosquitto) "

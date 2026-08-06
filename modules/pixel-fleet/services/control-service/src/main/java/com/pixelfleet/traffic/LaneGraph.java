@@ -41,6 +41,13 @@ import org.springframework.stereotype.Component;
  * 웨이포인트는 로봇의 실좌표를 쓰고, 구간 ID만 가장 가까운 연결로 기준으로 스냅한다.
  * 예전 {@code LaneGraph.plan()}도 같은 방식이었다(웨이포인트는 {@code fx}, 구간은
  * {@code nearestConnector(fx)}) — 그 근사를 그대로 계승한다.
+ *
+ * <p><b>P20-4: 장애물이 있는 엣지는 아예 통과할 수 없는 것으로 취급한다.</b> {@link
+ * ObstacleStore}에 막혀 있다고 기록된 엣지는 다익스트라 완화(relaxation) 단계에서 건너뛴다 —
+ * 비용을 무한대로 두는 것과 같은 효과이면서 코드가 더 단순하다. 로봇의 <b>진입점 접근
+ * 구간</b>(가상 노드 → 가장 가까운 연결로)은 장애물 대상이 아니다 — 실제 DB 엣지가 아니라
+ * 매 호출 임시로 만드는 국소 연결이라, 장애물이 실재 엣지 목록으로만 들어오는 한(P20-4
+ * 계약) 자연히 걸리지 않는다. 설계 근거: {@code docs/p20-layout-routing-design.md} D4·D5.
  */
 @Component
 public class LaneGraph {
@@ -48,9 +55,16 @@ public class LaneGraph {
     private static final double EPS = 0.05;
 
     private final LocationRegistry locations;
+    private final ObstacleStore obstacles;
 
-    public LaneGraph(LocationRegistry locations) {
+    public LaneGraph(LocationRegistry locations, ObstacleStore obstacles) {
         this.locations = locations;
+        this.obstacles = obstacles;
+    }
+
+    /** 두 노드 사이 엣지의 정본 id — 방향과 무관하게 항상 같은 문자열(사전순). 장애물 조회 키다. */
+    public static String canonicalEdgeId(String a, String b) {
+        return a.compareTo(b) <= 0 ? a + "~" + b : b + "~" + a;
     }
 
     /** 서버가 계산한 주행 계획: 로봇에게 줄 웨이포인트와, 점유해야 할 구간들. */
@@ -195,6 +209,9 @@ public class LaneGraph {
             for (Edge edge : neighborsOf(current, extraAdjacency)) {
                 if (visited.contains(edge.to())) {
                     continue;
+                }
+                if (obstacles.isBlocked(canonicalEdgeId(current, edge.to()))) {
+                    continue; // 장애물 — 이 엣지는 존재하지 않는 것처럼 취급한다
                 }
                 double candidate = currentDist + edge.cost();
                 if (candidate < dist.getOrDefault(edge.to(), Double.MAX_VALUE)) {

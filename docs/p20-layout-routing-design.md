@@ -300,11 +300,38 @@ class GraphCostAwareAssignmentPolicy implements AssignmentPolicy {
 > "새 건물 추가 시 흐름 몇 줄을 손으로 더하는 정도는 회귀가 아니다"로 정리한 항목이라,
 > 라우팅 코드 무변경 원칙과 별개다(데모 시나리오 데이터일 뿐, 라우팅 알고리즘이 아니다).
 
-### P20-4. 동적 장애물
-- [ ] `fleet/layout/{buildingCode}/obstacle` 토픽/`FleetEventType` 2종/Redis 캐시
-- [ ] 시뮬레이터에서 장애물 발행 트리거(수동 API or 주기적 랜덤)
-- [ ] 진행 중 로봇이 막힌 엣지를 실제로 우회(D5 로직) — 교통정리 대기와 혼동되지 않음을 확인
-- [ ] `NodeMapLayoutConsistencyTest` 비교 대상 전환
+### P20-4. 동적 장애물 ✅ (2026-08-06)
+- [x] `fleet/layout/{buildingCode}/obstacle` 토픽(`MqttMessageHandler`, 세그먼트 4개로 로봇
+      스코프와 구분) / `FleetEventType.LAYOUT_OBSTACLE_ADDED`·`_CLEARED` / `ObstacleStore`
+      (Redis, TTL 기반 — CLEARED 유실돼도 자연 만료). 문서: `modules/pixel-fleet/docs/mqtt-topics.md`
+- [x] `ObstacleSimulator`(robot-sim) — 10초마다 확률적으로 하드코딩된 엣지 목록(`DemoTaskGenerator.
+      FLOWS`와 같은 원리로 손으로 든 실재 엣지 목록, P20-3 신관 엣지 포함) 중 하나를 20~40초
+      막았다 푼다. 수동 트리거 대신 주기적 랜덤을 택함(사용자 원 요청: "시뮬레이터가 동적으로
+      반영")
+- [x] `LaneGraph`의 다익스트라가 막힌 엣지를 완화 단계에서 건너뜀(비용 무한대와 동치, 코드는
+      더 단순). `OrderService.nextLegCache`는 애초에 "순수 캐시 — 잃어도 다시 계산" 전제로
+      만들어져 있어서(코드 주석 확인), 설계 문서가 제안한 `ReserveFailure`(OCCUPIED/BLOCKED)
+      enum 없이 **장애물 이벤트 시 캐시 전체를 비우는 것만으로 충분** — 다음 재시도에서
+      자연히 새로 계산되어 막힌 엣지를 피한다. 설계보다 단순하게 끝난 부분
+- [x] 실사용 검증(factory+fleet+robot-sim 실기동, `mosquitto_pub`으로 결정론적 장애물 주입):
+      WH-DOCK-1→WH-DOCK-3(같은 연결로, 중간 대역 통과 필요) 경로의 중간 대역 엣지를 막자
+      실제로 인접 연결로(9번)를 거치는 5-웨이포인트 우회 경로로 재계산됨을 확인(막히기 전엔
+      직선이라 1개였을 경로). 일반 교통 정체("Traffic: ... busy")와 장애물 차단("Layout: edge
+      ... blocked")이 로그에서 분명히 구분됨. 예외 없음
+- [x] 단위 테스트 3건 추가(`LaneGraphTest`) — 막힌 엣지 우회, 무관한 엣지는 영향 없음,
+      `canonicalEdgeId` 방향 무관성. `ObstacleStore`는 Mockito로 대체(Redis 불필요)
+- [x] 실사용 중 발견한 별도 결함 하나 고침 — robot-sim의 하트비트(로봇 8대 × 텔레메트리 3종
+      = 24건 동시 발행)가 `ObstacleSimulator`의 주기적 발행과 겹치며 Paho MQTT 클라이언트의
+      기본 `maxInflight`(10)를 넘겨 "Too many publishes in progress"로 조용히 드롭되는 걸
+      실측(자가 복구되므로 크래시는 없었지만 근본 원인을 남겨두지 않음) — `maxInflight`를
+      50으로 올려 해결
+- [x] `NodeMapLayoutConsistencyTest` 재검토 — **비교 대상을 옮길 필요가 없다고 판정.** 클래스
+      문서가 이미 "평면도를 **다시 그리는**(재정의) 마이그레이션에서만 경로를 옮긴다"고
+      명시하는데, V13(그래프 데이터 모델)·V14(신관 추가)는 둘 다 기존 V12 노드를 **삭제·재정의
+      하지 않고 순수 추가만** 했다 — robot-sim의 NodeMap이 원래도 몰랐던 JUNCTION/GATE/
+      새 건물 노드들이라 subset 검사가 실패할 이유가 없다. 실제로 P20-1/2/3/4 내내 무변경으로
+      계속 통과 확인. 장애물은 애초에 factory DB(`layout_edges`)를 건드리지 않으므로(D4)
+      이 항목과 아예 무관하기도 하다
 
 ### P20-5. 배차 비용 그래프화
 - [ ] `GraphCostAwareAssignmentPolicy` 구현, 설정으로 기존 정책과 전환 가능

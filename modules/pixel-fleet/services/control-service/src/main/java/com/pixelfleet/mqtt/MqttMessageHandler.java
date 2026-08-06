@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.pixelfleet.order.service.OrderService;
 import com.pixelfleet.robot.domain.RobotStatus;
 import com.pixelfleet.robot.service.RobotService;
+import com.pixelfleet.traffic.ObstacleService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -14,7 +15,10 @@ import org.springframework.stereotype.Service;
  * between the ROS 2 world (via the MQTT broker) and the control server; the topic
  * and payload contract lives in docs/mqtt-topics.md.
  *
- * Topic: fleet/{robotCode}/{kind}   kind ∈ {status, position, battery, task}
+ * <p>Topic: {@code fleet/{robotCode}/{kind}}   kind ∈ {status, position, battery, task}
+ *
+ * <p>P20-4에 하나 더 추가됐다 — {@code fleet/layout/{buildingCode}/obstacle} (로봇이 아니라
+ * 레이아웃 스코프라 세그먼트가 4개다). 로봇 스코프 토픽과는 세그먼트 수로 구분한다.
  */
 @Service
 public class MqttMessageHandler {
@@ -23,16 +27,26 @@ public class MqttMessageHandler {
 
     private final RobotService robotService;
     private final OrderService orderService;
+    private final ObstacleService obstacleService;
     private final ObjectMapper objectMapper;
 
-    public MqttMessageHandler(RobotService robotService, OrderService orderService, ObjectMapper objectMapper) {
+    public MqttMessageHandler(RobotService robotService, OrderService orderService,
+                              ObstacleService obstacleService, ObjectMapper objectMapper) {
         this.robotService = robotService;
         this.orderService = orderService;
+        this.obstacleService = obstacleService;
         this.objectMapper = objectMapper;
     }
 
     public void handle(String topic, String payload) throws Exception {
         String[] parts = topic.split("/");
+
+        if (parts.length == 4 && "fleet".equals(parts[0]) && "layout".equals(parts[1])
+                && "obstacle".equals(parts[3])) {
+            handleObstacle(objectMapper.readTree(payload));
+            return;
+        }
+
         if (parts.length != 3 || !"fleet".equals(parts[0])) {
             log.debug("Ignoring message on unexpected topic: {}", topic);
             return;
@@ -79,6 +93,28 @@ public class MqttMessageHandler {
     private void handleBattery(String robotCode, JsonNode json, String payload) {
         int percent = json.path("percent").asInt();
         robotService.updateBattery(robotCode, percent, payload);
+    }
+
+    /**
+     * 장애물 발생/해제 (P20-4). {@code buildingCode}는 지금은 로깅·향후 필터링용일 뿐 —
+     * 엣지는 노드 코드 쌍만으로 전역에서 유일하게 식별된다({@link
+     * com.pixelfleet.traffic.LaneGraph#canonicalEdgeId}).
+     */
+    private void handleObstacle(JsonNode json) {
+        String kind = json.path("kind").asText();
+        String fromNode = json.path("fromNode").asText(null);
+        String toNode = json.path("toNode").asText(null);
+        if (fromNode == null || toNode == null) {
+            log.warn("Ignoring obstacle message without fromNode/toNode: {}", json);
+            return;
+        }
+        String reason = json.path("reason").asText(null);
+        switch (kind) {
+            case "OBSTACLE_ADDED" -> obstacleService.block(fromNode, toNode, reason,
+                    json.path("validUntil").asText(null));
+            case "OBSTACLE_CLEARED" -> obstacleService.clear(fromNode, toNode, reason);
+            default -> log.debug("Ignoring unsupported obstacle kind '{}'", kind);
+        }
     }
 
     private void handleTask(JsonNode json) {

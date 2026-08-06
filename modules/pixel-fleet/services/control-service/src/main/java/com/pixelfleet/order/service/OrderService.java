@@ -18,6 +18,7 @@ import com.pixelfleet.robot.service.RobotService;
 import com.pixelfleet.task.dispatch.AssignmentPolicy;
 import com.pixelfleet.task.event.TaskLifecycleChanged;
 import com.pixelfleet.traffic.LaneGraph;
+import com.pixelfleet.traffic.LayoutObstacleChanged;
 import com.pixelfleet.traffic.TrafficController;
 import com.pixelplatform.core.common.exception.BusinessException;
 import com.pixelplatform.core.common.exception.ErrorCode;
@@ -29,6 +30,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronization;
@@ -425,6 +427,24 @@ public class OrderService {
                 .filter(o -> o.getCurrentStepIndex() >= 0 && o.getCurrentStepIndex() < o.getSteps().size())
                 .filter(o -> o.stepAt(o.getCurrentStepIndex()).getStatus() == StepStatus.EXECUTABLE)
                 .forEach(this::grantNextLeg);
+    }
+
+    /**
+     * 장애물이 생기거나 풀리면 캐시된 경로 계획을 전부 비운다 (P20-4).
+     *
+     * <p>{@code nextLegCache}는 "순수 캐시 — 잃어도 다시 계산하면 된다"는 전제로 만들어졌다
+     * (클래스 문서 참고). 그 전제 덕에 여기서 어떤 엣지가 막혔는지 가릴 필요가 없다 —
+     * 전부 비우면 다음 {@link #grantPendingNextLegs} 패스에서 대기 중인 주문마다
+     * {@link LaneGraph#plan}이 새로 계산되고, 그 계산이 자연히 막힌 엣지를 피한다. 장애물이
+     * 드물게(데모 기준 수십 초 간격) 바뀌므로 이 정도 비용은 무시할 만하다 — 어느 주문의
+     * 캐시가 실제로 영향받는지 추적하는 정교함은 지금 필요 없다.
+     */
+    @EventListener
+    public void onLayoutObstacleChanged(LayoutObstacleChanged event) {
+        if (!nextLegCache.isEmpty()) {
+            log.debug("Layout obstacle changed — clearing {} cached route plan(s).", nextLegCache.size());
+            nextLegCache.clear();
+        }
     }
 
     /** 실패 보고(로봇·워치독) — 예산이 남으면 전체 리셋 후 재큐, 소진이면 fault 동결. */
