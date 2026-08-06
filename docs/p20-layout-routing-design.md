@@ -250,11 +250,29 @@ class GraphCostAwareAssignmentPolicy implements AssignmentPolicy {
 > 실제 노드 행이 있어야 A*가 지나갈 자리가 생긴다. 상세 근거는 `V13__layout_edges.sql`
 > 파일 상단 주석 참고.
 
-### P20-2. 그래프 라우팅 교체 (기존 3개 건물 범위 안에서 회귀 없이)
-- [ ] `LocationRegistry`가 `edges`까지 캐시
-- [ ] `RouteGraph`(A*) 구현, `LaneGraph` 호출부(`OrderService`, `RobotService`) 무변경으로 교체
-- [ ] `TrafficController` 세그먼트 ID를 엣지 기준으로 전환
-- [ ] 기존 데모 시나리오(`DemoTaskGenerator.FLOWS` 21개 흐름) 회귀 없이 동작 확인
+### P20-2. 그래프 라우팅 교체 (기존 3개 건물 범위 안에서 회귀 없이) ✅ (2026-08-06)
+- [x] `LocationRegistry`가 `edges`까지 캐시 — 폴백(42 노드+42 엣지, factory 미기동 대비)도 함께 갖춤
+- [x] `LaneGraph`를 다익스트라 그래프 탐색으로 교체, 호출부(`OrderService`, `RobotService`) 무변경 —
+      `RouteGraph`로 새로 만들지 않고 클래스명은 그대로 유지(시그니처 동일: `plan`/`planByNode`/
+      `segmentAt`/`describe`)
+- [x] `TrafficController` 자료구조는 무변경 — 구간 ID를 기하학적으로 계산(연결로 x + 통로 기준
+      top/mid/bot, AU/AL:구간)해서 옛 문자열 형식과 완전히 같게 재현 (P20-1 엣지가 대역 하나씩과
+      정확히 대응하도록 만들어졌기 때문에 가능)
+- [x] 단위 테스트(`LaneGraphTest`, 6케이스) — 옛 `LaneGraph.plan()` 손계산값과 비용·웨이포인트·
+      구간 ID 일치 확인. 이 모듈 최초의 테스트(리서치 확인: 이전엔 하나도 없었다)
+- [x] 실사용 회귀 확인 — factory+fleet+robot-sim(로봇 8대) 실제 기동, `LocationRegistry`가
+      `GET /api/layout`에서 42노드/42엣지 소스 로드 확인, `DemoTaskGenerator`가 만든 실제 주문을
+      배차→경로계산→GOTO 전송까지 수행. 로그에 찍힌 구간 ID(`V:4:top`, `AU:14-27` 등)가 옛 형식과
+      동일, 교통정리 충돌("approach segments busy")도 정상 동작. 예외/에러 없음
+
+> **진입점(anchor) 설계 중 발견해 고친 문제 2건** (설계 문서엔 없던 구현 결정):
+> 1. 로봇의 실시간 좌표가 그래프 노드가 아닐 때, 가장 가까운 연결로의 <b>교차점에만</b> 잇게
+>    하면 같은 연결로의 다른 명명 노드(예: WH-DOCK-1↔WH-DOCK-2)로 가는 짧은 이동도 교차점을
+>    거치는 먼 길로 계산됐다 — 같은 연결로 위 <b>가장 가까운 이웃 노드</b>(교차점이든 명명
+>    노드든)에 잇도록 고쳤다.
+> 2. 구간 ID 계산에 로봇의 실좌표를 그대로 쓰면(스냅 전) 대각선이 돼 분류가 깨졌다 — 웨이포인트는
+>    실좌표를, 구간 ID는 스냅된 연결로 좌표를 쓰도록 둘을 분리했다(`PathStep.pos` vs
+>    `PathStep.segmentPos`).
 
 ### P20-3. Building-A/B 신설 (데이터만으로)
 - [ ] 신규 건물 좌표 구획 확정(기존 68×26과 겹치지 않게, 또는 캔버스 확장)
