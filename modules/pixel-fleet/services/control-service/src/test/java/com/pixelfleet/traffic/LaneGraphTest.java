@@ -31,6 +31,7 @@ class LaneGraphTest {
         // + addAisle(9,4->27)=5+5+13=23 + addVertical(27,9,6)=3 = 32.
         RoutePlan plan = laneGraph.plan(new double[]{4, 3}, new double[]{27, 6});
 
+        assertThat(plan.cost()).isEqualTo(32.0); // P20-5 — 배차 정책이 쓰는 그래프 비용
         assertThat(totalCost(plan.waypoints(), new double[]{4, 3})).isEqualTo(32.0);
         assertThat(plan.waypoints()).containsExactly(
                 new double[]{4, 9}, new double[]{27, 9}, new double[]{27, 6});
@@ -94,6 +95,7 @@ class LaneGraphTest {
 
         assertThat(plan.segments()).doesNotContain("AU:14-27");
         assertThat(plan.waypoints()).contains(new double[]{27, 6}); // 그래도 목적지엔 도달한다
+        assertThat(plan.cost()).isGreaterThan(32.0); // P20-5 배차 비교가 이 값을 쓴다
         assertThat(totalCost(plan.waypoints(), new double[]{4, 3})).isGreaterThan(32.0);
     }
 

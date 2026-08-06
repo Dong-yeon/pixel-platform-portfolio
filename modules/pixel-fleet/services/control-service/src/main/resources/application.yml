@@ -62,6 +62,9 @@ dispatch:
   # Set enabled=false to dispatch only via POST /api/tasks/dispatch.
   enabled: ${DISPATCH_ENABLED:true}
   interval-ms: ${DISPATCH_INTERVAL_MS:2000}
+  # P20-5 — nearest(직선거리, 기본) | graph-cost(장애물 반영한 실제 경로 비용).
+  # graph-cost로 바꾸면 GraphCostAwareAssignmentPolicy가 뜬다. 회귀 시 nearest로 즉시 롤백.
+  policy: ${DISPATCH_POLICY:nearest}
   watchdog:
     # 진행이 멈춘 작업을 걷어낸다. 없으면 로봇이 놓친 지시 하나가 레인 구간을 영원히
     # 점유해 함대 전체가 멈춘다(배포 중 실제로 발생).

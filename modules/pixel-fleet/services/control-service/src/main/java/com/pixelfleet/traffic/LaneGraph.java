@@ -67,8 +67,15 @@ public class LaneGraph {
         return a.compareTo(b) <= 0 ? a + "~" + b : b + "~" + a;
     }
 
-    /** 서버가 계산한 주행 계획: 로봇에게 줄 웨이포인트와, 점유해야 할 구간들. */
-    public record RoutePlan(List<double[]> waypoints, List<String> segments) {}
+    /**
+     * 서버가 계산한 주행 계획: 로봇에게 줄 웨이포인트와, 점유해야 할 구간들.
+     *
+     * @param cost 그래프 최단경로 비용(P20-5 — 배차 정책이 "직선 최근접" 대신 이걸로 후보를
+     *             고른다). 목적지에 이미 있으면 0, 그래프가 끊겨 있으면
+     *             {@link Double#POSITIVE_INFINITY}(직선 폴백은 여전히 웨이포인트로 준다 —
+     *             로봇을 세우는 것보다는 낫다는 판단, 다만 배차 비교에서는 항상 진다).
+     */
+    public record RoutePlan(List<double[]> waypoints, List<String> segments, double cost) {}
 
     public RoutePlan planByNode(double[] from, String toNode) {
         return plan(from, locations.resolve(toNode));
@@ -91,16 +98,18 @@ public class LaneGraph {
 
         if (source.code().equals(target.code())) {
             // 이미 그 자리 — 옛 구현도 이 경우 구간 없이 목적지 좌표 하나만 돌려줬다.
-            return new RoutePlan(List.of(to.clone()), List.of());
+            return new RoutePlan(List.of(to.clone()), List.of(), 0.0);
         }
 
-        List<PathStep> path = dijkstra(source, target);
-        if (path.isEmpty()) {
+        DijkstraResult result = dijkstra(source, target);
+        if (result.path().isEmpty()) {
             // 그래프가 끊겨 있으면(설정 오류) 직선 목적지라도 준다 — 로봇을 완전히 세우는 것보다 낫다.
-            return new RoutePlan(List.of(to.clone()), List.of());
+            // 비용은 무한대로 둔다 — 배차 비교에서 이 후보/경로가 절대 이기지 않게.
+            return new RoutePlan(List.of(to.clone()), List.of(), Double.POSITIVE_INFINITY);
         }
 
-        return new RoutePlan(buildWaypoints(from, to, source, path), buildSegments(path));
+        List<PathStep> path = result.path();
+        return new RoutePlan(buildWaypoints(from, to, source, path), buildSegments(path), result.cost());
     }
 
     /**
@@ -181,7 +190,10 @@ public class LaneGraph {
      */
     private record PathStep(String code, double[] pos, double[] segmentPos) {}
 
-    private List<PathStep> dijkstra(Anchor source, Anchor target) {
+    /** @param path 비어 있으면 도달 불가 — 그때 {@code cost}는 의미 없다({@code plan()}이 무한대로 대체). */
+    private record DijkstraResult(List<PathStep> path, double cost) {}
+
+    private DijkstraResult dijkstra(Anchor source, Anchor target) {
         Map<String, double[]> extraPositions = new HashMap<>();
         Map<String, double[]> extraSegmentPositions = new HashMap<>();
         Map<String, List<Edge>> extraAdjacency = new HashMap<>();
@@ -223,7 +235,7 @@ public class LaneGraph {
         }
 
         if (!dist.containsKey(target.code())) {
-            return List.of();
+            return new DijkstraResult(List.of(), Double.POSITIVE_INFINITY);
         }
 
         LinkedList<String> codes = new LinkedList<>();
@@ -239,7 +251,7 @@ public class LaneGraph {
             double[] segmentPos = extraSegmentPositions.containsKey(code) ? extraSegmentPositions.get(code) : pos;
             steps.add(new PathStep(code, pos, segmentPos));
         }
-        return steps;
+        return new DijkstraResult(steps, dist.get(target.code()));
     }
 
     /** 가상 노드를 이번 탐색에서만 그래프에 편입시킨다 — 이웃 쪽에도 돌아오는 엣지를 심는다. */

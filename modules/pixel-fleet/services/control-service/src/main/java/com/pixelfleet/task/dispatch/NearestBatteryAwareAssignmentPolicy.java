@@ -6,10 +6,16 @@ import com.pixelfleet.robot.dto.RobotResponse;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
 /**
- * Default matching rule:
+ * 직선거리 기준 배차 (기본값). P20-5에서 그래프 비용 기준
+ * {@link GraphCostAwareAssignmentPolicy}이 추가되며 {@code dispatch.policy}로
+ * 전환 가능한 두 구현 중 하나가 됐다 — 기본을 이쪽으로 둔 이유는 회귀 시 즉시 롤백 수단이
+ * 필요해서다(설계 근거: {@code docs/p20-layout-routing-design.md} D9).
+ *
+ * <p>Matching rule:
  * <ol>
  *   <li>다른 층 로봇은 후보에서 뺀다 — 로봇은 층을 오가지 못한다(엘리베이터는 화물용).
  *       거리로만 고르면 좌표가 겹치는 위층 로봇이 "가장 가깝다"고 뽑힌다.</li>
@@ -30,6 +36,7 @@ import org.springframework.stereotype.Component;
  * 만들면 애초에 어긋날 수가 없어진다(백로그).
  */
 @Component
+@ConditionalOnProperty(name = "dispatch.policy", havingValue = "nearest", matchIfMissing = true)
 public class NearestBatteryAwareAssignmentPolicy implements AssignmentPolicy {
 
     /** A robot needs at least this much charge to be handed a new task. */

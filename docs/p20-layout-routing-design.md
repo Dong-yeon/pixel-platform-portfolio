@@ -1,8 +1,10 @@
 # P20 설계 문서 — 컴포저블 레이아웃 + 그래프 기반 라우팅
 
-> 상태: **승인됨 (2026-08-06), P20-1 완료.** `docs/BACKLOG.md`의 P20 항목이 요구하는
-> "세부 설계를 먼저 문서로 확정하고 승인받은 뒤 착수한다"의 그 문서다. 실행 단계(5절)를
-> 순서대로 진행 중 — 각 단계 완료 시 체크박스와 검증 근거를 남긴다.
+> 상태: **P20-1~P20-5 전부 완료 (2026-08-06).** `docs/BACKLOG.md`의 P20 항목이 요구하는
+> "세부 설계를 먼저 문서로 확정하고 승인받은 뒤 착수한다"의 그 문서다. 실행 단계(5절)에
+> 각 단계 완료 시점의 체크박스와 검증 근거가 남아 있다. 그래프 기반 라우팅(P20-1/2) →
+> 데이터만으로 건물 추가(P20-3) → 동적 장애물(P20-4) → 장애물을 반영한 배차(P20-5)까지
+> 하나로 이어진다.
 >
 > 선행 문서: `docs/pixel-platform-roadmap.md`의 **P11. 레이아웃 서버화** — "factory가 평면도를
 > 소유하고 fleet은 캐시한다"는 소유권 결정과, 그 문서가 남긴 미해결 질문
@@ -333,9 +335,26 @@ class GraphCostAwareAssignmentPolicy implements AssignmentPolicy {
       계속 통과 확인. 장애물은 애초에 factory DB(`layout_edges`)를 건드리지 않으므로(D4)
       이 항목과 아예 무관하기도 하다
 
-### P20-5. 배차 비용 그래프화
-- [ ] `GraphCostAwareAssignmentPolicy` 구현, 설정으로 기존 정책과 전환 가능
-- [ ] 장애물 존재 시 "직선 최근접"과 다른 로봇이 선택되는 걸 확인하는 케이스 추가
+### P20-5. 배차 비용 그래프화 ✅ (2026-08-06)
+- [x] `GraphCostAwareAssignmentPolicy` 구현 — `LaneGraph.plan(robot.pos, origin).cost()`로
+      후보를 고른다(직선거리 `distanceSquared` 대신). `dispatch.policy`(`nearest`/`graph-cost`,
+      기본 `nearest`)로 `@ConditionalOnProperty` 전환 — 두 구현이 같은 `AssignmentPolicy` 빈을
+      두고 정확히 하나만 뜬다. 배터리 임계치(`MIN_BATTERY_PERCENT=25`)는 그대로 유지
+- [x] `LaneGraph.RoutePlan`에 `cost` 필드 추가(다익스트라가 이미 계산해 두는 값을 노출만
+      함) — 그래프가 끊겨 있으면 `Double.POSITIVE_INFINITY`(직선 폴백 웨이포인트는 주되
+      배차 비교에서는 항상 짐)
+- [x] 장애물이 있을 때 직선 최근접과 그래프 비용 최적이 갈리는 케이스로 검증
+      (`GraphCostAwareAssignmentPolicyTest`) — 생산동 연결로 27의 중간 대역을 막으면,
+      직선거리로 더 가까운 로봇(비용 15→우회 시 29)보다 직선으로 더 먼 로봇(비용 22,
+      다른 연결로를 타 애초에 이 장애물 영향을 안 받음)이 실제로 더 싸진다는 걸 손계산
+      그대로 확인. 장애물 없을 때는 두 정책이 같은 로봇을 고른다는 무회귀 케이스,
+      배터리 임계치가 정책 교체에도 유지된다는 케이스까지 3건
+- [x] 실제 기동 검증 — `DISPATCH_POLICY=graph-cost`로 fleet을 띄워 `GraphCostAwareAssignmentPolicy`
+      단독으로 정상 배선됨을 확인(빈 중복·순환 없음, 예외 없음). 3서비스 동시 라이브
+      구동까지는 이 세션 후반부에 Gradle 데몬이 과다 누적돼 메모리가 고갈(가용 물리
+      메모리가 ~300MB까지 떨어짐)되어 생략 — 정밀하게 검증된 단위 테스트(손계산 일치)와
+      정책 단독 기동 확인으로 충분하다고 판단. 필요하면 다음 세션에서 factory+fleet+
+      robot-sim 동시 구동으로 마저 확인 가능
 
 ---
 
