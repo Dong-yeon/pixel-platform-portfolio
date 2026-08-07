@@ -60,7 +60,7 @@ public class SecurityConfig {
                         .requestMatchers("/swagger-ui.html", "/swagger-ui/**", "/v3/api-docs/**").permitAll()
                         // WebSocket(STOMP/SockJS) 핸드셰이크. SockJS는 핸드셰이크에 Authorization
                         // 헤더를 실을 수 없어 통과시킨다 — 게이트웨이도 /ws/**는 인증 없이 넘긴다.
-                        // TODO: STOMP CONNECT 프레임에서 토큰을 검증할 것(백로그).
+                        // 실제 인증은 StompAuthChannelInterceptor가 CONNECT 프레임에서 한다(P16).
                         .requestMatchers("/ws/**").permitAll()
                         .anyRequest().authenticated()
                 )

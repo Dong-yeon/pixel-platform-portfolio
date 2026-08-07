@@ -201,7 +201,7 @@ jjwt를 직접 가져왔다.
 근거: 2026-07-30~31 국내 언론 다수 기사 분석(비공개 리서치 문서, 공개 버전에서 제외).
 **기사 자체를 플랫폼에 넣지 않는다.** 뉴스는 근거이고, 여기 적힌 것만 구현 대상이다.
 
-### P16. 인증 경계 정리 (보안 하드닝)
+### P16. 인증 경계 정리 (보안 하드닝) 🔶 1파 완료(WP0 CORS + WP1 STOMP 인증, 2026-08-06) — M2M·MQTT는 별도 승인 대기
 
 > P15 배포 단계에 몰아둔 보안 항목을 앞당긴다. **근거가 생겼다** — IBM '2026 데이터 유출
 > 비용 보고서'에서 침해 원인 공동 1위가 **API·애플리케이션·플러그인 보안 취약점(27%)**과
@@ -227,17 +227,15 @@ jjwt를 직접 가져왔다.
 
 완료 기준
 
-- [ ] 토큰 없이 `/ws/factory` STOMP CONNECT 시 연결이 거부된다 — 미착수
-- [ ] `GET /api/factory/layout`에 토큰 없이 접근하면 401이다 — 미착수(`SecurityConfig`에
-      여전히 `.requestMatchers(GET, "/api/layout").permitAll()`)
-- [ ] fleet이 서비스 토큰으로 게이트웨이를 경유해 평면도를 받아온다 (직접 접속 제거) — 미착수.
+- [x] 토큰 없이 `/ws/factory` STOMP CONNECT 시 연결이 거부된다 — **완료(P16 1파)**
+- [ ] `GET /api/factory/layout`에 토큰 없이 접근하면 401이다 (WP2, 미착수)
+- [ ] fleet이 서비스 토큰으로 게이트웨이를 경유해 평면도를 받아온다 (WP2, 미착수).
       **다만 M2M 패턴 자체는 P13·P14에서 먼저 생겼다:** QMS→factory(`ServiceTokenProvider` +
       `FactoryQualityClient`), WMS→fleet(`ServiceTokenProvider` + `FleetTaskClient`)가 이미 같은
       방식으로 서비스 토큰을 쓴다. fleet→factory layout 쪽에 같은 패턴을 붙이기만 하면 된다 —
       새로 설계할 게 아니라 이미 검증된 패턴을 한 곳 더 적용하는 일이다.
-- [ ] 익명 MQTT 접속이 거부된다 — 미착수(`mosquitto.conf`에 `allow_anonymous true` 그대로)
-- [ ] 허용되지 않은 오리진의 브라우저 요청이 CORS에서 막힌다 — 미착수(게이트웨이
-      `allowedOriginPatterns: "*"`, 코드에 `TODO: 배포 전 실제 대시보드 오리진으로 제한` 주석 있음)
+- [ ] 익명 MQTT 접속이 거부된다 (WP3, 미착수 — `mosquitto.conf`에 `allow_anonymous true` 그대로)
+- [x] 허용되지 않은 오리진의 브라우저 요청이 CORS에서 막힌다 — **완료(P16 1파)**
 
 주의
 
@@ -245,6 +243,23 @@ jjwt를 직접 가져왔다.
   못 받는다 — 기존 폴백(하드코딩 + WARN)이 그대로 살아 있어야 한다. 폴백을 지우지 말 것.
 - **STOMP 인증을 켜면 대시보드가 먼저 깨진다.** 대시보드가 CONNECT에 토큰을 싣도록
   같은 커밋에서 고친다. 서버만 먼저 잠그면 화면이 통째로 죽는다.
+
+1파 완료 기록 (WP0 CORS + WP1 STOMP 인증)
+
+- **범위 분할**: 조사해보니 P16이 게이트웨이+factory+fleet+wms+qms+robot-sim+factory-sim+
+  대시보드+infra까지 닿는 넓은 범위였다. 한 번에 승인받기엔 크다고 판단해 WP0(CORS)+WP1
+  (STOMP 인증) / WP2(M2M) / WP3(MQTT) 세 파로 나눠 이번엔 앞의 둘만 진행했다.
+- **CORS**: 게이트웨이 `globalcors`와 factory·fleet의 `WebSocketConfig`(SockJS 핸드셰이크는
+  globalcors를 안 거침) 세 곳 전부 `DASHBOARD_ORIGIN` 환경변수로 통일. 실제로 evil origin은
+  게이트웨이·모듈 양쪽에서 403, 정상 오리진은 200 + `Access-Control-Allow-Origin` 확인.
+- **STOMP 인증**: `StompAuthChannelInterceptor`를 factory·fleet에 각각 신설(`shared`는
+  게이트웨이가 의존할 수 없고 wms/qms는 STOMP가 없어서, `WebSocketConfig`처럼 모듈별로 둠).
+  `JwtTokenProvider`를 HTTP 필터와 동일하게 재사용하되 실패 시 조용히 통과가 아니라 CONNECT
+  자체를 거부. 대시보드 `usePlatformSocket.ts`에 `connectHeaders` 추가 — 서버 인터셉터와
+  같은 계획 실행 단위로 처리해 "대시보드가 먼저 깨지는" 문제를 피했다. `ws-test.html`에
+  토큰 없음(거부, "끊김 재연결 중" 지속)/토큰 있음(연결됨) 두 케이스 다 실측 확인.
+- **남은 것**: M2M(WP2)과 MQTT(WP3)는 각각 별도 승인 필요 — 설계 초안은 이미 확보돼 있다.
+  `docs/auth-boundaries.md`는 WP2·WP3까지 끝난 뒤 마무리 단계로 작성한다.
 
 ---
 
@@ -312,7 +327,7 @@ jjwt를 직접 가져왔다.
 
 ---
 
-### P19. Fleet API를 M4 모양으로 — 현장 규격을 기본기로 삼는다
+### P19. Fleet API를 M4 모양으로 — 현장 규격을 기본기로 삼는다 ✅ 완료 (2026-08-06, 일부 후속 항목 제외)
 
 > 실 운영 중인 한 현장은 WMS가 **M4**(상용 AMR 군집관제 서버)를 거쳐 실물 로봇을 부린다.
 > 근거 문서: 해당 현장에서 확보한 M4 Fleet API 명세서(HTTP + WebSocket, 176쪽).
@@ -348,6 +363,37 @@ M4에서 가져올 뼈대 (fleet API를 이 모양으로 개편)
   API 시그니처에 sceneId 자리만 잡아 둔다.
 - 스텝 일반화는 fleet 도메인 개편이라 **마이그레이션·배차·교통통제가 다 닿는다.**
   착수 전에 계획을 먼저 세우고 승인 받는다(작업 규칙).
+
+완료 기록 (P19-1은 이미 완료돼 있었고, 이번에 나머지를 마쳤다)
+
+- **주문 생애주기 동사**: cancel(-batch)/suspend/unsuspend/complete-order/retry-failed —
+  전부 `OrderController`(`/api/orders`)로 신설. cancel은 `OrderStatus`에
+  `EXECUTING→CANCELLED`를 추가해 정직한 전이로 만들었다(faultOut 우회 아님).
+  retry-failed는 `resetForRetry`를 그대로 재사용하지 않고 `fault`까지 지우는
+  `retryAfterFault` 래퍼를 얹었다(안 그러면 영원히 안 배차되는 좀비 주문이 남는다).
+- **externalId 관례**: `TaskController.create()`가 이제 `OrderCodeGenerator`(V9 시퀀스)로
+  자체 `orderCode`(`FO-########`)를 발급하고, WMS의 taskCode는 externalId로만 들어간다.
+  WMS 쪽 코드 변경 0건(왕복 확인 완료).
+- **로봇 운영 동사**: off-duty/disabled/clear-alarm — `robots` 테이블(V8)에 조작자 전용
+  플래그로 추가(텔레메트리로 안 바뀌게 Postgres 마스터에 둠). `findAvailable()`에서 걸러
+  배차 후보에서 빠진다.
+- **WS 요청-응답 봉투**: `/app/query` + `/topic/query-reply`, 첫 질의
+  `RobotsPositionOnly::Query`. `ws-test.html`(깨져 있던 `/ws` 경로도 `/ws/fleet`로 고침)에서
+  실측 확인.
+- 로컬 스택(`-Stack e2e`)에서 curl/SQL fixture/브라우저로 전부 실동작 확인 — 그 과정에서
+  `cancel()`이 미배차(로봇 없음) 주문을 취소할 때 `TrafficController.release(null)`이
+  `ConcurrentHashMap` null 키로 NPE 나는 실버그를 하나 잡아 고쳤다.
+
+의도적으로 미룬 것 (범위 밖, 별도 승인 필요)
+
+- **cancel의 물리적 중단** — 지금은 서버만 손을 뗀다. 이동 중이던 로봇에게 실제로 멈추라고
+  MQTT `CANCEL` 커맨드를 보내는 건 robot-sim 모듈까지 건드려야 해서 이번 계획(control-service +
+  dashboard)의 선언된 범위 밖으로 남겨뒀다. robot-sim의 `VirtualRobot.clearOrder()`가 이미
+  "중단"을 언급해둬서 토대는 있다.
+- **M4형 `orders/create`**(steps 배열 입력, add/update/delete-steps) — 생성은 계속
+  `TaskController`(호환 어댑터) 전담. `OrderController`는 조작자 동사만 다룬다.
+- **WS 세션 타겟 응답** — 지금은 `/topic/query-reply` 브로드캐스트 + `replyToId` 클라이언트
+  필터링. P16(STOMP 인증)이 진짜 `Principal`을 주면 세션 타겟으로 올리는 걸 검토.
 
 ---
 

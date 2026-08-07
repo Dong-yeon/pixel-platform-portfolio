@@ -71,10 +71,13 @@ spring:
             - Path=/ws/factory/**
 
       # 대시보드(9200)는 다른 오리진이므로 게이트웨이에서 CORS를 한 곳에 모아 처리한다.
+      # DASHBOARD_ORIGIN은 factory·fleet의 WebSocketConfig(/ws/factory, /ws/fleet)도 같은
+      # 이름으로 읽는다 — SockJS/STOMP 핸드셰이크는 이 globalcors를 안 거치고 모듈이 직접
+      # 처리하므로, 세 군데를 같은 값으로 맞춰야 오리진 제한이 실제로 전부 걸린다(P16).
       globalcors:
         cors-configurations:
           '[/**]':
-            allowedOriginPatterns: "*"   # TODO: 배포 전 실제 대시보드 오리진으로 제한
+            allowedOriginPatterns: "${DASHBOARD_ORIGIN:http://localhost:9200}"
             allowedMethods: "*"
             allowedHeaders: "*"
             allowCredentials: true

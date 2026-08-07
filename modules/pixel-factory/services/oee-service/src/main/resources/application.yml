@@ -61,6 +61,12 @@ factory:
       days: ${FACTORY_EVENT_RETENTION_DAYS:90}
       cron: ${FACTORY_EVENT_RETENTION_CRON:0 0 3 * * *}
 
+dashboard:
+  # /ws/factory STOMP 핸드셰이크가 허용할 오리진. 게이트웨이의 globalcors(P16)와
+  # 같은 이름·같은 기본값을 쓴다 — SockJS 핸드셰이크는 globalcors를 안 거치고 모듈이
+  # 직접 처리하므로 값이 어긋나면 게이트웨이는 통과시켜도 여기서 막힌다.
+  origin: ${DASHBOARD_ORIGIN:http://localhost:9200}
+
 ---
 spring:
   config:

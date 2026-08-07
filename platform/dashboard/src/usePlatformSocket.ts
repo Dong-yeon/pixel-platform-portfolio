@@ -1,6 +1,7 @@
 import { Client } from '@stomp/stompjs'
 import { useEffect, useRef, useState } from 'react'
 import SockJS from 'sockjs-client'
+import { getToken } from './api'
 
 /** 구독할 토픽 → 메시지 본문(JSON 파싱된 것)을 받는 핸들러. */
 export type Subscriptions = Record<string, (body: unknown) => void>
@@ -26,6 +27,11 @@ export function usePlatformSocket(endpoint: string, subscriptions: Subscriptions
     const client = new Client({
       webSocketFactory: () => new SockJS(endpoint),
       reconnectDelay: 3000,
+      // CONNECT 프레임에 토큰을 싣는다(P16) — 서버(StompAuthChannelInterceptor)가 이 헤더
+      // 없이는 연결 자체를 거부한다. 리프레시 토큰이 아직 없어(로그인 시 한 번 발급) 여기서도
+      // 컴포넌트 마운트 시점에 한 번만 읽는다 — 리프레시 흐름이 생기면 재연결마다 최신 토큰을
+      // 읽도록 beforeConnect 훅으로 옮겨야 한다.
+      connectHeaders: { Authorization: getToken() ? `Bearer ${getToken()}` : '' },
       onConnect: () => {
         setConnected(true)
         for (const topic of Object.keys(handlers.current)) {

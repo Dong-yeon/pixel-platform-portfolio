@@ -52,7 +52,8 @@ public class SecurityConfig {
                         .requestMatchers("/actuator/**").permitAll()
                         .requestMatchers("/swagger-ui.html", "/swagger-ui/**", "/v3/api-docs/**").permitAll()
                         // WebSocket (STOMP/SockJS) handshake + the dev push test page.
-                        // TODO: authenticate the STOMP CONNECT frame before non-local use.
+                        // permitAll은 SockJS 핸드셰이크(헤더를 못 실음)까지만이고, 실제 인증은
+                        // StompAuthChannelInterceptor가 CONNECT 프레임에서 한다(P16).
                         .requestMatchers("/ws/**", "/ws-test.html").permitAll()
                         .anyRequest().authenticated()
                 )

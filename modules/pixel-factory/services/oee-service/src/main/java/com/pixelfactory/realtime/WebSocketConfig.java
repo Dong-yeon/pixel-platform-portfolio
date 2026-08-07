@@ -1,6 +1,8 @@
 package com.pixelfactory.realtime;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.messaging.simp.config.ChannelRegistration;
 import org.springframework.messaging.simp.config.MessageBrokerRegistry;
 import org.springframework.web.socket.config.annotation.EnableWebSocketMessageBroker;
 import org.springframework.web.socket.config.annotation.StompEndpointRegistry;
@@ -25,6 +27,17 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
     public static final String TOPIC_EVENTS = "/topic/factory/events";
     public static final String TOPIC_OEE = "/topic/factory/oee";
 
+    private final String dashboardOrigin;
+    private final StompAuthChannelInterceptor stompAuthChannelInterceptor;
+
+    public WebSocketConfig(
+            @Value("${dashboard.origin}") String dashboardOrigin,
+            StompAuthChannelInterceptor stompAuthChannelInterceptor
+    ) {
+        this.dashboardOrigin = dashboardOrigin;
+        this.stompAuthChannelInterceptor = stompAuthChannelInterceptor;
+    }
+
     @Override
     public void configureMessageBroker(MessageBrokerRegistry registry) {
         registry.enableSimpleBroker("/topic");
@@ -33,8 +46,14 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
 
     @Override
     public void registerStompEndpoints(StompEndpointRegistry registry) {
-        // Dev: 대시보드가 별도 오리진(9200)에서 서비스되므로 모든 오리진을 허용한다.
-        // TODO: 배포 전 오리진 제한 + STOMP CONNECT 프레임 인증(게이트웨이가 /ws는 통과시킨다).
-        registry.addEndpoint("/ws/factory").setAllowedOriginPatterns("*").withSockJS();
+        // 오리진은 dashboard.origin(P16) — 게이트웨이 globalcors와 같은 값을 공유한다.
+        registry.addEndpoint("/ws/factory").setAllowedOriginPatterns(dashboardOrigin).withSockJS();
+    }
+
+    @Override
+    public void configureClientInboundChannel(ChannelRegistration registration) {
+        // CONNECT 프레임의 Authorization 헤더를 검증한다(P16) — /ws/**는 HTTP 필터 체인에서는
+        // 계속 permitAll이다(SockJS 핸드셰이크 자체는 헤더를 못 실음). 실제 게이트는 여기다.
+        registration.interceptors(stompAuthChannelInterceptor);
     }
 }
