@@ -31,6 +31,7 @@ export function TaskPanel({
   const [priority, setPriority] = useState<TaskPriority>('NORMAL')
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
+  const [actionBusy, setActionBusy] = useState<string | null>(null)
 
   const robotCodeById = new Map(robots.map((r) => [r.id, r.robotCode]))
 
@@ -46,6 +47,19 @@ export function TaskPanel({
       setError(err instanceof Error ? err.message : '작업 생성 실패')
     } finally {
       setBusy(false)
+    }
+  }
+
+  async function runAction(orderCode: string, action: () => Promise<unknown>) {
+    setActionBusy(orderCode)
+    setError(null)
+    try {
+      await action()
+      onChanged()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : '조작 실패')
+    } finally {
+      setActionBusy(null)
     }
   }
 
@@ -85,10 +99,41 @@ export function TaskPanel({
             </span>
             <span className={`badge prio-${t.priority}`}>{t.priority}</span>
             <span className={`badge task-${t.status}`}>{t.status}</span>
+            {t.suspended && <span className="badge muted">정지</span>}
             <span className="muted small">
               {t.assignedRobotId ? robotCodeById.get(t.assignedRobotId) ?? `#${t.assignedRobotId}` : '—'}
               {t.retryCount > 0 ? ` · 재시도 ${t.retryCount}` : ''}
             </span>
+            {t.status !== 'COMPLETED' && t.status !== 'CANCELLED' && (
+              <span className="task-actions">
+                <button
+                  className="ghost small"
+                  disabled={actionBusy === t.orderCode}
+                  onClick={() =>
+                    runAction(t.orderCode, () =>
+                      t.suspended ? api.fleet.unsuspendOrder(t.orderCode) : api.fleet.suspendOrder(t.orderCode))
+                  }
+                >
+                  {t.suspended ? '재개' : '정지'}
+                </button>
+                <button
+                  className="ghost small"
+                  disabled={actionBusy === t.orderCode}
+                  onClick={() => runAction(t.orderCode, () => api.fleet.cancelOrder(t.orderCode))}
+                >
+                  취소
+                </button>
+                {t.status === 'FAILED' && (
+                  <button
+                    className="ghost small"
+                    disabled={actionBusy === t.orderCode}
+                    onClick={() => runAction(t.orderCode, () => api.fleet.retryFailedOrder(t.orderCode))}
+                  >
+                    재시도
+                  </button>
+                )}
+              </span>
+            )}
           </div>
         ))}
       </div>

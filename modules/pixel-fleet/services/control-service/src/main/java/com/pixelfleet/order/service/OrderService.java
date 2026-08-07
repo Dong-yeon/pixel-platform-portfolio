@@ -121,6 +121,11 @@ public class OrderService {
                 .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND, "존재하지 않는 주문입니다. id=" + id));
     }
 
+    @Transactional(readOnly = true)
+    public FleetOrder getByCode(String orderCode) {
+        return requireByCode(orderCode);
+    }
+
     /**
      * 주문 생성.
      *
@@ -350,7 +355,11 @@ public class OrderService {
 
         int next = stepIndex + 1;
         order.advanceToStep(next);
-        grantNextLeg(order);
+        // suspend 중이면 다음 레그를 지금 내주지 않는다 — currentStepIndex만 진행되고
+        // 새 스텝은 EXECUTABLE로 대기, grantPendingNextLegs()가 unsuspend 후 집어간다.
+        if (!order.isSuspended()) {
+            grantNextLeg(order);
+        }
     }
 
     /** 마지막 스텝까지 끝났다 — 봉인이면 닫고, 미봉인이면 로봇을 쥔 채 기다린다. */
@@ -364,12 +373,22 @@ public class OrderService {
             return;
         }
 
+        closeOrder(order, SourceType.ROBOT, order.getAssignedRobotId());
+    }
+
+    /**
+     * 주문을 닫는 공통 부수효과 — complete() + ORDER_DONE 하행 + TASK_COMPLETED 기록 +
+     * 층간 체인 이어달리기 + TaskLifecycleChanged.completed 발행. 로봇발 자동완료
+     * ({@link #finishSteps})와 조작자 수동 {@link #completeOrder}가 공유한다 — 이벤트
+     * source(로봇 vs 조작자)만 다르다.
+     */
+    private void closeOrder(FleetOrder order, SourceType source, Long sourceId) {
         order.complete();
         robotCodeOf(order).ifPresent(code ->
                 publishAfterCommit(() -> robotCommandPublisher.sendOrderDone(code, order.getOrderCode())));
         fleetEventService.record(
                 FleetEventType.TASK_COMPLETED,
-                SourceType.ROBOT, order.getAssignedRobotId(),
+                source, sourceId,
                 TargetType.TASK, order.getId(),
                 order.getId(), EventSeverity.INFO,
                 "Order " + order.getOrderCode() + " completed", null);
@@ -479,6 +498,113 @@ public class OrderService {
         order.faultOut(reason);
         // 최종 실패만 밖에 알린다 — 재시도할 주문을 실패로 알리면 받은 쪽이 전표를 성급히 정리한다.
         eventPublisher.publishEvent(TaskLifecycleChanged.failed(notificationCode(order), reason));
+    }
+
+    // ---- 조작자 동사 (P19 나머지 작업) ----
+
+    /**
+     * 다음 레그를 막는다. <b>이미 시작된 레그는 그대로 끝까지 간다</b> — 취소 불가능한
+     * 물리적 화물 상태를 서버가 되돌릴 수 없으므로. MQTT 커맨드는 필요 없다: 로봇은
+     * 이미 받은 레그를 마칠 뿐이고, 다음 레그를 안 주는 것으로 충분하다.
+     */
+    @Transactional
+    public FleetOrder suspend(String orderCode, String reason) {
+        FleetOrder order = requireByCode(orderCode);
+        if (order.getStatus().isTerminal()) {
+            throw new BusinessException(ErrorCode.INVALID_REQUEST,
+                    "이미 종료된 주문은 suspend할 수 없습니다. status=" + order.getStatus());
+        }
+        order.suspend();
+        fleetEventService.record(
+                FleetEventType.TASK_SUSPENDED,
+                SourceType.OPERATOR, null,
+                TargetType.TASK, order.getId(),
+                order.getId(), EventSeverity.WARNING,
+                "Order " + orderCode + " suspended" + (reason != null ? ": " + reason : ""), null);
+        return order;
+    }
+
+    /** suspend를 푼다 — 막혀 있던 다음 레그는 grantPendingNextLegs()의 다음 패스가 내준다. */
+    @Transactional
+    public FleetOrder unsuspend(String orderCode) {
+        FleetOrder order = requireByCode(orderCode);
+        order.unsuspend();
+        fleetEventService.record(
+                FleetEventType.TASK_UNSUSPENDED,
+                SourceType.OPERATOR, null,
+                TargetType.TASK, order.getId(),
+                order.getId(), EventSeverity.INFO,
+                "Order " + orderCode + " unsuspended", null);
+        return order;
+    }
+
+    /**
+     * 조작자 취소.
+     *
+     * <p><b>기본 범위: 서버 쪽에서만 손을 뗀다.</b> 이동 중이던 로봇은 남은 웨이포인트를
+     * 계속 달린다 — robot-sim에 CANCEL 커맨드를 추가하는 물리적 중단은 이 변경의 선언된
+     * 모듈(control-service) 밖이라 범위에 넣지 않았다. 도착 후 보내는 step-done은
+     * markStepDone의 기존 상태 가드(주문이 이미 CANCELLED)가 조용히 무시한다 — 알려진
+     * 한계: 그 로봇은 데모 화면에서 재기동 전까지 MOVING으로 붙박이가 될 수 있다.
+     */
+    @Transactional
+    public FleetOrder cancel(String orderCode, String reason) {
+        FleetOrder order = requireByCode(orderCode);
+        if (order.getStatus().isTerminal()) {
+            throw new BusinessException(ErrorCode.INVALID_REQUEST,
+                    "이미 종료된 주문은 cancel할 수 없습니다. status=" + order.getStatus());
+        }
+        Long robotId = order.getAssignedRobotId();
+        nextLegCache.remove(orderCode);
+        // markFailed와 달리 cancel은 TO_BE_ALLOCATED(로봇 미배정)에서도 불릴 수 있다 —
+        // release()의 remainingRoute(ConcurrentHashMap)는 null 키를 거부하므로 반드시 가드한다.
+        if (robotId != null) {
+            trafficController.release(robotId);
+        }
+
+        order.cancel();
+        fleetEventService.record(
+                FleetEventType.TASK_CANCELLED,
+                SourceType.OPERATOR, null,
+                TargetType.TASK, order.getId(),
+                order.getId(), EventSeverity.WARNING,
+                "Order " + orderCode + " cancelled" + (reason != null ? ": " + reason : ""), null);
+        eventPublisher.publishEvent(TaskLifecycleChanged.cancelled(notificationCode(order), reason));
+        return order;
+    }
+
+    /**
+     * 미봉인 주문을 조작자가 수동으로 닫는다. PENDING(스텝 소진, add-steps 대기)에서만
+     * 유효 — 봉인 후 {@link #closeOrder}의 완료 부수효과를 로봇발 자동완료와 그대로 공유한다.
+     */
+    @Transactional
+    public FleetOrder completeOrder(String orderCode) {
+        FleetOrder order = requireByCode(orderCode);
+        if (order.getStatus() != OrderStatus.PENDING) {
+            throw new BusinessException(ErrorCode.INVALID_REQUEST,
+                    "PENDING(미봉인 대기) 주문만 수동으로 완료할 수 있습니다. status=" + order.getStatus());
+        }
+        order.seal();
+        closeOrder(order, SourceType.OPERATOR, null);
+        return order;
+    }
+
+    /**
+     * fault로 얼어붙은 주문을 조작자가 되살린다. failureNum은 계속 누적(초기화 안 함) —
+     * 되살린 직후 또 실패하면 자동 재시도 루프로 안 돌고 바로 faultOut으로 가서
+     * 재시도 폭주를 막는다(의도된 동작).
+     */
+    @Transactional
+    public FleetOrder retryFailed(String orderCode, String note) {
+        FleetOrder order = requireByCode(orderCode);
+        order.retryAfterFault(note);
+        fleetEventService.record(
+                FleetEventType.TASK_RETRIED,
+                SourceType.OPERATOR, null,
+                TargetType.TASK, order.getId(),
+                order.getId(), EventSeverity.INFO,
+                "Order " + orderCode + " manually retried" + (note != null ? ": " + note : ""), null);
+        return order;
     }
 
     /** 밖에 알릴 때 쓰는 코드 — 상류가 낸 externalId가 있으면 그것, 없으면 주문 코드. */

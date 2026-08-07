@@ -10,7 +10,7 @@ import java.util.Set;
  *         ▲                │             ├─────▶ PENDING          (미봉인: 스텝 소진 대기)
  *         │   (자동 재시도) │             │          │ add-steps → EXECUTING
  *         └────────────────┴─────────────┘          │ complete-order → DONE
- *   TO_BE_ALLOCATED / ALLOCATED / PENDING ─▶ CANCELLED
+ *   TO_BE_ALLOCATED / ALLOCATED / EXECUTING / PENDING ─▶ CANCELLED (조작자 cancel, P19)
  * </pre>
  *
  * <p><b>FAILED 상태가 없다.</b> M4처럼 실패는 상태가 아니라 {@code fault} 플래그다 —
@@ -34,7 +34,10 @@ public enum OrderStatus {
         return switch (this) {
             case TO_BE_ALLOCATED -> Set.of(ALLOCATED, CANCELLED).contains(next);
             case ALLOCATED -> Set.of(EXECUTING, TO_BE_ALLOCATED, CANCELLED).contains(next);
-            case EXECUTING -> Set.of(DONE, PENDING, TO_BE_ALLOCATED).contains(next);
+            // CANCELLED 추가(P19 나머지 작업): 취소는 실패가 아니라 정직한 전이다 —
+            // faultOut/재시도 경로로 우회하면 failureNum이 거짓으로 오르고 TASK_FAILED가
+            // 잘못 찍힌다.
+            case EXECUTING -> Set.of(DONE, PENDING, TO_BE_ALLOCATED, CANCELLED).contains(next);
             case PENDING -> Set.of(EXECUTING, DONE, CANCELLED).contains(next);
             case DONE, CANCELLED -> false;
         };

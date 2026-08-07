@@ -23,6 +23,7 @@ import java.util.Map;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Applies robot telemetry. Live state (status/battery/position) is written to Redis via
@@ -30,8 +31,10 @@ import org.springframework.stereotype.Service;
  * changes (status, battery-low) are still recorded as durable fleet events, and every
  * update is fanned out to dashboards via {@link RealtimePublisher}.
  *
- * <p>Master data (id/code/name) is immutable seed data, so it is cached in memory to keep
- * the high-frequency telemetry path off the database entirely.
+ * <p>Master data (id/code/name/floorNo) is effectively-immutable seed data, so it is cached
+ * in memory to keep the high-frequency telemetry path off the database entirely. The one
+ * exception is the operator-set off-duty/disabled flags (see {@link #setOffDuty}/
+ * {@link #setDisabled}) — those writes invalidate the cache explicitly.
  */
 @Service
 public class RobotService {
@@ -69,17 +72,14 @@ public class RobotService {
     }
 
     public RobotResponse getById(Long id) {
-        Robot master = masters().values().stream()
-                .filter(r -> r.getId().equals(id))
-                .findFirst()
-                .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND, "존재하지 않는 로봇입니다. id=" + id));
-        return toResponse(master);
+        return toResponse(masterById(id));
     }
 
     public List<RobotResponse> findAvailable() {
         return masters().values().stream()
                 .map(this::toResponse)
                 .filter(r -> r.status() == RobotStatus.IDLE)
+                .filter(r -> !r.offDuty() && !r.disabled())
                 .toList();
     }
 
@@ -143,6 +143,66 @@ public class RobotService {
         realtimePublisher.publishRobot(RobotResponse.of(master, updated));
     }
 
+    /** 배차 대상에서 뺀다(휴무). 이동/작업 중인 로봇을 지금 당장 멈추지는 않는다 — 다음 배차부터 제외될 뿐이다. */
+    @Transactional
+    public void setOffDuty(Long id, boolean value) {
+        Robot master = masterById(id);
+        if (value) {
+            master.markOffDuty();
+        } else {
+            master.markOnDuty();
+        }
+        robotRepository.save(master);
+        masterCache = null; // 캐시가 낡은 값을 계속 돌려주지 않도록 즉시 무효화.
+        fleetEventService.record(
+                value ? FleetEventType.ROBOT_OFF_DUTY : FleetEventType.ROBOT_ON_DUTY,
+                SourceType.OPERATOR, null,
+                TargetType.ROBOT, master.getId(),
+                null, EventSeverity.INFO,
+                "Robot " + master.getRobotCode() + (value ? " set off-duty" : " returned on-duty"), null);
+        realtimePublisher.publishRobot(toResponse(master));
+    }
+
+    /** 완전히 잠근다(고장/점검 등). off-duty보다 강한 배제 — 의미는 같은 필터에서 함께 걸러진다. */
+    @Transactional
+    public void setDisabled(Long id, boolean value) {
+        Robot master = masterById(id);
+        if (value) {
+            master.disable();
+        } else {
+            master.enable();
+        }
+        robotRepository.save(master);
+        masterCache = null;
+        fleetEventService.record(
+                value ? FleetEventType.ROBOT_DISABLED : FleetEventType.ROBOT_ENABLED,
+                SourceType.OPERATOR, null,
+                TargetType.ROBOT, master.getId(),
+                null, value ? EventSeverity.WARNING : EventSeverity.INFO,
+                "Robot " + master.getRobotCode() + (value ? " disabled" : " enabled"), null);
+        realtimePublisher.publishRobot(toResponse(master));
+    }
+
+    /** ERROR 상태를 사람이 확인하고 IDLE로 되돌린다. changeStatus()는 재사용하지 않는다 — 그건 SourceType.ROBOT 고정. */
+    @Transactional
+    public void clearAlarm(Long id) {
+        Robot master = masterById(id);
+        RobotLiveState current = liveStateStore.findOrOffline(master.getRobotCode());
+        if (current.status() != RobotStatus.ERROR) {
+            throw new BusinessException(ErrorCode.INVALID_REQUEST,
+                    "ERROR 상태가 아닌 로봇은 clear-alarm으로 되돌릴 수 없습니다. status=" + current.status());
+        }
+        RobotLiveState updated = current.withStatus(RobotStatus.IDLE, LocalDateTime.now());
+        liveStateStore.save(updated);
+        fleetEventService.record(
+                FleetEventType.ROBOT_ALARM_CLEARED,
+                SourceType.OPERATOR, null,
+                TargetType.ROBOT, master.getId(),
+                null, EventSeverity.INFO,
+                "Robot " + master.getRobotCode() + " alarm cleared", null);
+        realtimePublisher.publishRobot(RobotResponse.of(master, updated));
+    }
+
     private RobotResponse toResponse(Robot master) {
         return RobotResponse.of(master, liveStateStore.findOrOffline(master.getRobotCode()));
     }
@@ -155,7 +215,14 @@ public class RobotService {
         return master;
     }
 
-    /** Lazily loaded, cached master list (seed data, effectively immutable). */
+    private Robot masterById(Long id) {
+        return masters().values().stream()
+                .filter(r -> r.getId().equals(id))
+                .findFirst()
+                .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND, "존재하지 않는 로봇입니다. id=" + id));
+    }
+
+    /** Lazily loaded, cached master list (seed data — off_duty/disabled excepted, see setOffDuty/setDisabled). */
     private Map<String, Robot> masters() {
         Map<String, Robot> cached = masterCache;
         if (cached == null) {

@@ -29,8 +29,9 @@ import org.springframework.stereotype.Component;
  * </ol>
  * 둘 다 실패 처리한다 — 실패 경로가 점유 해제와 재시도를 담당한다.
  *
- * <p><b>PENDING(미봉인 대기)과 fault(동결)는 쓸지 않는다.</b> 전자는 설계상 기다리는
- * 중이고, 후자는 사람이 retry-failed로 되살릴 때까지 그대로 두는 것이 맞다.
+ * <p><b>PENDING(미봉인 대기)·fault(동결)·suspended(조작자가 세움)는 쓸지 않는다.</b> 첫째는
+ * 설계상 기다리는 중이고, 둘째는 사람이 retry-failed로, 셋째는 사람이 unsuspend로 되살릴
+ * 때까지 그대로 두는 것이 맞다 — 워치독이 대신 "구조"하면 조작자의 결정을 뒤집는 셈이다.
  */
 @Component
 @ConditionalOnProperty(name = "dispatch.watchdog.enabled", havingValue = "true", matchIfMissing = true)
@@ -64,11 +65,12 @@ public class StuckTaskWatchdog {
     public void sweep() {
         LocalDateTime now = LocalDateTime.now();
 
-        List<FleetOrder> stuck = new ArrayList<>(orderRepository.findByStatusAndFaultFalseAndAssignedAtBefore(
-                OrderStatus.ALLOCATED, now.minusSeconds(ackTimeoutSeconds)));
+        List<FleetOrder> stuck = new ArrayList<>(
+                orderRepository.findByStatusAndFaultFalseAndSuspendedFalseAndAssignedAtBefore(
+                        OrderStatus.ALLOCATED, now.minusSeconds(ackTimeoutSeconds)));
         stuck.forEach(order -> recover(order, "assignment not acknowledged"));
 
-        orderRepository.findByStatusAndFaultFalseAndLastProgressAtBefore(
+        orderRepository.findByStatusAndFaultFalseAndSuspendedFalseAndLastProgressAtBefore(
                         OrderStatus.EXECUTING, now.minusSeconds(runTimeoutSeconds))
                 .forEach(order -> recover(order, "no progress reported"));
     }

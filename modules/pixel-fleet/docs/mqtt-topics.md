@@ -50,28 +50,36 @@ fleet/{robotCode}/{kind}
 → 배터리 갱신. 임계치(20%) 아래로 내려가는 순간 `ROBOT_BATTERY_LOW` (WARNING).
 
 ### `fleet/{robotCode}/task`
-작업 실행 상태 보고.
+주문(다단 스텝) 실행 상태 보고. **`taskCode`가 아니라 `orderCode`** — P19-1로 주문 모델이
+바뀌면서 필드명도 같이 바뀌었다.
 ```json
-{ "taskCode": "T-1001", "event": "started" }
-{ "taskCode": "T-1001", "event": "completed" }
-{ "taskCode": "T-1001", "event": "failed", "reason": "obstacle timeout" }
+{ "orderCode": "FO-00000001", "event": "started" }
+{ "orderCode": "FO-00000001", "event": "step-done", "stepIndex": 0 }
+{ "orderCode": "FO-00000001", "event": "failed", "reason": "obstacle timeout" }
 ```
-`event` ∈ `started` | `completed` | `failed`
-→ 각각 `TASK_STARTED` / `TASK_COMPLETED` / `TASK_FAILED`. 실패 시 재시도 예산 내에서 재큐잉.
+`event` ∈ `started` | `step-done` | `failed`. **`completed`는 없다** — 완료는 서버가
+마지막 스텝의 `step-done`에서 스스로 판단한다(주문이 몇 스텝짜리인지는 서버만 안다).
+→ 각각 `TASK_STARTED` / (스텝 경계마다 다음 레그 예약, 마지막 스텝이면 주문을 닫고
+`TASK_COMPLETED` + downlink `ORDER_DONE`) / `TASK_FAILED`. 실패 시 재시도 예산(3회) 내에서
+전체 재큐, 소진되면 `fault`로 얼려 사람의 retry-failed를 기다린다.
 
 ## Downlink (관제 서버 → 로봇)
 
-작업 할당을 로봇에게 지시하는 하행 토픽. `TaskService.dispatchOnce()`가 대기 작업을
-가용 로봇에 배정하면 관제 서버가 발행하고, robot-sim(추후 ROS 2 브릿지)이 구독한다.
+스텝 이동을 로봇에게 지시하는 하행 토픽. `OrderService.dispatchOnce()`/스텝 경계마다
+관제 서버가 발행하고, robot-sim(추후 ROS 2 브릿지)이 구독한다.
 
 ### `fleet/{robotCode}/command`
 ```json
-{ "command": "GOTO", "taskCode": "T-1001", "origin": "STATION-A", "destination": "STATION-B" }
+{ "command": "GOTO", "orderCode": "FO-00000001", "stepIndex": 0, "location": "WH-PICK",
+  "forLoad": true, "forUnload": false, "waypoints": [[1.0, 2.0], [3.5, 2.0]] }
+{ "command": "ORDER_DONE", "orderCode": "FO-00000001" }
 ```
-- `command` — 현재 `GOTO` 만. 로봇은 origin(픽업)→destination(드롭)으로 이동.
-- 로봇은 이동 시작 시 `fleet/{code}/task {event:"started"}`, 도착 시 `completed`,
-  중간 실패 시 `failed` 를 uplink 로 보고한다.
-- 관제 서버는 배차 시 로봇 상태를 낙관적으로 `MOVING` 으로 표시해 같은 로봇이 중복
+- `GOTO` — 로봇은 `waypoints`(서버가 계산한 경로, 구간 점유 통제를 위해 순서대로)를 따라
+  `location`으로 이동해 `stepIndex` 스텝을 실행한다(`forLoad`/`forUnload`로 싣기/내리기 구분).
+- `ORDER_DONE` — 주문이 완전히 끝났으니 로봇은 다음 배차를 기다리는 상태로 돌아간다.
+- 로봇은 스텝 시작 시 `fleet/{code}/task {event:"started"}`(첫 스텝만), 스텝 도착 시
+  `step-done`, 중간 실패 시 `failed`를 uplink로 보고한다.
+- 관제 서버는 배차 시 로봇 상태를 낙관적으로 `MOVING`으로 표시해 같은 로봇이 중복
   배정되지 않게 하고, 이후 실제 상태는 로봇 텔레메트리로 갱신한다.
 
 ## 레이아웃 이벤트 (P20-4)

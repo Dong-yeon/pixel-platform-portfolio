@@ -14,6 +14,11 @@ import java.util.List;
  */
 public record TaskResponse(
         Long id,
+        /**
+         * fleet 내부 코드(예: {@code FO-00000001}) — 조작자 동사({@code /api/orders/{orderCode}/...})는
+         * 이 값으로 호출해야 한다. WMS가 알아보는 값은 {@link #taskCode}.
+         */
+        String orderCode,
         String taskCode,
         String originNode,
         String destinationNode,
@@ -27,7 +32,9 @@ public record TaskResponse(
         LocalDateTime assignedAt,
         LocalDateTime startedAt,
         LocalDateTime finishedAt,
-        String failureReason
+        String failureReason,
+        /** 조작자가 다음 레그를 막았다 — suspend/unsuspend 버튼 라벨을 정한다. */
+        boolean suspended
 ) {
 
     public static TaskResponse from(FleetOrder order) {
@@ -37,6 +44,9 @@ public record TaskResponse(
         return new TaskResponse(
                 order.getId(),
                 order.getOrderCode(),
+                // WMS가 알아보는 값을 보여준다 — order_code는 fleet 내부 코드일 뿐이다.
+                // notificationCode()(OrderService)와 같은 우선순위.
+                order.getExternalId() != null ? order.getExternalId() : order.getOrderCode(),
                 origin,
                 destination,
                 priorityName(order.getPriority()),
@@ -49,7 +59,8 @@ public record TaskResponse(
                 order.getAssignedAt(),
                 order.getStartedAt(),
                 order.getFinishedAt(),
-                order.getFailureReason()
+                order.getFailureReason(),
+                order.isSuspended()
         );
     }
 

@@ -39,9 +39,36 @@ public class Robot extends BaseEntity {
     @Column(nullable = false)
     private short floorNo;
 
+    /**
+     * 조작자가 이 로봇을 배차 대상에서 뺐다(휴무). {@link RobotStatus}와 달리 텔레메트리로
+     * 바뀌지 않는다 — 다음 하트비트가 이 결정을 덮어쓰면 안 되기 때문에 마스터(Postgres)에 둔다.
+     */
+    @Column(nullable = false)
+    private boolean offDuty;
+
+    /** 조작자가 이 로봇을 고장/점검 등의 이유로 완전히 잠갔다. off-duty보다 강한 배제. */
+    @Column(nullable = false)
+    private boolean disabled;
+
     public Robot(String robotCode, String name, short floorNo) {
         this.robotCode = robotCode;
         this.name = name;
         this.floorNo = floorNo;
+    }
+
+    public void markOffDuty() {
+        this.offDuty = true;
+    }
+
+    public void markOnDuty() {
+        this.offDuty = false;
+    }
+
+    public void disable() {
+        this.disabled = true;
+    }
+
+    public void enable() {
+        this.disabled = false;
     }
 }

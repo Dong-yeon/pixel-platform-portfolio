@@ -93,6 +93,25 @@ export const api = {
     createTask: (input: {
       taskCode: string; originNode: string; destinationNode: string; priority: TaskPriority
     }) => request<Task>(FLEET, '/tasks', { method: 'POST', body: JSON.stringify(input) }),
+    cancelOrder: (orderCode: string, reason?: string) =>
+      request<void>(FLEET, `/orders/${encodeURIComponent(orderCode)}/cancel`, {
+        method: 'POST', body: JSON.stringify({ reason }),
+      }),
+    suspendOrder: (orderCode: string, reason?: string) =>
+      request<void>(FLEET, `/orders/${encodeURIComponent(orderCode)}/suspend`, {
+        method: 'POST', body: JSON.stringify({ reason }),
+      }),
+    unsuspendOrder: (orderCode: string) =>
+      request<void>(FLEET, `/orders/${encodeURIComponent(orderCode)}/unsuspend`, { method: 'POST' }),
+    retryFailedOrder: (orderCode: string, note?: string) =>
+      request<void>(FLEET, `/orders/${encodeURIComponent(orderCode)}/retry-failed`, {
+        method: 'POST', body: JSON.stringify({ note }),
+      }),
+    setOffDuty: (id: number) => request<void>(FLEET, `/robots/${id}/off-duty`, { method: 'POST' }),
+    setOnDuty: (id: number) => request<void>(FLEET, `/robots/${id}/on-duty`, { method: 'POST' }),
+    disableRobot: (id: number) => request<void>(FLEET, `/robots/${id}/disable`, { method: 'POST' }),
+    enableRobot: (id: number) => request<void>(FLEET, `/robots/${id}/enable`, { method: 'POST' }),
+    clearAlarm: (id: number) => request<void>(FLEET, `/robots/${id}/clear-alarm`, { method: 'POST' }),
   },
 
   factory: {

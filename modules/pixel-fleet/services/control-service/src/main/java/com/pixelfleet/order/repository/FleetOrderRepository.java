@@ -7,8 +7,13 @@ import java.util.List;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
 
 public interface FleetOrderRepository extends JpaRepository<FleetOrder, Long> {
+
+    /** fleet 자체 order_code 발급용 시퀀스(V9). OrderCodeGenerator가 포맷을 입힌다. */
+    @Query(value = "select nextval('fleet_order_code_seq')", nativeQuery = true)
+    long nextOrderCodeSeq();
 
     /**
      * 스텝을 함께 읽는다. 주문을 다루는 코드는 거의 항상 스텝을 보므로 N+1을 미리 없애고,
@@ -39,9 +44,14 @@ public interface FleetOrderRepository extends JpaRepository<FleetOrder, Long> {
      */
     boolean existsByAssignedRobotIdAndStatusIn(Long assignedRobotId, List<OrderStatus> statuses);
 
-    /** 배차됐는데 시작 보고가 없는 채 오래된 주문(로봇이 지시를 놓쳤다). fault는 제외. */
-    List<FleetOrder> findByStatusAndFaultFalseAndAssignedAtBefore(OrderStatus status, LocalDateTime cutoff);
+    /**
+     * 배차됐는데 시작 보고가 없는 채 오래된 주문(로봇이 지시를 놓쳤다). fault는 제외.
+     * suspended도 제외 — 안 그러면 워치독이 일부러 세워 둔 주문을 "구조"해서 재큐/동결해버린다.
+     */
+    List<FleetOrder> findByStatusAndFaultFalseAndSuspendedFalseAndAssignedAtBefore(
+            OrderStatus status, LocalDateTime cutoff);
 
-    /** 진행 보고가 끊긴 지 오래된 주문(로봇 유실). 스텝마다 갱신되는 lastProgressAt 기준. */
-    List<FleetOrder> findByStatusAndFaultFalseAndLastProgressAtBefore(OrderStatus status, LocalDateTime cutoff);
+    /** 진행 보고가 끊긴 지 오래된 주문(로봇 유실). 스텝마다 갱신되는 lastProgressAt 기준. suspended 제외 이유는 위와 같다. */
+    List<FleetOrder> findByStatusAndFaultFalseAndSuspendedFalseAndLastProgressAtBefore(
+            OrderStatus status, LocalDateTime cutoff);
 }

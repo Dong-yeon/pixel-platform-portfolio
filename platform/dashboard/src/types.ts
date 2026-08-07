@@ -46,6 +46,10 @@ export interface Robot {
    */
   floorNo: number
   lastHeartbeatAt: string | null
+  /** 조작자가 배차 대상에서 뺐다(휴무). 텔레메트리로는 안 바뀐다. */
+  offDuty: boolean
+  /** 조작자가 완전히 잠갔다(고장/점검 등) — off-duty보다 강한 배제. */
+  disabled: boolean
 }
 
 export type TaskStatus = 'PENDING' | 'ASSIGNED' | 'IN_PROGRESS' | 'COMPLETED' | 'FAILED' | 'CANCELLED'
@@ -53,6 +57,11 @@ export type TaskPriority = 'LOW' | 'NORMAL' | 'HIGH' | 'URGENT'
 
 export interface Task {
   id: number
+  /**
+   * fleet 내부 코드(예: `FO-00000001`) — 조작자 동사(cancel/suspend/complete/retry-failed)는
+   * 이 값으로 호출해야 한다. taskCode는 WMS가 알아보는 값이라 서로 다를 수 있다.
+   */
+  orderCode: string
   taskCode: string
   originNode: string
   destinationNode: string
@@ -62,6 +71,8 @@ export interface Task {
   retryCount: number
   /** 이 작업이 벌어지는 층 — 같은 층 로봇에게만 배차된다. */
   floorNo: number
+  /** 조작자가 다음 레그를 막았다. */
+  suspended: boolean
   /**
    * 채워져 있으면 이 구간이 끝난 뒤 물건이 화물 엘리베이터를 타고 여기로 간다.
    * 층이 다른 이송은 승강장에서 두 구간으로 끊긴다(로봇이 층을 따라갈 수 없어서).

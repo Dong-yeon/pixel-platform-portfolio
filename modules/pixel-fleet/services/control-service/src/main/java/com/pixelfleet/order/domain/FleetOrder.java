@@ -243,6 +243,36 @@ public class FleetOrder extends BaseEntity {
         this.assignedRobotId = null;
     }
 
+    /**
+     * 조작자 수동 retry-failed — fault로 얼어붙은 주문만 되살린다.
+     *
+     * <p>{@link #resetForRetry}를 그대로 재사용하지 않는 이유: 지금까지 유일한 호출자
+     * ({@code markFailed}의 자동 재시도 분기)는 {@code fault==false}일 때만 부르므로
+     * {@code resetForRetry}는 {@code fault}를 지우지 않는다. 수동 retry는 정확히
+     * {@code fault==true}일 때 불리므로, 그대로 쓰면 영원히 배차 안 되는 주문이 남는다.
+     */
+    public void retryAfterFault(String reason) {
+        if (!fault) {
+            throw new BusinessException(ErrorCode.INVALID_REQUEST,
+                    "fault 상태가 아닌 주문은 retry-failed로 되살릴 수 없습니다.");
+        }
+        resetForRetry(reason);
+        this.fault = false;
+    }
+
+    /**
+     * 조작자가 다음 레그를 막는다. {@code fault}와 같은 설계 — 상태 전이가 아니라 얹힌
+     * 플래그다. <b>이미 시작된(물리적으로 끝난) 레그는 막지 않는다</b> — 그 결과는 서버가
+     * 되돌릴 수 없다. 서비스가 markStepDone의 즉시 배차 경로를 이 플래그로 게이트한다.
+     */
+    public void suspend() {
+        this.suspended = true;
+    }
+
+    public void unsuspend() {
+        this.suspended = false;
+    }
+
     public void cancel() {
         transitionTo(OrderStatus.CANCELLED);
         this.finishedAt = LocalDateTime.now();

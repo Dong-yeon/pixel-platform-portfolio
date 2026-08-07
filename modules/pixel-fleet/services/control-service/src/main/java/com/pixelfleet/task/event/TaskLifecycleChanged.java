@@ -8,8 +8,8 @@ package com.pixelfleet.task.event;
  * 컴포저블이 깨지므로 <b>수신자를 지목하지 않는다</b>.
  *
  * @param taskCode 작업 코드 — 다른 모듈이 자기 전표를 되찾는 열쇠(fleet 내부 id가 아니다)
- * @param event    {@code completed} | {@code failed}
- * @param reason   실패 사유(완료면 null)
+ * @param event    {@code completed} | {@code failed} | {@code cancelled}
+ * @param reason   실패/취소 사유(완료면 null)
  */
 public record TaskLifecycleChanged(String taskCode, String event, String reason) {
 
@@ -19,5 +19,14 @@ public record TaskLifecycleChanged(String taskCode, String event, String reason)
 
     public static TaskLifecycleChanged failed(String taskCode, String reason) {
         return new TaskLifecycleChanged(taskCode, "failed", reason);
+    }
+
+    /**
+     * P19 나머지 작업: 조작자 cancel도 밖에 알린다. WMS 쪽 핸들러는 아직 {@code cancelled}를
+     * 처리하지 않지만(default 로 조용히 무시) catch-all이 있어 이 publish는 무해하다 —
+     * WMS는 필요해지면 자기 일정에 핸들러를 붙이면 된다.
+     */
+    public static TaskLifecycleChanged cancelled(String taskCode, String reason) {
+        return new TaskLifecycleChanged(taskCode, "cancelled", reason);
     }
 }
