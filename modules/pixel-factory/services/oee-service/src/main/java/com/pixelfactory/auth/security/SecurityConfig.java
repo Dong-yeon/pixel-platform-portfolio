@@ -50,6 +50,9 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(HttpMethod.POST, "/api/auth/login").permitAll()
                         .requestMatchers("/api/health").permitAll()
+                        // Prometheus 스크레이핑용. 이 서비스는 Railway에서 퍼블릭 도메인이
+                        // 없다(gateway만 연다) — 로컬·프라이빗 네트워크 전제로 인증 없이 연다.
+                        .requestMatchers("/actuator/**").permitAll()
                         // 평면도는 민감정보가 아니고(설비 위치·하역 좌표뿐), **fleet이 기동 시
                         // 읽어야 한다**. 서비스 간 인증(M2M)이 아직 없어 토큰을 받을 방법이
                         // 없으므로 열어 둔다 — 자세한 근거는 LayoutController Javadoc.

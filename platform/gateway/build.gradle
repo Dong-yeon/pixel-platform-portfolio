@@ -33,6 +33,7 @@ dependencies {
     // 그래서 토큰 검증에 필요한 만큼만 jjwt를 직접 가져온다(서명 키는 모듈과 공유).
     implementation 'org.springframework.cloud:spring-cloud-starter-gateway'
     implementation 'org.springframework.boot:spring-boot-starter-actuator'
+    implementation 'io.micrometer:micrometer-registry-prometheus'
 
     implementation 'io.jsonwebtoken:jjwt-api:0.12.6'
     runtimeOnly 'io.jsonwebtoken:jjwt-impl:0.12.6'

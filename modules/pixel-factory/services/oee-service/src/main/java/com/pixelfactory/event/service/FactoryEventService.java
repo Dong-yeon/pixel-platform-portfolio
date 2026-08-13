@@ -9,7 +9,11 @@ import com.pixelfactory.event.dto.FactoryEventCreateRequest;
 import com.pixelfactory.event.dto.FactoryEventResponse;
 import com.pixelfactory.event.repository.FactoryEventRepository;
 import com.pixelfactory.realtime.FactoryRealtimeEvents;
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.Timer;
+import java.time.Duration;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.List;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.PageRequest;
@@ -26,12 +30,25 @@ public class FactoryEventService {
     private final FactoryEventRepository factoryEventRepository;
     private final ApplicationEventPublisher eventPublisher;
 
+    /**
+     * 적재 지연 — 설비에서 실제로 일어난 시각(occurredAt)부터 이 서비스가 커밋을 위해
+     * 저장을 시도하는 시각까지. MQTT 전달 지연·브로커 백로그·트랜잭션 대기를 전부 합친
+     * 값이다. {@code docs/BACKLOG.md}의 "다운타임 중 최대 94초 지연" 같은 관측을 수동
+     * 로그 대신 이 메트릭으로 상시 볼 수 있게 한다.
+     */
+    private final Timer ingestionLag;
+
     public FactoryEventService(
             FactoryEventRepository factoryEventRepository,
-            ApplicationEventPublisher eventPublisher
+            ApplicationEventPublisher eventPublisher,
+            MeterRegistry meterRegistry
     ) {
         this.factoryEventRepository = factoryEventRepository;
         this.eventPublisher = eventPublisher;
+        this.ingestionLag = Timer.builder("factory.event.ingestion.lag")
+                .description("occurredAt(설비 발생시각)부터 이 서비스가 저장을 시도하는 시각까지의 지연")
+                .publishPercentiles(0.5, 0.95, 0.99)
+                .register(meterRegistry);
     }
 
     @Transactional
@@ -89,7 +106,19 @@ public class FactoryEventService {
                 occurredAt
         );
 
+        recordIngestionLag(occurredAt);
         return publish(FactoryEventResponse.from(factoryEventRepository.save(event)));
+    }
+
+    /**
+     * 음수(설비 시각이 서버보다 앞서는 클럭 스큐)는 기록하지 않는다 — Timer가 음수 표본을
+     * 어떻게 다루는지는 구현에 맡기기보다 여기서 걸러 지표가 조용히 왜곡되는 걸 막는다.
+     */
+    private void recordIngestionLag(LocalDateTime occurredAt) {
+        Duration lag = Duration.between(occurredAt, LocalDateTime.now(ZoneId.systemDefault()));
+        if (!lag.isNegative()) {
+            ingestionLag.record(lag);
+        }
     }
 
     public List<FactoryEventResponse> getRecent(Integer limit) {

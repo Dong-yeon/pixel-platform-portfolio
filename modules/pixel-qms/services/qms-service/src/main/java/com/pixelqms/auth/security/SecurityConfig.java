@@ -51,6 +51,9 @@ public class SecurityConfig {
                 )
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/api/health").permitAll()
+                        // Prometheus 스크레이핑용. 이 서비스는 Railway에서 퍼블릭 도메인이
+                        // 없다(gateway만 연다) — 로컬·프라이빗 네트워크 전제로 인증 없이 연다.
+                        .requestMatchers("/actuator/**").permitAll()
                         .requestMatchers("/swagger-ui.html", "/swagger-ui/**", "/v3/api-docs/**").permitAll()
                         .anyRequest().authenticated()
                 )

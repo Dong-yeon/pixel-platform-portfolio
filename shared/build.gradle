@@ -53,6 +53,11 @@ dependencies {
 
     api 'org.springdoc:springdoc-openapi-starter-webmvc-ui:2.6.0'
 
+    // 관측성 — 공통 코어에 둬서 모듈마다 따로 추가할 필요가 없게 한다.
+    // 도메인별 커스텀 메트릭(적재 지연·PENDING 수·레인 점유율 등)은 각 모듈이 스스로 등록한다.
+    api 'org.springframework.boot:spring-boot-starter-actuator'
+    api 'io.micrometer:micrometer-registry-prometheus'
+
     compileOnly 'org.projectlombok:lombok'
     annotationProcessor 'org.projectlombok:lombok'
 }
