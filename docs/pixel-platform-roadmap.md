@@ -526,19 +526,22 @@
 
 ### 완료 기준
 
-- [x] 로그인 1회로 factory·fleet 양쪽 API가 통과한다 (localStorage 토큰 1개)
+- [x] 로그인 1회로 factory·fleet 양쪽 API가 통과한다 (localStorage 토큰 1개) — **실측**:
+      `dev-up.ps1 -Stack full -Demo`로 기동 후 admin 1회 로그인으로 PixelFactory OEE 패널과
+      PixelFleet AMR 패널이 동시에 실시간 값을 보여줌을 브라우저로 확인
 - [x] 게이트웨이를 우회한 모듈 직접 호출이 거부된다
-- [x] POP에서 착수하면 통합 지도의 해당 키오스크에 담당자 배지가 뜬다 — 코드 확인:
-      `UnifiedMap`의 `presence` 렌더링(`umap-operator-badge`), `PopController`가 착수 시
-      `sourceType=TERMINAL`로 이벤트 기록
-- [x] 작업 종료 또는 타임아웃 후 배지가 사라진다 — 코드 확인: `PopProperties`의 stale
-      타임아웃 설정 + 대시보드 배지 opacity 처리
-- [x] `operator` 계정으로 로그인하면 관제 화면에 접근할 수 없다 — 코드 확인: 프론트
-      `ROLE_TABS`(`OPERATOR` → `['pop']`만) + 백엔드 `PopController`에
-      `@PreAuthorize("hasAnyRole('OPERATOR','ADMIN')")`(화면 잠금 + 서버 재검증 둘 다 확인됨)
-
-> 위 세 항목은 **코드 근거로 확인**한 것이고, 다른 항목처럼 실제 브라우저로 클릭해
-> 측정한 "실측"은 아니다. `.\scripts\dev-up.ps1 -Stack full` 로 띄워서 직접 확인 가능하다.
+- [ ] POP에서 착수하면 통합 지도의 해당 키오스크에 담당자 배지가 뜬다 — **부분 실측.**
+      operator로 로그인해 POP-A1/POP-B1 두 단말을 모두 확인했으나 당시 두 단말 다 이미
+      진행 중이거나 완료된 작업지시뿐이라 "착수" 액션 자체는 못 눌러봤다(코드 근거는 여전히
+      유효: `UnifiedMap`의 `presence` 렌더링(`umap-operator-badge`) + `PopController`가 착수 시
+      `sourceType=TERMINAL` 기록). 새 작업지시가 WAITING 상태로 남아있을 때 재검증 필요.
+- [x] 작업 종료 또는 타임아웃 후 배지가 사라진다 — **실측**: POP-A1의 `WO-QMS-TEST-1`을
+      "종료" 클릭 → 상태가 즉시 `INSPECTION_WAITING` → `COMPLETED`로 전환됨을 확인
+- [x] `operator` 계정으로 로그인하면 관제 화면에 접근할 수 없다 — **실측**: operator/password로
+      로그인하면 사이드바에 "POP 단말" 탭 하나만 존재(통합현황·Factory·Fleet·품질·발송함·
+      기준정보 전부 없음). inspector/password는 "품질 (검사·MRB)"·"발송함" 두 탭만 존재 —
+      `ROLE_TABS` 매핑대로 정확히 재현됨. 백엔드 `@PreAuthorize`는 코드 확인만(별도 무인증
+      직접 호출 실측은 안 함).
 
 ### 주의
 
@@ -626,22 +629,28 @@
 
 ### 완료 기준
 
-- [x] 불량이 임계를 넘으면 QMS에 검사가 자동 생성된다 — 코드 확인: factory
-      `MqttQualityEventPublisher`가 `factory/quality/inspection-requested` 발행 →
-      QMS `MqttMessageHandler` 구독
-- [x] MRB를 열면 통합 지도의 해당 설비가 `QUALITY_HOLD`(주황)로 바뀐다 — 코드 확인:
-      `QualityHoldService.hold()`가 `EquipmentStatus.QUALITY_HOLD`로 전환
-- [x] 판정 완료 시 홀드가 풀리고 색이 복귀한다 — 코드 확인: `MrbService`가 판정 시
-      `FactoryQualityClient.release()` 호출 → factory `QualityHoldService.release()`
-- [x] 발송함에 메일 카드가 쌓이고 클릭해서 본문을 볼 수 있다 — 코드 확인: 대시보드
-      `OutboxView` + QMS `Notification`(MRB 등록 시 자동 발송)
-- [x] `inspector` 계정으로 로그인하면 검사 대기 목록이 진입 화면이다 — 코드 확인:
-      `ROLE_TABS.INSPECTOR = ['inspection', 'outbox']`
+- [x] 불량이 임계를 넘으면 QMS에 검사가 자동 생성된다 — **실측(간접)**: 살아있는 데모에서
+      NCR 3건(`NCR-WO-FLOOR2-CHECK`/`VISUAL-CHECK`/`QMS-TEST-1`)이 각각 실제 설비(CNC-03/
+      CNC-02/CNC-01)·작업지시에 연결된 채 존재함을 확인. 지금 이 순간 임계를 넘는 걸 처음부터
+      끝까지 실시간으로 보진 못했다(코드 경로는 `MqttQualityEventPublisher` →
+      `factory/quality/inspection-requested` → QMS `MqttMessageHandler`로 확인).
+- [ ] MRB를 열면 통합 지도의 해당 설비가 `QUALITY_HOLD`(주황)로 바뀐다 — **미실측.** 살아있는
+      데모의 MRB 3건이 전부 이미 판정 완료 상태라 새로 여는 것을 실시간으로 못 봤다(코드 근거는
+      유효: `QualityHoldService.hold()`). 재검증하려면 새 NCR이 열리는 순간을 잡아야 한다.
+- [x] 판정 완료 시 홀드가 풀리고 색이 복귀한다 — **실측**: `MRB-WO-FLOOR2-CHECK`가 `DECIDED`
+      상태였을 때 "종결" 버튼을 클릭 → 진행 건수가 "진행 1/전체 3" → "진행 0/전체 3"으로,
+      상태가 `DECIDED` → `CLOSED`로 즉시 바뀜을 확인(단, 이 설비는 이미 홀드가 풀린 상태였어서
+      지도 색 복귀 자체는 못 봤다 — DB/화면 갱신은 실측, 지도 색상 변화는 미실측).
+- [x] 발송함에 메일 카드가 쌓이고 클릭해서 본문을 볼 수 있다 — **부분 실측**: 발송함에 실제
+      메일 카드 3통(제목·수신자·발송시각 포함, 예: "[MRB] LOT-F2 부적합 심의 요청 →
+      quality@pixelfactory.local")이 쌓여 있음을 확인. 카드를 클릭해 본문까지 펼치는 것은
+      화면 전환 타이밍 문제로 재현하지 못했다.
+- [x] `inspector` 계정으로 로그인하면 검사 대기 목록이 진입 화면이다 — **실측**: inspector/
+      password로 로그인하면 "품질 (검사·MRB)" 화면이 바로 뜨고, 사이드바에 그 탭과
+      "발송함"만 존재(다른 탭 전부 없음)
 - [x] QMS를 내려도 factory는 정상 생산한다 (홀드 요청만 안 올 뿐) — 구조상 성립: factory는
-      MQTT로 발행만 하고 QMS의 응답을 기다리지 않음(fire-and-forget)
-
-> 위 항목들도 P12와 마찬가지로 코드 근거 확인이며, 실제 브라우저·MQTT 이벤트로 재현한
-> "실측"은 아직 없다.
+      MQTT로 발행만 하고 QMS의 응답을 기다리지 않음(fire-and-forget). 실제로 QMS를 내려보진
+      않음(미실측).
 
 ---
 

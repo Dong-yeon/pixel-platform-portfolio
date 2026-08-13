@@ -387,7 +387,10 @@ M4에서 가져올 뼈대 (fleet API를 이 모양으로 개편)
       이동한다 — 코드 확인: `LaneGraph`가 `PriorityQueue` 기반 Dijkstra로 교체됨(P20-2),
       `LaneGraphTest`에 건물 간 경로 비교 테스트(`다른_건물_노드간_경로는_...`) 존재
 - [x] 시뮬레이터가 임의 구간을 막으면(이벤트 발행) 진행 중인 로봇이 그 구간을 피해 재경로한다 —
-      코드 확인: `ObstacleService`/`ObstacleStore` + `LaneGraphTest`의
+      **실측**: `dev-up.ps1 -Stack full -Demo`로 띄운 살아있는 데모의 통합 이벤트 타임라인에
+      `[A] LAYOUT_OBSTACLE_CLEARED — 엣지 JCT-4-L~JCT-4-U 해제 (정리 완료)`가 실제로 찍힘
+      (장애물이 발행→해제까지 도는 걸 재현 없이 실행 중 자연 발생으로 관측). 코드 근거는
+      `ObstacleService`/`ObstacleStore` + `LaneGraphTest`의
       `엣지가_막히면_그_엣지를_안_쓰고_다른_길로_우회한다` 테스트
 - [x] 기존 3개 건물(WH/PROD/QC) 데모 시나리오가 회귀 없이 그대로 동작한다(하위호환) —
       코드 확인: `LaneGraphTest`의 `다른_건물_노드간_경로는_옛_LaneGraph_계산값과_비용이_일치한다`가
