@@ -51,6 +51,13 @@ dependencies {
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
     testImplementation 'org.springframework.security:spring-security-test'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+
+    // 통합 테스트용 — 진짜 Postgres·Mosquitto 컨테이너를 띄워 MQTT 발행부터 이벤트 적재까지
+    // 실제 파이프라인으로 검증한다("이벤트가 단일 진실 공급원"이라는 원칙 1이 실제로 도는지).
+    testImplementation 'org.springframework.boot:spring-boot-testcontainers'
+    testImplementation 'org.testcontainers:junit-jupiter'
+    testImplementation 'org.testcontainers:postgresql'
+    testImplementation 'org.awaitility:awaitility'
 }
 
 
