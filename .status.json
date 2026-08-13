@@ -1,0 +1,1045 @@
+{
+  "buckets": {
+    "edges": []
+  },
+  "deletedAt": null,
+  "environments": {
+    "edges": [
+      {
+        "node": {
+          "canAccess": true,
+          "deletedAt": null,
+          "id": "621486a4-1d70-465a-a291-bb0533cf24b5",
+          "name": "production",
+          "serviceInstances": {
+            "edges": [
+              {
+                "node": {
+                  "activeDeployments": [],
+                  "cronSchedule": null,
+                  "domains": {
+                    "customDomains": [],
+                    "serviceDomains": [
+                      {
+                        "domain": "gateway-production-4f47.up.railway.app",
+                        "id": "b7084de8-abe6-4627-a008-5af31ccd8ca7",
+                        "targetPort": 9000
+                      }
+                    ]
+                  },
+                  "environmentId": "621486a4-1d70-465a-a291-bb0533cf24b5",
+                  "id": "067cd9c1-cfc9-471a-b9f5-51eaa08e2151",
+                  "latestDeployment": {
+                    "canRedeploy": false,
+                    "createdAt": "2026-08-13T02:23:03.721Z",
+                    "deploymentStopped": true,
+                    "id": "f3d45370-91db-4a32-be57-1906327376b8",
+                    "instances": [],
+                    "meta": {
+                      "branch": "main",
+                      "buildOnly": false,
+                      "commitAuthor": "",
+                      "commitHash": "d3eeb95106566a061bdd98ef847ff80cd37e1bd7",
+                      "commitMessage": "fix(dev-down.ps1): 하드코딩된 'pixel-platform' 문자열 매칭 대신 $Root 절대경로로 프로세스 탐지 — 다른 이름으로 클론하면 dev-up으로 띄운 프로세스를 못 찾던 문제 (실측 검증 중 재현)",
+                      "fileServiceManifest": {},
+                      "ignoreWatchPatterns": true,
+                      "logsV2": true,
+                      "nixpacksProviders": [],
+                      "patchId": "2189c93b-fd1a-4a84-ad23-77b5e5c6cc72",
+                      "plan": "hobby",
+                      "propertyFileMapping": {},
+                      "queuedReason": "Waiting for build slot",
+                      "reason": "deploy",
+                      "repo": "Dong-yeon/pixel-platform-portfolio",
+                      "rootDirectory": null,
+                      "runtime": "V2",
+                      "serviceManifest": {
+                        "build": {
+                          "buildCommand": null,
+                          "buildEnvironment": "V3",
+                          "builder": "RAILPACK",
+                          "dockerfilePath": null,
+                          "nixpacksConfigPath": null,
+                          "nixpacksPlan": null,
+                          "watchPatterns": []
+                        },
+                        "deploy": {
+                          "cronSchedule": null,
+                          "drainingSeconds": null,
+                          "healthcheckPath": null,
+                          "healthcheckTimeout": null,
+                          "ipv6EgressEnabled": false,
+                          "limitOverride": null,
+                          "multiRegionConfig": {
+                            "sfo": {
+                              "numReplicas": 1
+                            }
+                          },
+                          "numReplicas": 1,
+                          "overlapSeconds": null,
+                          "preDeployCommand": null,
+                          "region": null,
+                          "registryCredentials": null,
+                          "requiredMountPath": null,
+                          "restartPolicyMaxRetries": 10,
+                          "restartPolicyType": "ON_FAILURE",
+                          "runtime": "V2",
+                          "sleepApplication": false,
+                          "startCommand": null,
+                          "useLegacyStacker": false
+                        }
+                      },
+                      "volumeMounts": []
+                    },
+                    "status": "FAILED"
+                  },
+                  "nextCronRunAt": null,
+                  "numReplicas": null,
+                  "serviceId": "7cc9283d-91fc-4b8f-8d47-5433789ed97a",
+                  "serviceName": "gateway",
+                  "source": {
+                    "image": null,
+                    "repo": "Dong-yeon/pixel-platform-portfolio"
+                  },
+                  "startCommand": null
+                }
+              },
+              {
+                "node": {
+                  "activeDeployments": [],
+                  "cronSchedule": null,
+                  "domains": {
+                    "customDomains": [],
+                    "serviceDomains": []
+                  },
+                  "environmentId": "621486a4-1d70-465a-a291-bb0533cf24b5",
+                  "id": "3dff5f6d-ff3a-43a4-a11d-d1f400d788c0",
+                  "latestDeployment": {
+                    "canRedeploy": true,
+                    "createdAt": "2026-08-13T02:32:21.988Z",
+                    "deploymentStopped": true,
+                    "id": "2060a41d-8169-4c74-ab26-8b3afda05b03",
+                    "instances": [],
+                    "meta": {
+                      "branch": "main",
+                      "buildOnly": false,
+                      "commitAuthor": "",
+                      "commitHash": "d3eeb95106566a061bdd98ef847ff80cd37e1bd7",
+                      "commitMessage": "fix(dev-down.ps1): 하드코딩된 'pixel-platform' 문자열 매칭 대신 $Root 절대경로로 프로세스 탐지 — 다른 이름으로 클론하면 dev-up으로 띄운 프로세스를 못 찾던 문제 (실측 검증 중 재현)",
+                      "fileServiceManifest": {},
+                      "ignoreWatchPatterns": true,
+                      "logsV2": true,
+                      "nixpacksProviders": [],
+                      "patchId": "49e0629c-2a6a-490b-a6f1-85acf3f308be",
+                      "plan": "hobby",
+                      "propertyFileMapping": {},
+                      "reason": "redeploy",
+                      "repo": "Dong-yeon/pixel-platform-portfolio",
+                      "rootDirectory": null,
+                      "runtime": "V2",
+                      "serviceManifest": {
+                        "build": {
+                          "buildCommand": null,
+                          "buildEnvironment": "V3",
+                          "builder": "RAILPACK",
+                          "dockerfilePath": null,
+                          "nixpacksConfigPath": null,
+                          "nixpacksPlan": null,
+                          "watchPatterns": []
+                        },
+                        "deploy": {
+                          "cronSchedule": null,
+                          "drainingSeconds": null,
+                          "healthcheckPath": null,
+                          "healthcheckTimeout": null,
+                          "ipv6EgressEnabled": false,
+                          "limitOverride": null,
+                          "multiRegionConfig": {
+                            "sfo": {
+                              "numReplicas": 1
+                            }
+                          },
+                          "numReplicas": 1,
+                          "overlapSeconds": null,
+                          "preDeployCommand": null,
+                          "region": null,
+                          "registryCredentials": null,
+                          "requiredMountPath": null,
+                          "restartPolicyMaxRetries": 10,
+                          "restartPolicyType": "ON_FAILURE",
+                          "runtime": "V2",
+                          "sleepApplication": false,
+                          "startCommand": null,
+                          "useLegacyStacker": false
+                        }
+                      },
+                      "skipBuildCache": true,
+                      "volumeMounts": []
+                    },
+                    "status": "FAILED"
+                  },
+                  "nextCronRunAt": null,
+                  "numReplicas": null,
+                  "serviceId": "bf6feef4-04a4-48a4-bb84-206e483a89f3",
+                  "serviceName": "pixel-factory",
+                  "source": {
+                    "image": null,
+                    "repo": "Dong-yeon/pixel-platform-portfolio"
+                  },
+                  "startCommand": null
+                }
+              },
+              {
+                "node": {
+                  "activeDeployments": [
+                    {
+                      "createdAt": "2026-08-13T02:32:27.276Z",
+                      "deploymentStopped": true,
+                      "id": "68efe349-6557-4828-9d69-cbd610d8ca66",
+                      "instances": [],
+                      "meta": {
+                        "branch": "main",
+                        "buildOnly": false,
+                        "commitAuthor": "",
+                        "commitHash": "d3eeb95106566a061bdd98ef847ff80cd37e1bd7",
+                        "commitMessage": "fix(dev-down.ps1): 하드코딩된 'pixel-platform' 문자열 매칭 대신 $Root 절대경로로 프로세스 탐지 — 다른 이름으로 클론하면 dev-up으로 띄운 프로세스를 못 찾던 문제 (실측 검증 중 재현)",
+                        "fileServiceManifest": {},
+                        "ignoreWatchPatterns": true,
+                        "logsV2": true,
+                        "nixpacksProviders": [],
+                        "patchId": "34a4261f-8efc-46e4-8708-5ea7bc1b413f",
+                        "plan": "hobby",
+                        "propertyFileMapping": {},
+                        "reason": "redeploy",
+                        "repo": "Dong-yeon/pixel-platform-portfolio",
+                        "rootDirectory": null,
+                        "runtime": "V2",
+                        "serviceManifest": {
+                          "build": {
+                            "buildCommand": null,
+                            "buildEnvironment": "V3",
+                            "builder": "RAILPACK",
+                            "dockerfilePath": null,
+                            "nixpacksConfigPath": null,
+                            "nixpacksPlan": null,
+                            "watchPatterns": []
+                          },
+                          "deploy": {
+                            "cronSchedule": null,
+                            "drainingSeconds": null,
+                            "healthcheckPath": null,
+                            "healthcheckTimeout": null,
+                            "ipv6EgressEnabled": false,
+                            "limitOverride": null,
+                            "multiRegionConfig": {
+                              "sfo": {
+                                "numReplicas": 1
+                              }
+                            },
+                            "numReplicas": 1,
+                            "overlapSeconds": null,
+                            "preDeployCommand": null,
+                            "region": null,
+                            "registryCredentials": null,
+                            "requiredMountPath": null,
+                            "restartPolicyMaxRetries": 10,
+                            "restartPolicyType": "ON_FAILURE",
+                            "runtime": "V2",
+                            "sleepApplication": false,
+                            "startCommand": null,
+                            "useLegacyStacker": false
+                          }
+                        },
+                        "skipBuildCache": true,
+                        "volumeMounts": []
+                      },
+                      "status": "BUILDING"
+                    }
+                  ],
+                  "cronSchedule": null,
+                  "domains": {
+                    "customDomains": [],
+                    "serviceDomains": []
+                  },
+                  "environmentId": "621486a4-1d70-465a-a291-bb0533cf24b5",
+                  "id": "4b2a54a1-d3a4-4dfe-af7c-4070068dece8",
+                  "latestDeployment": {
+                    "canRedeploy": true,
+                    "createdAt": "2026-08-13T02:32:27.276Z",
+                    "deploymentStopped": true,
+                    "id": "68efe349-6557-4828-9d69-cbd610d8ca66",
+                    "instances": [],
+                    "meta": {
+                      "branch": "main",
+                      "buildOnly": false,
+                      "commitAuthor": "",
+                      "commitHash": "d3eeb95106566a061bdd98ef847ff80cd37e1bd7",
+                      "commitMessage": "fix(dev-down.ps1): 하드코딩된 'pixel-platform' 문자열 매칭 대신 $Root 절대경로로 프로세스 탐지 — 다른 이름으로 클론하면 dev-up으로 띄운 프로세스를 못 찾던 문제 (실측 검증 중 재현)",
+                      "fileServiceManifest": {},
+                      "ignoreWatchPatterns": true,
+                      "logsV2": true,
+                      "nixpacksProviders": [],
+                      "patchId": "34a4261f-8efc-46e4-8708-5ea7bc1b413f",
+                      "plan": "hobby",
+                      "propertyFileMapping": {},
+                      "reason": "redeploy",
+                      "repo": "Dong-yeon/pixel-platform-portfolio",
+                      "rootDirectory": null,
+                      "runtime": "V2",
+                      "serviceManifest": {
+                        "build": {
+                          "buildCommand": null,
+                          "buildEnvironment": "V3",
+                          "builder": "RAILPACK",
+                          "dockerfilePath": null,
+                          "nixpacksConfigPath": null,
+                          "nixpacksPlan": null,
+                          "watchPatterns": []
+                        },
+                        "deploy": {
+                          "cronSchedule": null,
+                          "drainingSeconds": null,
+                          "healthcheckPath": null,
+                          "healthcheckTimeout": null,
+                          "ipv6EgressEnabled": false,
+                          "limitOverride": null,
+                          "multiRegionConfig": {
+                            "sfo": {
+                              "numReplicas": 1
+                            }
+                          },
+                          "numReplicas": 1,
+                          "overlapSeconds": null,
+                          "preDeployCommand": null,
+                          "region": null,
+                          "registryCredentials": null,
+                          "requiredMountPath": null,
+                          "restartPolicyMaxRetries": 10,
+                          "restartPolicyType": "ON_FAILURE",
+                          "runtime": "V2",
+                          "sleepApplication": false,
+                          "startCommand": null,
+                          "useLegacyStacker": false
+                        }
+                      },
+                      "skipBuildCache": true,
+                      "volumeMounts": []
+                    },
+                    "status": "BUILDING"
+                  },
+                  "nextCronRunAt": null,
+                  "numReplicas": null,
+                  "serviceId": "c26a5c87-eb4c-4834-b826-773b06b7b72f",
+                  "serviceName": "factory-sim",
+                  "source": {
+                    "image": null,
+                    "repo": "Dong-yeon/pixel-platform-portfolio"
+                  },
+                  "startCommand": null
+                }
+              },
+              {
+                "node": {
+                  "activeDeployments": [],
+                  "cronSchedule": null,
+                  "domains": {
+                    "customDomains": [],
+                    "serviceDomains": []
+                  },
+                  "environmentId": "621486a4-1d70-465a-a291-bb0533cf24b5",
+                  "id": "7662963a-8cd0-4e00-8b75-5a398aecb590",
+                  "latestDeployment": {
+                    "canRedeploy": true,
+                    "createdAt": "2026-08-13T02:32:23.695Z",
+                    "deploymentStopped": true,
+                    "id": "edebc092-5487-4c0a-b81f-66cfbae520a9",
+                    "instances": [],
+                    "meta": {
+                      "branch": "main",
+                      "buildOnly": false,
+                      "commitAuthor": "",
+                      "commitHash": "d3eeb95106566a061bdd98ef847ff80cd37e1bd7",
+                      "commitMessage": "fix(dev-down.ps1): 하드코딩된 'pixel-platform' 문자열 매칭 대신 $Root 절대경로로 프로세스 탐지 — 다른 이름으로 클론하면 dev-up으로 띄운 프로세스를 못 찾던 문제 (실측 검증 중 재현)",
+                      "fileServiceManifest": {},
+                      "ignoreWatchPatterns": true,
+                      "logsV2": true,
+                      "nixpacksProviders": [],
+                      "patchId": "c7cafb12-fadd-473f-9412-6e47a36c2e0c",
+                      "plan": "hobby",
+                      "propertyFileMapping": {},
+                      "reason": "redeploy",
+                      "repo": "Dong-yeon/pixel-platform-portfolio",
+                      "rootDirectory": null,
+                      "runtime": "V2",
+                      "serviceManifest": {
+                        "build": {
+                          "buildCommand": null,
+                          "buildEnvironment": "V3",
+                          "builder": "RAILPACK",
+                          "dockerfilePath": null,
+                          "nixpacksConfigPath": null,
+                          "nixpacksPlan": null,
+                          "watchPatterns": []
+                        },
+                        "deploy": {
+                          "cronSchedule": null,
+                          "drainingSeconds": null,
+                          "healthcheckPath": null,
+                          "healthcheckTimeout": null,
+                          "ipv6EgressEnabled": false,
+                          "limitOverride": null,
+                          "multiRegionConfig": {
+                            "sfo": {
+                              "numReplicas": 1
+                            }
+                          },
+                          "numReplicas": 1,
+                          "overlapSeconds": null,
+                          "preDeployCommand": null,
+                          "region": null,
+                          "registryCredentials": null,
+                          "requiredMountPath": null,
+                          "restartPolicyMaxRetries": 10,
+                          "restartPolicyType": "ON_FAILURE",
+                          "runtime": "V2",
+                          "sleepApplication": false,
+                          "startCommand": null,
+                          "useLegacyStacker": false
+                        }
+                      },
+                      "skipBuildCache": true,
+                      "volumeMounts": []
+                    },
+                    "status": "FAILED"
+                  },
+                  "nextCronRunAt": null,
+                  "numReplicas": null,
+                  "serviceId": "4b8a8f48-5618-4cb0-b41c-5d740e37543d",
+                  "serviceName": "pixel-fleet",
+                  "source": {
+                    "image": null,
+                    "repo": "Dong-yeon/pixel-platform-portfolio"
+                  },
+                  "startCommand": null
+                }
+              },
+              {
+                "node": {
+                  "activeDeployments": [
+                    {
+                      "createdAt": "2026-08-13T02:22:02.831Z",
+                      "deploymentStopped": false,
+                      "id": "d10f6830-dd70-4598-9a30-9572d62b68e6",
+                      "instances": [
+                        {
+                          "id": "ffa08273-9279-4a2c-9615-c041f3024b69",
+                          "status": "RUNNING"
+                        }
+                      ],
+                      "meta": {
+                        "image": "ghcr.io/railwayapp-templates/postgres-ssl:18",
+                        "imageDigest": "sha256:0c72a05e70ba09efd8a4a7817e6bb0022e6370cdfc4424bbcb3383f4aa779c82",
+                        "logsV2": true,
+                        "patchId": "5b1cef1b-28e7-46b1-b405-19b3be3bb048",
+                        "reason": "deploy",
+                        "runtime": "V2",
+                        "serviceManifest": {
+                          "build": {
+                            "buildCommand": null,
+                            "buildEnvironment": "V3",
+                            "builder": "RAILPACK",
+                            "dockerfilePath": null,
+                            "nixpacksConfigPath": null,
+                            "nixpacksPlan": null,
+                            "watchPatterns": []
+                          },
+                          "deploy": {
+                            "cronSchedule": null,
+                            "drainingSeconds": null,
+                            "healthcheckPath": null,
+                            "healthcheckTimeout": null,
+                            "ipv6EgressEnabled": false,
+                            "limitOverride": null,
+                            "multiRegionConfig": {
+                              "sfo": {
+                                "numReplicas": 1
+                              }
+                            },
+                            "numReplicas": 1,
+                            "overlapSeconds": null,
+                            "preDeployCommand": null,
+                            "region": null,
+                            "registryCredentials": null,
+                            "requiredMountPath": "/var/lib/postgresql/data",
+                            "restartPolicyMaxRetries": 10,
+                            "restartPolicyType": "ON_FAILURE",
+                            "runtime": "V2",
+                            "sleepApplication": false,
+                            "startCommand": null,
+                            "useLegacyStacker": false
+                          }
+                        },
+                        "volumeMounts": [
+                          "/var/lib/postgresql/data"
+                        ]
+                      },
+                      "status": "SUCCESS"
+                    }
+                  ],
+                  "cronSchedule": null,
+                  "domains": {
+                    "customDomains": [],
+                    "serviceDomains": []
+                  },
+                  "environmentId": "621486a4-1d70-465a-a291-bb0533cf24b5",
+                  "id": "b91b6cfb-95b8-4a2e-8785-6cf8e056ce2b",
+                  "latestDeployment": {
+                    "canRedeploy": true,
+                    "createdAt": "2026-08-13T02:22:02.831Z",
+                    "deploymentStopped": false,
+                    "id": "d10f6830-dd70-4598-9a30-9572d62b68e6",
+                    "instances": [
+                      {
+                        "id": "ffa08273-9279-4a2c-9615-c041f3024b69",
+                        "status": "RUNNING"
+                      }
+                    ],
+                    "meta": {
+                      "image": "ghcr.io/railwayapp-templates/postgres-ssl:18",
+                      "imageDigest": "sha256:0c72a05e70ba09efd8a4a7817e6bb0022e6370cdfc4424bbcb3383f4aa779c82",
+                      "logsV2": true,
+                      "patchId": "5b1cef1b-28e7-46b1-b405-19b3be3bb048",
+                      "reason": "deploy",
+                      "runtime": "V2",
+                      "serviceManifest": {
+                        "build": {
+                          "buildCommand": null,
+                          "buildEnvironment": "V3",
+                          "builder": "RAILPACK",
+                          "dockerfilePath": null,
+                          "nixpacksConfigPath": null,
+                          "nixpacksPlan": null,
+                          "watchPatterns": []
+                        },
+                        "deploy": {
+                          "cronSchedule": null,
+                          "drainingSeconds": null,
+                          "healthcheckPath": null,
+                          "healthcheckTimeout": null,
+                          "ipv6EgressEnabled": false,
+                          "limitOverride": null,
+                          "multiRegionConfig": {
+                            "sfo": {
+                              "numReplicas": 1
+                            }
+                          },
+                          "numReplicas": 1,
+                          "overlapSeconds": null,
+                          "preDeployCommand": null,
+                          "region": null,
+                          "registryCredentials": null,
+                          "requiredMountPath": "/var/lib/postgresql/data",
+                          "restartPolicyMaxRetries": 10,
+                          "restartPolicyType": "ON_FAILURE",
+                          "runtime": "V2",
+                          "sleepApplication": false,
+                          "startCommand": null,
+                          "useLegacyStacker": false
+                        }
+                      },
+                      "volumeMounts": [
+                        "/var/lib/postgresql/data"
+                      ]
+                    },
+                    "status": "SUCCESS"
+                  },
+                  "nextCronRunAt": null,
+                  "numReplicas": 1,
+                  "serviceId": "743894ba-6829-4091-873b-cbbebac93b9c",
+                  "serviceName": "Postgres",
+                  "source": {
+                    "image": "ghcr.io/railwayapp-templates/postgres-ssl:18",
+                    "repo": null
+                  },
+                  "startCommand": null
+                }
+              },
+              {
+                "node": {
+                  "activeDeployments": [
+                    {
+                      "createdAt": "2026-08-13T02:32:25.391Z",
+                      "deploymentStopped": true,
+                      "id": "247c4e94-78c1-45f0-a70f-627f194cccd9",
+                      "instances": [],
+                      "meta": {
+                        "branch": "main",
+                        "buildOnly": false,
+                        "commitAuthor": "",
+                        "commitHash": "d3eeb95106566a061bdd98ef847ff80cd37e1bd7",
+                        "commitMessage": "fix(dev-down.ps1): 하드코딩된 'pixel-platform' 문자열 매칭 대신 $Root 절대경로로 프로세스 탐지 — 다른 이름으로 클론하면 dev-up으로 띄운 프로세스를 못 찾던 문제 (실측 검증 중 재현)",
+                        "fileServiceManifest": {},
+                        "ignoreWatchPatterns": true,
+                        "logsV2": true,
+                        "nixpacksProviders": [],
+                        "patchId": "74db97de-6230-4ea6-b40b-61c4fcfd6e14",
+                        "plan": "hobby",
+                        "propertyFileMapping": {},
+                        "reason": "redeploy",
+                        "repo": "Dong-yeon/pixel-platform-portfolio",
+                        "rootDirectory": null,
+                        "runtime": "V2",
+                        "serviceManifest": {
+                          "build": {
+                            "buildCommand": null,
+                            "buildEnvironment": "V3",
+                            "builder": "RAILPACK",
+                            "dockerfilePath": null,
+                            "nixpacksConfigPath": null,
+                            "nixpacksPlan": null,
+                            "watchPatterns": []
+                          },
+                          "deploy": {
+                            "cronSchedule": null,
+                            "drainingSeconds": null,
+                            "healthcheckPath": null,
+                            "healthcheckTimeout": null,
+                            "ipv6EgressEnabled": false,
+                            "limitOverride": null,
+                            "multiRegionConfig": {
+                              "sfo": {
+                                "numReplicas": 1
+                              }
+                            },
+                            "numReplicas": 1,
+                            "overlapSeconds": null,
+                            "preDeployCommand": null,
+                            "region": null,
+                            "registryCredentials": null,
+                            "requiredMountPath": null,
+                            "restartPolicyMaxRetries": 10,
+                            "restartPolicyType": "ON_FAILURE",
+                            "runtime": "V2",
+                            "sleepApplication": false,
+                            "startCommand": null,
+                            "useLegacyStacker": false
+                          }
+                        },
+                        "skipBuildCache": true,
+                        "volumeMounts": []
+                      },
+                      "status": "BUILDING"
+                    }
+                  ],
+                  "cronSchedule": null,
+                  "domains": {
+                    "customDomains": [],
+                    "serviceDomains": []
+                  },
+                  "environmentId": "621486a4-1d70-465a-a291-bb0533cf24b5",
+                  "id": "e5b213a3-57b4-40b7-8579-eb57cbb60e20",
+                  "latestDeployment": {
+                    "canRedeploy": true,
+                    "createdAt": "2026-08-13T02:32:25.391Z",
+                    "deploymentStopped": true,
+                    "id": "247c4e94-78c1-45f0-a70f-627f194cccd9",
+                    "instances": [],
+                    "meta": {
+                      "branch": "main",
+                      "buildOnly": false,
+                      "commitAuthor": "",
+                      "commitHash": "d3eeb95106566a061bdd98ef847ff80cd37e1bd7",
+                      "commitMessage": "fix(dev-down.ps1): 하드코딩된 'pixel-platform' 문자열 매칭 대신 $Root 절대경로로 프로세스 탐지 — 다른 이름으로 클론하면 dev-up으로 띄운 프로세스를 못 찾던 문제 (실측 검증 중 재현)",
+                      "fileServiceManifest": {},
+                      "ignoreWatchPatterns": true,
+                      "logsV2": true,
+                      "nixpacksProviders": [],
+                      "patchId": "74db97de-6230-4ea6-b40b-61c4fcfd6e14",
+                      "plan": "hobby",
+                      "propertyFileMapping": {},
+                      "reason": "redeploy",
+                      "repo": "Dong-yeon/pixel-platform-portfolio",
+                      "rootDirectory": null,
+                      "runtime": "V2",
+                      "serviceManifest": {
+                        "build": {
+                          "buildCommand": null,
+                          "buildEnvironment": "V3",
+                          "builder": "RAILPACK",
+                          "dockerfilePath": null,
+                          "nixpacksConfigPath": null,
+                          "nixpacksPlan": null,
+                          "watchPatterns": []
+                        },
+                        "deploy": {
+                          "cronSchedule": null,
+                          "drainingSeconds": null,
+                          "healthcheckPath": null,
+                          "healthcheckTimeout": null,
+                          "ipv6EgressEnabled": false,
+                          "limitOverride": null,
+                          "multiRegionConfig": {
+                            "sfo": {
+                              "numReplicas": 1
+                            }
+                          },
+                          "numReplicas": 1,
+                          "overlapSeconds": null,
+                          "preDeployCommand": null,
+                          "region": null,
+                          "registryCredentials": null,
+                          "requiredMountPath": null,
+                          "restartPolicyMaxRetries": 10,
+                          "restartPolicyType": "ON_FAILURE",
+                          "runtime": "V2",
+                          "sleepApplication": false,
+                          "startCommand": null,
+                          "useLegacyStacker": false
+                        }
+                      },
+                      "skipBuildCache": true,
+                      "volumeMounts": []
+                    },
+                    "status": "BUILDING"
+                  },
+                  "nextCronRunAt": null,
+                  "numReplicas": null,
+                  "serviceId": "0394274a-e3e8-416e-bcc3-be88b3ccc72e",
+                  "serviceName": "robot-sim",
+                  "source": {
+                    "image": null,
+                    "repo": "Dong-yeon/pixel-platform-portfolio"
+                  },
+                  "startCommand": null
+                }
+              },
+              {
+                "node": {
+                  "activeDeployments": [],
+                  "cronSchedule": null,
+                  "domains": {
+                    "customDomains": [],
+                    "serviceDomains": []
+                  },
+                  "environmentId": "621486a4-1d70-465a-a291-bb0533cf24b5",
+                  "id": "e5ccff56-bbf3-4021-a9b4-3a07417c9c7f",
+                  "latestDeployment": {
+                    "canRedeploy": true,
+                    "createdAt": "2026-08-13T02:32:19.895Z",
+                    "deploymentStopped": true,
+                    "id": "69fbfea2-06df-423a-8f3a-6096fac21375",
+                    "instances": [],
+                    "meta": {
+                      "branch": "main",
+                      "buildOnly": false,
+                      "commitAuthor": "",
+                      "commitHash": "d3eeb95106566a061bdd98ef847ff80cd37e1bd7",
+                      "commitMessage": "fix(dev-down.ps1): 하드코딩된 'pixel-platform' 문자열 매칭 대신 $Root 절대경로로 프로세스 탐지 — 다른 이름으로 클론하면 dev-up으로 띄운 프로세스를 못 찾던 문제 (실측 검증 중 재현)",
+                      "fileServiceManifest": {},
+                      "ignoreWatchPatterns": true,
+                      "logsV2": true,
+                      "nixpacksProviders": [],
+                      "patchId": "819e6b6e-c8c2-453b-9bf6-ab117f6829ae",
+                      "plan": "hobby",
+                      "propertyFileMapping": {},
+                      "reason": "redeploy",
+                      "repo": "Dong-yeon/pixel-platform-portfolio",
+                      "rootDirectory": null,
+                      "runtime": "V2",
+                      "serviceManifest": {
+                        "build": {
+                          "buildCommand": null,
+                          "buildEnvironment": "V3",
+                          "builder": "RAILPACK",
+                          "dockerfilePath": null,
+                          "nixpacksConfigPath": null,
+                          "nixpacksPlan": null,
+                          "watchPatterns": []
+                        },
+                        "deploy": {
+                          "cronSchedule": null,
+                          "drainingSeconds": null,
+                          "healthcheckPath": null,
+                          "healthcheckTimeout": null,
+                          "ipv6EgressEnabled": false,
+                          "limitOverride": null,
+                          "multiRegionConfig": {
+                            "sfo": {
+                              "numReplicas": 1
+                            }
+                          },
+                          "numReplicas": 1,
+                          "overlapSeconds": null,
+                          "preDeployCommand": null,
+                          "region": null,
+                          "registryCredentials": null,
+                          "requiredMountPath": null,
+                          "restartPolicyMaxRetries": 10,
+                          "restartPolicyType": "ON_FAILURE",
+                          "runtime": "V2",
+                          "sleepApplication": false,
+                          "startCommand": null,
+                          "useLegacyStacker": false
+                        }
+                      },
+                      "skipBuildCache": true,
+                      "volumeMounts": []
+                    },
+                    "status": "FAILED"
+                  },
+                  "nextCronRunAt": null,
+                  "numReplicas": null,
+                  "serviceId": "d995a690-445a-4991-b415-0db2424c6ab6",
+                  "serviceName": "mosquitto",
+                  "source": {
+                    "image": null,
+                    "repo": "Dong-yeon/pixel-platform-portfolio"
+                  },
+                  "startCommand": null
+                }
+              },
+              {
+                "node": {
+                  "activeDeployments": [
+                    {
+                      "createdAt": "2026-08-13T02:22:41.678Z",
+                      "deploymentStopped": false,
+                      "id": "ecef44a2-be03-4d06-8f79-0d4510ac94df",
+                      "instances": [
+                        {
+                          "id": "298507d3-3d4e-4460-9bf8-c17c6f438120",
+                          "status": "RUNNING"
+                        }
+                      ],
+                      "meta": {
+                        "image": "redis:8.2.1",
+                        "imageDigest": "sha256:5fa2edb1e408fa8235e6db8fab01d1afaaae96c9403ba67b70feceb8661e8621",
+                        "logsV2": true,
+                        "patchId": "11474c70-a3bf-4a5a-a3d4-add74cb48253",
+                        "reason": "deploy",
+                        "runtime": "V2",
+                        "serviceManifest": {
+                          "build": {
+                            "buildCommand": null,
+                            "buildEnvironment": "V3",
+                            "builder": "RAILPACK",
+                            "dockerfilePath": null,
+                            "nixpacksConfigPath": null,
+                            "nixpacksPlan": null,
+                            "watchPatterns": []
+                          },
+                          "deploy": {
+                            "cronSchedule": null,
+                            "drainingSeconds": null,
+                            "healthcheckPath": null,
+                            "healthcheckTimeout": null,
+                            "ipv6EgressEnabled": false,
+                            "limitOverride": null,
+                            "multiRegionConfig": {
+                              "sfo": {
+                                "numReplicas": 1
+                              }
+                            },
+                            "numReplicas": 1,
+                            "overlapSeconds": null,
+                            "preDeployCommand": null,
+                            "region": null,
+                            "registryCredentials": null,
+                            "requiredMountPath": null,
+                            "restartPolicyMaxRetries": 10,
+                            "restartPolicyType": "ON_FAILURE",
+                            "runtime": "V2",
+                            "sleepApplication": false,
+                            "startCommand": "/bin/sh -c \"rm -rf $RAILWAY_VOLUME_MOUNT_PATH/lost+found/ && exec docker-entrypoint.sh redis-server --requirepass $REDIS_PASSWORD --save 60 1 --dir $RAILWAY_VOLUME_MOUNT_PATH\"",
+                            "useLegacyStacker": false
+                          }
+                        },
+                        "volumeMounts": [
+                          "/data"
+                        ]
+                      },
+                      "status": "SUCCESS"
+                    }
+                  ],
+                  "cronSchedule": null,
+                  "domains": {
+                    "customDomains": [],
+                    "serviceDomains": []
+                  },
+                  "environmentId": "621486a4-1d70-465a-a291-bb0533cf24b5",
+                  "id": "f0592875-6972-49dc-af34-8ec61346d780",
+                  "latestDeployment": {
+                    "canRedeploy": true,
+                    "createdAt": "2026-08-13T02:22:41.678Z",
+                    "deploymentStopped": false,
+                    "id": "ecef44a2-be03-4d06-8f79-0d4510ac94df",
+                    "instances": [
+                      {
+                        "id": "298507d3-3d4e-4460-9bf8-c17c6f438120",
+                        "status": "RUNNING"
+                      }
+                    ],
+                    "meta": {
+                      "image": "redis:8.2.1",
+                      "imageDigest": "sha256:5fa2edb1e408fa8235e6db8fab01d1afaaae96c9403ba67b70feceb8661e8621",
+                      "logsV2": true,
+                      "patchId": "11474c70-a3bf-4a5a-a3d4-add74cb48253",
+                      "reason": "deploy",
+                      "runtime": "V2",
+                      "serviceManifest": {
+                        "build": {
+                          "buildCommand": null,
+                          "buildEnvironment": "V3",
+                          "builder": "RAILPACK",
+                          "dockerfilePath": null,
+                          "nixpacksConfigPath": null,
+                          "nixpacksPlan": null,
+                          "watchPatterns": []
+                        },
+                        "deploy": {
+                          "cronSchedule": null,
+                          "drainingSeconds": null,
+                          "healthcheckPath": null,
+                          "healthcheckTimeout": null,
+                          "ipv6EgressEnabled": false,
+                          "limitOverride": null,
+                          "multiRegionConfig": {
+                            "sfo": {
+                              "numReplicas": 1
+                            }
+                          },
+                          "numReplicas": 1,
+                          "overlapSeconds": null,
+                          "preDeployCommand": null,
+                          "region": null,
+                          "registryCredentials": null,
+                          "requiredMountPath": null,
+                          "restartPolicyMaxRetries": 10,
+                          "restartPolicyType": "ON_FAILURE",
+                          "runtime": "V2",
+                          "sleepApplication": false,
+                          "startCommand": "/bin/sh -c \"rm -rf $RAILWAY_VOLUME_MOUNT_PATH/lost+found/ && exec docker-entrypoint.sh redis-server --requirepass $REDIS_PASSWORD --save 60 1 --dir $RAILWAY_VOLUME_MOUNT_PATH\"",
+                          "useLegacyStacker": false
+                        }
+                      },
+                      "volumeMounts": [
+                        "/data"
+                      ]
+                    },
+                    "status": "SUCCESS"
+                  },
+                  "nextCronRunAt": null,
+                  "numReplicas": 1,
+                  "serviceId": "c840d6d9-f03e-461a-996b-8db8a57fecef",
+                  "serviceName": "Redis",
+                  "source": {
+                    "image": "redis:8.2.1",
+                    "repo": null
+                  },
+                  "startCommand": "/bin/sh -c \"rm -rf $RAILWAY_VOLUME_MOUNT_PATH/lost+found/ && exec docker-entrypoint.sh redis-server --requirepass $REDIS_PASSWORD --save 60 1 --dir $RAILWAY_VOLUME_MOUNT_PATH\""
+                }
+              }
+            ]
+          },
+          "unmergedChangesCount": null,
+          "volumeInstances": {
+            "edges": [
+              {
+                "node": {
+                  "currentSizeMB": 71.99539200000001,
+                  "deletedAt": null,
+                  "environmentId": "621486a4-1d70-465a-a291-bb0533cf24b5",
+                  "id": "b1a5a3cb-7f19-46e8-9d18-d732cdced535",
+                  "isPendingDeletion": false,
+                  "mountPath": "/var/lib/postgresql/data",
+                  "serviceId": "743894ba-6829-4091-873b-cbbebac93b9c",
+                  "sizeMB": 5000,
+                  "state": "READY",
+                  "volume": {
+                    "id": "cdc59328-5a48-4a50-ad32-d4a3eddcaeb4",
+                    "name": "postgres-volume"
+                  }
+                }
+              },
+              {
+                "node": {
+                  "currentSizeMB": 82.61631999999999,
+                  "deletedAt": null,
+                  "environmentId": "621486a4-1d70-465a-a291-bb0533cf24b5",
+                  "id": "be621935-2c0b-4d7e-920f-443c692dc6d2",
+                  "isPendingDeletion": false,
+                  "mountPath": "/data",
+                  "serviceId": "c840d6d9-f03e-461a-996b-8db8a57fecef",
+                  "sizeMB": 5000,
+                  "state": "READY",
+                  "volume": {
+                    "id": "08281bfa-71ac-4f7c-8bfb-5e8348ea5085",
+                    "name": "redis-volume"
+                  }
+                }
+              }
+            ]
+          }
+        }
+      }
+    ]
+  },
+  "id": "a1a1425b-9f23-4229-b04c-a7c41f296921",
+  "name": "pixel-platform-portfolio",
+  "services": {
+    "edges": [
+      {
+        "node": {
+          "id": "0394274a-e3e8-416e-bcc3-be88b3ccc72e",
+          "name": "robot-sim"
+        }
+      },
+      {
+        "node": {
+          "id": "4b8a8f48-5618-4cb0-b41c-5d740e37543d",
+          "name": "pixel-fleet"
+        }
+      },
+      {
+        "node": {
+          "id": "743894ba-6829-4091-873b-cbbebac93b9c",
+          "name": "Postgres"
+        }
+      },
+      {
+        "node": {
+          "id": "7cc9283d-91fc-4b8f-8d47-5433789ed97a",
+          "name": "gateway"
+        }
+      },
+      {
+        "node": {
+          "id": "bf6feef4-04a4-48a4-bb84-206e483a89f3",
+          "name": "pixel-factory"
+        }
+      },
+      {
+        "node": {
+          "id": "c26a5c87-eb4c-4834-b826-773b06b7b72f",
+          "name": "factory-sim"
+        }
+      },
+      {
+        "node": {
+          "id": "c840d6d9-f03e-461a-996b-8db8a57fecef",
+          "name": "Redis"
+        }
+      },
+      {
+        "node": {
+          "id": "d995a690-445a-4991-b415-0db2424c6ab6",
+          "name": "mosquitto"
+        }
+      }
+    ]
+  },
+  "workspace": {
+    "name": "Happyeon's Projects"
+  },
+  "workspaceId": "b1940caf-db04-4653-baaf-89a7f9abf753"
+}

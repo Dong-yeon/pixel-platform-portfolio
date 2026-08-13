@@ -2,6 +2,15 @@
 
 > **Spring Cloud Gateway + MQTT 기반 실시간 IoT/로봇 군집 관제(FMS) 마이크로서비스 플랫폼**
 
+## 🚀 라이브 데모
+
+**[gateway-production-4f47.up.railway.app](https://gateway-production-4f47.up.railway.app)**
+— `admin` / `password`로 로그인 (데모 계정)
+
+> 지금 배포된 건 **PixelFactory(OEE) + PixelFleet(AMR) 2모듈**입니다. WMS·QMS는 아직
+> 배포 설정(Dockerfile/railway.json)이 없어 로컬에서만 동작합니다 — 자세한 건
+> [`docs/deploy-railway.md`](docs/deploy-railway.md) 참고.
+
 Pixel Platform은 제조 현장의 서로 다른 도메인(가공 설비 OEE, AMR 로봇 군집 관제, 창고 재고, 품질 검사)을
 **API Gateway + 중앙 인증 아래 4개의 독립 서비스**로 묶어, MQTT·Redis·WebSocket 기반 실시간 데이터를
 하나의 대시보드로 통합해서 보여주는 컴포저블 마이크로서비스 플랫폼입니다.

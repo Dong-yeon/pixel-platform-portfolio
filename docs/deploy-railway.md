@@ -21,8 +21,15 @@ Pixel Platform을 Railway에 올리는 절차. **배포 실행에는 동연님�
 
 ## 0. 준비
 
-GitHub 저장소(`Dong-yeon/pixel-platform`)를 Railway 프로젝트에 연결한다.
-서비스마다 **Root Directory**를 다르게 지정해 같은 저장소에서 여러 서비스를 만든다.
+GitHub 저장소(`Dong-yeon/pixel-platform-portfolio` — 공개용 사본)를 Railway 프로젝트에
+연결한다. 서비스마다 **Root Directory**를 다르게 지정해 같은 저장소에서 여러 서비스를 만든다.
+
+> **CLI로 자동화할 때: `railway redeploy`는 옛 설정을 그대로 재사용한다.** 서비스를
+> `railway add --repo ...`로 막 만든 뒤 `rootDirectory`/`dockerfilePath`를 API로 바꾸고
+> `railway redeploy`를 돌리면, **redeploy가 참조하는 건 최초 생성 시점의 스냅샷**이라
+> 여전히 옛 설정(Root Directory 없음, RAILPACK)으로 빌드된다 — 실제로 겪었다. 설정을
+> 바꾼 뒤에는 `redeploy`가 아니라 GraphQL `serviceInstanceDeploy(serviceId, environmentId,
+> latestCommit: true)`로 **새 배포**를 트리거해야 현재 설정이 반영된다.
 
 ## 1. 플러그인 추가
 
@@ -158,6 +165,7 @@ Root Directory가 `platform`인 이유: 이미지 빌드에 `dashboard/`와 `gat
 
 ```
 SERVER_ADDRESS=::
+PORT=9000
 AUTH_MODULE_URI=http://pixel-factory.railway.internal:9001
 MODULE_FACTORY_URI=http://pixel-factory.railway.internal:9001
 MODULE_FLEET_URI=http://pixel-fleet.railway.internal:9002
@@ -171,6 +179,13 @@ PLATFORM_JWT_SECRET=<32바이트 이상 랜덤 문자열>   ← 세 서비스가
 > 그러면 URI가 `http://pixel-factory.railway.internal:` 로 깨져서 모든 라우팅이 **500**이
 > 된다. 서비스 그래프에 화살표가 그려지더라도 값이 있다는 뜻은 아니니 속지 말 것.
 > 그래서 모듈 쪽에 `PORT=9001`/`PORT=9002`를 명시하고, 여기서는 그 숫자를 그대로 쓴다.
+>
+> **`PORT`는 gateway 자신에게도 명시해야 한다 — 실제로 겪었다.** `application.yml`이
+> `server.port: ${PORT:9000}`라 안 정하면 기본값 9000으로 뜰 거라 생각했는데, Railway가
+> **모든 서비스에 자체 `PORT`(이 경우 8080)를 자동 주입**해서 그 값이 우선 적용됐다.
+> `railway domain`으로 만든 도메인은 9000을 바라보고 있어 8080에서 뜬 앱과 안 맞아
+> **502 Application failed to respond**로 조용히 실패했다(빌드는 성공으로 보인다).
+> factory/fleet과 같은 이유로 gateway도 `PORT=9000`을 명시해야 한다.
 
 > **WS URI 두 개는 `http://` 로 둔다.** 게이트웨이가 `Upgrade` 헤더를 보고 자동으로 ws로
 > 바꾼다. `ws://`로 두면 SockJS의 `/info`(일반 HTTP)가 400이 된다.
@@ -181,12 +196,25 @@ PLATFORM_JWT_SECRET=<32바이트 이상 랜덤 문자열>   ← 세 서비스가
 
 ## 3. 배포 후 확인
 
+`/api/factory/health`·`/api/fleet/health`는 게이트웨이의 공개 경로(`/api/auth/`,
+`/actuator/`)에 안 들어가서 **토큰 없이는 401**이다(설계대로 — 헬스체크도 인증 관문을
+통과해야 한다). 확인하려면 먼저 로그인해서 토큰을 받는다.
+
 ```bash
-curl https://<도메인>/api/factory/health
-curl https://<도메인>/api/fleet/health
+DOMAIN=https://<도메인>
+TOKEN=$(curl -s -X POST $DOMAIN/api/auth/login \
+  -H 'Content-Type: application/json' \
+  -d '{"username":"admin","password":"password"}' | jq -r .data.accessToken)
+
+curl -H "Authorization: Bearer $TOKEN" $DOMAIN/api/factory/equipments
+curl -H "Authorization: Bearer $TOKEN" $DOMAIN/api/fleet/robots
 ```
 
 브라우저로 `https://<도메인>` 접속 → `admin` / `password` 로 로그인.
+
+**실측(2026-08-13):** `https://gateway-production-4f47.up.railway.app` — 위 순서 그대로
+배포해서 로그인·설비 8대·AMR 8대 실시간 스트림(장애물 이벤트 포함)까지 브라우저로 확인했다.
+유일하게 걸린 것이 위에 적은 gateway `PORT` 미설정 하나였다.
 
 ## 반드시 알아둘 점
 
