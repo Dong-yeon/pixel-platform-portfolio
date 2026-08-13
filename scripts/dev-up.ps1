@@ -202,10 +202,26 @@ foreach ($svc in $targets) {
 }
 
 if ($Stack -eq 'full') {
+    $dashDir = Join-Path $Root 'platform/dashboard'
+    # 최초 클론엔 node_modules가 없다 — 그대로 npm run dev를 돌리면 "'vite'은(는) ... 명령이
+    # 아닙니다"로 조용히 실패한다(실제로 겪음). 있으면 install을 건너뛰어 재기동은 빠르게 유지.
+    if (-not (Test-Path (Join-Path $dashDir 'node_modules'))) {
+        Write-Host "  dashboard 의존성 설치…" -NoNewline
+        Push-Location $dashDir
+        npm install --no-fund --no-audit *> $null
+        $code = $LASTEXITCODE
+        Pop-Location
+        if ($code -ne 0) {
+            Write-Host " 실패 — npm install을 수동으로 확인할 것" -ForegroundColor Red
+            exit 1
+        }
+        Write-Host " ok" -ForegroundColor Green
+    }
+
     Write-Host "  dashboard…" -NoNewline
     $log = Join-Path $LogDir 'dashboard.log'
     Start-Process -FilePath 'npm.cmd' -ArgumentList 'run', 'dev' `
-        -WorkingDirectory (Join-Path $Root 'platform/dashboard') `
+        -WorkingDirectory $dashDir `
         -RedirectStandardOutput $log -RedirectStandardError "$log.err" `
         -WindowStyle Hidden | Out-Null
     if (Wait-Port 9200) { Write-Host " ok  http://localhost:9200" -ForegroundColor Green }
