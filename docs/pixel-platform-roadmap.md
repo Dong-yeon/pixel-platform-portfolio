@@ -14,6 +14,9 @@
 
 ## 0. 현재 상태 스냅샷 (최종 갱신 2026-07-29, 코드 재확인)
 
+> **이 절은 P8~P11 시점의 스냅샷이다.** P12~P15의 완료 기준 체크박스는 각 절에서, P16 이후
+> 진행 상황은 [`docs/BACKLOG.md`](./BACKLOG.md)의 "2026-07 기술뉴스에서 도출한 항목" 절에서 관리한다.
+
 ### 완료된 것
 
 | 항목 | 근거 |
@@ -37,13 +40,13 @@
 | D3 | **이벤트 발생시각 컬럼 없음** | ✅ **해결** | P8에서 `V4` 마이그레이션 + `FactoryEvent.occurredAt`. 핸들러가 payload `ts`(UTC)를 시스템 시간대로 변환해 저장, 실패 시 적재 시각 폴백+WARN | — |
 | D4 | **설비별 기간 조회 인덱스 없음** | ✅ **해결** | P8 `V4`에서 `idx_factory_events_target_type_time`(target_type, target_id, event_type, occurred_at desc) + `idx_factory_events_occurred_at` | — |
 | D5 | **계획가동시간 정의 불가** | ✅ **해결** | P9: `shift_calendars`(휴식 시각 포함) + `EquipmentStatus`에 SETUP·PLANNED_STOP 추가. 계획/실가동 판정은 enum 메서드로 | — |
-| D6 | **표준CT가 설비 고정값** | ❌ | `equipments.ideal_cycle_time_ms`. `items`/`processes` 테이블 없음, `WorkOrder.itemId`는 FK 없는 raw bigint | 품종 전환 시 Performance 왜곡 |
+| D6 | **표준CT가 설비 고정값** | ❌ | P13에서 `pixel-wms`에 `items`/`ItemStandardCycleTime`이 생겼지만, `IdealCycleTimeProvider`의 구현체는 여전히 `EquipmentFixedIdealCycleTime` 하나뿐이다(인터페이스만 대비돼 있고 갈아끼우지 않음) | 품종 전환 시 Performance 왜곡 |
 | D7 | **좌표계 3중 하드코딩** | ✅ **해결** | P11: factory가 `layout_nodes`·`layout_settings`·`equipments.pos_*` 마스터를 소유. 대시보드는 API로만, fleet은 받아 캐시(폴백+WARN), robot-sim은 대조 테스트로 검증 | 부분 잔존(LaneGraph 통로·연결로) |
 | D8 | **MQTT 유실 설계** | ✅ **해결** | P8: 브로커 `persistence true` + `max_queued_messages 100000`, 구독자 `cleanSession=false`(factory·fleet). **유한 버퍼** — 약 7시간치 | 부분 잔존(장기 장애) |
 | D9 | **LWT / retained 미사용** | ✅ **해결** | P8: 설비별 접속 + 자기 status 토픽에 LWT, status만 retained(cycle은 금지) | — |
 | D10 | **모듈별 개별 인증 (P6 미완)** | ✅ **해결** | P6에서 게이트웨이 중앙 인증. 토큰 1개(`pp_token`), `loginAll()` 제거 | — |
 | D11 | **게이트웨이 `/ws` 라우트가 fleet 전용** | ✅ **해결** | P10: `/ws/fleet/**`→9002, `/ws/factory/**`→9001. 서버 엔드포인트도 같은 경로로 이동 | — |
-| D12 | **미사용 enum 값** | ❌ | `FactoryEventType.NOTIFICATION_SENT`, `INSPECTION_*` 4종 | P14에서 실제로 채운다 |
+| D12 | **미사용 enum 값** | ⚠️ **부분 해결** | P14에서 `INSPECTION_STARTED`/`PASSED`/`FAILED` 3종은 `QualityController`/`QualityHoldService`가 실제로 채워 쓴다. `NOTIFICATION_SENT`는 여전히 미사용 — QMS의 Outbox는 이 factory enum이 아니라 자체 `Notification` 엔티티로 구현됐다 | — |
 | D13 | **설비 8대 중 3대만 시뮬레이션됨** | ✅ **해결** | `FactorySimulator.EQUIPMENTS`가 8대 전부 | — |
 
 ### 이 로드맵에 없던 항목 (진행 중 발견 — `docs/BACKLOG.md`에 상세)
@@ -58,12 +61,21 @@
 
 ### 4종 세트 대비 실제 커버리지
 
-| 표방 | 실제 상태 |
-|---|---|
-| 로봇관제 | ✅ 완성도 높음 (유일하게 "제품"처럼 보임) |
-| MES | ⚠️ **OEE 엔진(P9) + 실시간 대시보드(P10) 완료.** POP 없음, 품목 마스터 없음 |
-| QMS | ❌ enum 껍데기만 |
-| WMS | ❌ `WAREHOUSE` 노드 좌표 1개뿐 |
+> **이 표는 2026-07-29 스냅샷이다 — P12~P14가 그 뒤에 끝나 아래 상태는 낡았다.**
+> 현재 상태: 로봇관제 완성도 높음(그래프 기반 동적 라우팅까지, P20) · MES는 POP 단말·역할별
+> 뷰까지 완료(P12), 품목 마스터는 WMS에 있지만 OEE 계산기에 아직 연결 안 됨(D6) · QMS는
+> 검사·MRB·품질홀드·Outbox까지 factory와 실제로 연동됨(P14, enum 껍데기 아님) · WMS는
+> 품목·재고·입출고·랙 로케이션까지 구현되고 fleet과 실제 연동됨(P13). 상세 근거는 각 절
+> (P12~P14)의 완료 기준 체크박스 참조.
+>
+> 아래는 2026-07-29 당시 실제 상태였다(역사적 기록으로 남긴다):
+>
+> | 표방 | 2026-07-29 당시 상태 |
+> |---|---|
+> | 로봇관제 | ✅ 완성도 높음 (유일하게 "제품"처럼 보임) |
+> | MES | ⚠️ **OEE 엔진(P9) + 실시간 대시보드(P10) 완료.** POP 없음, 품목 마스터 없음 |
+> | QMS | ❌ enum 껍데기만 |
+> | WMS | ❌ `WAREHOUSE` 노드 좌표 1개뿐 |
 
 ---
 
@@ -516,9 +528,17 @@
 
 - [x] 로그인 1회로 factory·fleet 양쪽 API가 통과한다 (localStorage 토큰 1개)
 - [x] 게이트웨이를 우회한 모듈 직접 호출이 거부된다
-- [ ] POP에서 착수하면 통합 지도의 해당 키오스크에 담당자 배지가 뜬다
-- [ ] 작업 종료 또는 타임아웃 후 배지가 사라진다
-- [ ] `operator` 계정으로 로그인하면 관제 화면에 접근할 수 없다
+- [x] POP에서 착수하면 통합 지도의 해당 키오스크에 담당자 배지가 뜬다 — 코드 확인:
+      `UnifiedMap`의 `presence` 렌더링(`umap-operator-badge`), `PopController`가 착수 시
+      `sourceType=TERMINAL`로 이벤트 기록
+- [x] 작업 종료 또는 타임아웃 후 배지가 사라진다 — 코드 확인: `PopProperties`의 stale
+      타임아웃 설정 + 대시보드 배지 opacity 처리
+- [x] `operator` 계정으로 로그인하면 관제 화면에 접근할 수 없다 — 코드 확인: 프론트
+      `ROLE_TABS`(`OPERATOR` → `['pop']`만) + 백엔드 `PopController`에
+      `@PreAuthorize("hasAnyRole('OPERATOR','ADMIN')")`(화면 잠금 + 서버 재검증 둘 다 확인됨)
+
+> 위 세 항목은 **코드 근거로 확인**한 것이고, 다른 항목처럼 실제 브라우저로 클릭해
+> 측정한 "실측"은 아니다. `.\scripts\dev-up.ps1 -Stack full` 로 띄워서 직접 확인 가능하다.
 
 ### 주의
 
@@ -551,10 +571,16 @@
 
 ### 완료 기준
 
-- [ ] WMS에서 출고지시를 만들면 fleet에 운송 작업이 생기고 AMR이 실제로 움직인다
-- [ ] 운송 완료 후 WMS 재고가 차감된다
-- [ ] `items` 기반 표준CT가 P9 OEE 계산기에 주입된다 (설비 고정값 제거)
-- [ ] WMS를 내려도 fleet·factory는 정상 동작한다 (컴포저블 검증)
+- [x] WMS에서 출고지시를 만들면 fleet에 운송 작업이 생기고 AMR이 실제로 움직인다 —
+      코드 확인: `OrderService` → `FleetTaskClient`가 게이트웨이 경유로 `POST /api/fleet/tasks` 호출
+- [x] 운송 완료 후 WMS 재고가 차감된다 — 코드 확인: `MqttMessageHandler`가
+      `fleet/tasks/{code}/completed` 구독 → `OrderService.handleTransportCompleted()`
+- [ ] `items` 기반 표준CT가 P9 OEE 계산기에 주입된다 (설비 고정값 제거) — **미완, D6 그대로
+      열려 있음.** `items`/`ItemStandardCycleTime` 테이블은 생겼지만 `IdealCycleTimeProvider`의
+      구현체는 여전히 `EquipmentFixedIdealCycleTime` 하나뿐이다. 인터페이스만 갈아끼울 준비가 돼
+      있고 실제 교체는 안 됐다.
+- [x] WMS를 내려도 fleet·factory는 정상 동작한다 (컴포저블 검증) — 구조상 성립: 의존 방향이
+      WMS→fleet 단방향이라(fleet이 WMS를 호출하지 않음) WMS가 내려가도 fleet·factory는 영향받지 않는다
 
 ---
 
@@ -600,12 +626,22 @@
 
 ### 완료 기준
 
-- [ ] 불량이 임계를 넘으면 QMS에 검사가 자동 생성된다
-- [ ] MRB를 열면 통합 지도의 해당 설비가 `QUALITY_HOLD`(주황)로 바뀐다
-- [ ] 판정 완료 시 홀드가 풀리고 색이 복귀한다
-- [ ] 발송함에 메일 카드가 쌓이고 클릭해서 본문을 볼 수 있다
-- [ ] `inspector` 계정으로 로그인하면 검사 대기 목록이 진입 화면이다
-- [ ] QMS를 내려도 factory는 정상 생산한다 (홀드 요청만 안 올 뿐)
+- [x] 불량이 임계를 넘으면 QMS에 검사가 자동 생성된다 — 코드 확인: factory
+      `MqttQualityEventPublisher`가 `factory/quality/inspection-requested` 발행 →
+      QMS `MqttMessageHandler` 구독
+- [x] MRB를 열면 통합 지도의 해당 설비가 `QUALITY_HOLD`(주황)로 바뀐다 — 코드 확인:
+      `QualityHoldService.hold()`가 `EquipmentStatus.QUALITY_HOLD`로 전환
+- [x] 판정 완료 시 홀드가 풀리고 색이 복귀한다 — 코드 확인: `MrbService`가 판정 시
+      `FactoryQualityClient.release()` 호출 → factory `QualityHoldService.release()`
+- [x] 발송함에 메일 카드가 쌓이고 클릭해서 본문을 볼 수 있다 — 코드 확인: 대시보드
+      `OutboxView` + QMS `Notification`(MRB 등록 시 자동 발송)
+- [x] `inspector` 계정으로 로그인하면 검사 대기 목록이 진입 화면이다 — 코드 확인:
+      `ROLE_TABS.INSPECTOR = ['inspection', 'outbox']`
+- [x] QMS를 내려도 factory는 정상 생산한다 (홀드 요청만 안 올 뿐) — 구조상 성립: factory는
+      MQTT로 발행만 하고 QMS의 응답을 기다리지 않음(fire-and-forget)
+
+> 위 항목들도 P12와 마찬가지로 코드 근거 확인이며, 실제 브라우저·MQTT 이벤트로 재현한
+> "실측"은 아직 없다.
 
 ---
 

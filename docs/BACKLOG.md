@@ -216,11 +216,17 @@ jjwt를 직접 가져왔다.
 
 완료 기준
 
-- [ ] 토큰 없이 `/ws/factory` STOMP CONNECT 시 연결이 거부된다
-- [ ] `GET /api/factory/layout`에 토큰 없이 접근하면 401이다
-- [ ] fleet이 서비스 토큰으로 게이트웨이를 경유해 평면도를 받아온다 (직접 접속 제거)
-- [ ] 익명 MQTT 접속이 거부된다
-- [ ] 허용되지 않은 오리진의 브라우저 요청이 CORS에서 막힌다
+- [ ] 토큰 없이 `/ws/factory` STOMP CONNECT 시 연결이 거부된다 — 미착수
+- [ ] `GET /api/factory/layout`에 토큰 없이 접근하면 401이다 — 미착수(`SecurityConfig`에
+      여전히 `.requestMatchers(GET, "/api/layout").permitAll()`)
+- [ ] fleet이 서비스 토큰으로 게이트웨이를 경유해 평면도를 받아온다 (직접 접속 제거) — 미착수.
+      **다만 M2M 패턴 자체는 P13·P14에서 먼저 생겼다:** QMS→factory(`ServiceTokenProvider` +
+      `FactoryQualityClient`), WMS→fleet(`ServiceTokenProvider` + `FleetTaskClient`)가 이미 같은
+      방식으로 서비스 토큰을 쓴다. fleet→factory layout 쪽에 같은 패턴을 붙이기만 하면 된다 —
+      새로 설계할 게 아니라 이미 검증된 패턴을 한 곳 더 적용하는 일이다.
+- [ ] 익명 MQTT 접속이 거부된다 — 미착수(`mosquitto.conf`에 `allow_anonymous true` 그대로)
+- [ ] 허용되지 않은 오리진의 브라우저 요청이 CORS에서 막힌다 — 미착수(게이트웨이
+      `allowedOriginPatterns: "*"`, 코드에 `TODO: 배포 전 실제 대시보드 오리진으로 제한` 주석 있음)
 
 주의
 
@@ -377,11 +383,21 @@ M4에서 가져올 뼈대 (fleet API를 이 모양으로 개편)
 
 완료 기준
 
-- [ ] Building-A/B 두 개를 게이트 노드로 연결한 경로가 실제로 계산되고, 로봇이 건물을 넘어 이동한다
-- [ ] 시뮬레이터가 임의 구간을 막으면(이벤트 발행) 진행 중인 로봇이 그 구간을 피해 재경로한다
-- [ ] 기존 3개 건물(WH/PROD/QC) 데모 시나리오가 회귀 없이 그대로 동작한다(하위호환)
-- [ ] 좌표 정합 검증(현재 `NodeMapLayoutConsistencyTest`의 후속)이 새 정본(DB) 기준으로
-      계속 불일치를 잡아낸다
+- [x] Building-A/B 두 개를 게이트 노드로 연결한 경로가 실제로 계산되고, 로봇이 건물을 넘어
+      이동한다 — 코드 확인: `LaneGraph`가 `PriorityQueue` 기반 Dijkstra로 교체됨(P20-2),
+      `LaneGraphTest`에 건물 간 경로 비교 테스트(`다른_건물_노드간_경로는_...`) 존재
+- [x] 시뮬레이터가 임의 구간을 막으면(이벤트 발행) 진행 중인 로봇이 그 구간을 피해 재경로한다 —
+      코드 확인: `ObstacleService`/`ObstacleStore` + `LaneGraphTest`의
+      `엣지가_막히면_그_엣지를_안_쓰고_다른_길로_우회한다` 테스트
+- [x] 기존 3개 건물(WH/PROD/QC) 데모 시나리오가 회귀 없이 그대로 동작한다(하위호환) —
+      코드 확인: `LaneGraphTest`의 `다른_건물_노드간_경로는_옛_LaneGraph_계산값과_비용이_일치한다`가
+      이 회귀를 직접 검증한다
+- [x] 좌표 정합 검증(현재 `NodeMapLayoutConsistencyTest`의 후속)이 새 정본(DB) 기준으로
+      계속 불일치를 잡아낸다 — 코드 확인: `NodeMapLayoutConsistencyTest`가 마이그레이션에서
+      파싱한 노드·폭·높이·상층 통로 y를 대조한다
+
+> 코드·테스트 근거로 확인한 것이며, 실제 대시보드에서 로봇이 우회하는 것을 눈으로 본
+> "실측"은 아직 없다.
 
 주의
 
