@@ -1,0 +1,177 @@
+name: CI
+
+# 모노레포 ≠ 모놀리스 원칙을 CI에도 그대로 적용한다 — 모듈은 독립적으로 빌드된다.
+# 루트 통합 빌드가 없으므로(각 모듈이 자체 gradlew/settings.gradle을 가짐), CI도
+# 모듈별 독립 job으로 나누고 경로 필터로 바뀐 모듈만 돌린다.
+#
+# shared/는 4개 모듈(factory·fleet·wms·qms)이 Gradle 복합 빌드(includeBuild)로 가져다
+# 쓴다 — gateway·시뮬레이터 2종은 shared에 의존하지 않는다(gateway는 WebFlux라 shared의
+# 서블릿 스택과 충돌하고, 시뮬레이터는 순수 Java 앱). 그래서 shared/ 변경은 그 4개
+# 모듈만 다시 돌리면 된다.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      gateway: ${{ steps.filter.outputs.gateway }}
+      factory: ${{ steps.filter.outputs.factory }}
+      factory-sim: ${{ steps.filter.outputs.factory-sim }}
+      fleet: ${{ steps.filter.outputs.fleet }}
+      fleet-sim: ${{ steps.filter.outputs.fleet-sim }}
+      wms: ${{ steps.filter.outputs.wms }}
+      qms: ${{ steps.filter.outputs.qms }}
+      dashboard: ${{ steps.filter.outputs.dashboard }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            gateway:
+              - 'platform/gateway/**'
+            factory:
+              - 'shared/**'
+              - 'modules/pixel-factory/services/oee-service/**'
+            factory-sim:
+              - 'modules/pixel-factory/simulator/**'
+            fleet:
+              - 'shared/**'
+              - 'modules/pixel-fleet/services/control-service/**'
+            fleet-sim:
+              - 'modules/pixel-fleet/robot-sim/**'
+            wms:
+              - 'shared/**'
+              - 'modules/pixel-wms/services/wms-service/**'
+            qms:
+              - 'shared/**'
+              - 'modules/pixel-qms/services/qms-service/**'
+            dashboard:
+              - 'platform/dashboard/**'
+
+  gateway:
+    needs: changes
+    if: needs.changes.outputs.gateway == 'true'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: platform/gateway
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: '17' }
+      - uses: gradle/actions/setup-gradle@v4
+      # Windows에서 커밋된 gradlew는 실행권한이 빠지는 경우가 있다(실제로 겪었다 — 7개
+      # 전부 644였다). git의 실행권한이 어긋나도 CI가 죽지 않도록 한 번 더 chmod한다.
+      - run: chmod +x ./gradlew
+      - run: ./gradlew build --no-daemon
+
+  factory:
+    needs: changes
+    if: needs.changes.outputs.factory == 'true'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: modules/pixel-factory/services/oee-service
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: '17' }
+      - uses: gradle/actions/setup-gradle@v4
+      - run: chmod +x ./gradlew
+      - run: ./gradlew build --no-daemon
+
+  factory-sim:
+    needs: changes
+    if: needs.changes.outputs.factory-sim == 'true'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: modules/pixel-factory/simulator
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: '17' }
+      - uses: gradle/actions/setup-gradle@v4
+      - run: chmod +x ./gradlew
+      - run: ./gradlew build --no-daemon
+
+  fleet:
+    needs: changes
+    if: needs.changes.outputs.fleet == 'true'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: modules/pixel-fleet/services/control-service
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: '17' }
+      - uses: gradle/actions/setup-gradle@v4
+      - run: chmod +x ./gradlew
+      - run: ./gradlew build --no-daemon
+
+  fleet-sim:
+    needs: changes
+    if: needs.changes.outputs.fleet-sim == 'true'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: modules/pixel-fleet/robot-sim
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: '17' }
+      - uses: gradle/actions/setup-gradle@v4
+      - run: chmod +x ./gradlew
+      - run: ./gradlew build --no-daemon
+
+  wms:
+    needs: changes
+    if: needs.changes.outputs.wms == 'true'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: modules/pixel-wms/services/wms-service
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: '17' }
+      - uses: gradle/actions/setup-gradle@v4
+      - run: chmod +x ./gradlew
+      - run: ./gradlew build --no-daemon
+
+  qms:
+    needs: changes
+    if: needs.changes.outputs.qms == 'true'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: modules/pixel-qms/services/qms-service
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: '17' }
+      - uses: gradle/actions/setup-gradle@v4
+      - run: chmod +x ./gradlew
+      - run: ./gradlew build --no-daemon
+
+  dashboard:
+    needs: changes
+    if: needs.changes.outputs.dashboard == 'true'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: platform/dashboard
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: '20', cache: 'npm', cache-dependency-path: platform/dashboard/package-lock.json }
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm run build
