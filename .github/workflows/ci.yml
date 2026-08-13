@@ -14,19 +14,25 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
+  workflow_dispatch:
+    inputs:
+      run_all:
+        description: "경로 변경과 무관하게 전 모듈 빌드 (인프라·워크플로만 바뀌었을 때 수동 검증용)"
+        type: boolean
+        default: false
 
 jobs:
   changes:
     runs-on: ubuntu-latest
     outputs:
-      gateway: ${{ steps.filter.outputs.gateway }}
-      factory: ${{ steps.filter.outputs.factory }}
-      factory-sim: ${{ steps.filter.outputs.factory-sim }}
-      fleet: ${{ steps.filter.outputs.fleet }}
-      fleet-sim: ${{ steps.filter.outputs.fleet-sim }}
-      wms: ${{ steps.filter.outputs.wms }}
-      qms: ${{ steps.filter.outputs.qms }}
-      dashboard: ${{ steps.filter.outputs.dashboard }}
+      gateway: ${{ inputs.run_all == true || steps.filter.outputs.gateway == 'true' }}
+      factory: ${{ inputs.run_all == true || steps.filter.outputs.factory == 'true' }}
+      factory-sim: ${{ inputs.run_all == true || steps.filter.outputs.factory-sim == 'true' }}
+      fleet: ${{ inputs.run_all == true || steps.filter.outputs.fleet == 'true' }}
+      fleet-sim: ${{ inputs.run_all == true || steps.filter.outputs.fleet-sim == 'true' }}
+      wms: ${{ inputs.run_all == true || steps.filter.outputs.wms == 'true' }}
+      qms: ${{ inputs.run_all == true || steps.filter.outputs.qms == 'true' }}
+      dashboard: ${{ inputs.run_all == true || steps.filter.outputs.dashboard == 'true' }}
     steps:
       - uses: actions/checkout@v4
       - uses: dorny/paths-filter@v3
