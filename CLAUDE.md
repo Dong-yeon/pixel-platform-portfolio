@@ -23,17 +23,7 @@ PostgreSQL · Redis(fleet) · Paho MQTT / Mosquitto · React.
 
 ## Skill
 
-`skills/` 가 모든 Claude skill의 **단일 원본(SSOT)** 이다. 각 프로젝트의 `.claude/skills/` 는 전부 사본.
-
-- 편집은 `skills/` 에서만. 프로젝트 쪽 사본을 직접 고치면 다음 배포 때 덮어써진다.
-- 배포: `./scripts/sync-skills.sh` (Linux/git-bash) 또는 `.\scripts\sync-skills.ps1` (PowerShell)
-- 확인만: 위 명령에 `--check` / `-Check`
-- 매핑은 `scripts/skill-targets.tsv` 한 곳에서 관리. 프로젝트가 늘면 여기에 한 줄 추가.
-
-이 repo 작업 시 자동 로드되는 것은 `pixel-platform` · `pixelfleet` · `pixelfactory` 3개다.
-`skills/` 의 고객사 MES skill들은 **보관용**이며 이 repo 작업에 적용하지 않는다.
-
-## 주의
-
-이 repo는 **private 전제**다. `skills/` 에 고객사 도메인 정보(테이블명·업무규칙·채번 포맷)가 있어,
-공개 전환 시 해당 디렉터리 분리가 선행돼야 한다. 파일 삭제만으로는 git 히스토리에 남는다.
+원본 작업 환경에는 Claude Code skill을 여러 프로젝트에 동기화하는 `skills/` SSOT + 배포
+스크립트가 있었다. 공개용으로 정리하며 고객사 도메인 정보가 담긴 skill 디렉터리와 그 배포
+매핑(`scripts/skill-targets.tsv`)은 히스토리에서 제거했다. `scripts/sync-skills.*`는 SSOT
+동기화 방식을 보여주기 위해 남겨뒀다(매핑 파일이 없어 실행해도 아무 일도 하지 않는다).
