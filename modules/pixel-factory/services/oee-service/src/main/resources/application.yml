@@ -51,6 +51,16 @@ quality:
   # factory는 누가 검사하는지 모른다 — factory/quality/inspection-requested 로 신호만 보낸다.
   defect-threshold: ${QUALITY_DEFECT_THRESHOLD:3}
 
+factory:
+  events:
+    retention:
+      # factory_events는 계속 쌓이는 테이블이다(P8 검증 당시 이미 72,862건). OEE는 항상
+      # 최근 구간만 보므로 이 기간보다 오래된 원본은 지운다 — 필요해지면(연간 리포트 등)
+      # 지우기 전에 내보내는 잡을 별도로 만든다.
+      enabled: ${FACTORY_EVENT_RETENTION_ENABLED:true}
+      days: ${FACTORY_EVENT_RETENTION_DAYS:90}
+      cron: ${FACTORY_EVENT_RETENTION_CRON:0 0 3 * * *}
+
 ---
 spring:
   config:

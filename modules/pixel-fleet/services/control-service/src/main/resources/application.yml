@@ -79,6 +79,15 @@ dispatch:
     ack-timeout-seconds: ${DISPATCH_WATCHDOG_ACK_TIMEOUT:30}
     run-timeout-seconds: ${DISPATCH_WATCHDOG_RUN_TIMEOUT:300}
 
+fleet:
+  events:
+    retention:
+      # fleet_events는 로봇 텔레메트리라 factory_events보다도 더 빨리 쌓인다(초당 발행).
+      # 근거·기본값은 factory 쪽과 동일 — docs/BACKLOG.md "이벤트 보존 정책".
+      enabled: ${FLEET_EVENT_RETENTION_ENABLED:true}
+      days: ${FLEET_EVENT_RETENTION_DAYS:90}
+      cron: ${FLEET_EVENT_RETENTION_CRON:0 15 3 * * *}
+
 ---
 spring:
   config:

@@ -9,8 +9,20 @@ import java.util.List;
 import java.util.Optional;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.data.jpa.repository.Query;
 
 public interface FactoryEventRepository extends JpaRepository<FactoryEvent, Long> {
+
+    /**
+     * 보존 정책 — 벌크 DELETE. 파생 쿼리({@code deleteByCreatedAtBefore})는 Hibernate가
+     * 대상을 전부 <b>엔티티로 읽어와 한 건씩</b> 지운다(영속성 컨텍스트 이벤트를 위해).
+     * 수만~수십만 건이 쌓이는 이 테이블에서는 그 방식 자체가 부하가 된다 — 그래서 직접
+     * SQL DELETE 한 방으로 끝내는 {@code @Modifying} 벌크 연산을 쓴다.
+     */
+    @Modifying
+    @Query("delete from FactoryEvent e where e.createdAt < :cutoff")
+    int deleteByCreatedAtBefore(LocalDateTime cutoff);
 
     // 정렬 기준은 적재 시각(createdAt)이 아니라 발생 시각(occurredAt)이다.
     // 밀렸다 한꺼번에 들어온 메시지가 처리 순서대로 붙으면 실제 일어난 순서와 뒤바뀐다.
