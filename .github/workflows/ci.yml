@@ -76,6 +76,14 @@ jobs:
       # 전부 644였다). git의 실행권한이 어긋나도 CI가 죽지 않도록 한 번 더 chmod한다.
       - run: chmod +x ./gradlew
       - run: ./gradlew build --no-daemon
+      - name: Upload test report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gateway-test-report
+          path: platform/gateway/build/reports/tests/test
+          retention-days: 7
+          if-no-files-found: ignore
 
   factory:
     needs: changes
@@ -91,6 +99,14 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
       - run: chmod +x ./gradlew
       - run: ./gradlew build --no-daemon
+      - name: Upload test report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: factory-test-report
+          path: modules/pixel-factory/services/oee-service/build/reports/tests/test
+          retention-days: 7
+          if-no-files-found: ignore
 
   factory-sim:
     needs: changes
@@ -106,6 +122,14 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
       - run: chmod +x ./gradlew
       - run: ./gradlew build --no-daemon
+      - name: Upload test report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: factory-sim-test-report
+          path: modules/pixel-factory/simulator/build/reports/tests/test
+          retention-days: 7
+          if-no-files-found: ignore
 
   fleet:
     needs: changes
@@ -121,6 +145,14 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
       - run: chmod +x ./gradlew
       - run: ./gradlew build --no-daemon
+      - name: Upload test report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: fleet-test-report
+          path: modules/pixel-fleet/services/control-service/build/reports/tests/test
+          retention-days: 7
+          if-no-files-found: ignore
 
   fleet-sim:
     needs: changes
@@ -136,6 +168,14 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
       - run: chmod +x ./gradlew
       - run: ./gradlew build --no-daemon
+      - name: Upload test report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: fleet-sim-test-report
+          path: modules/pixel-fleet/robot-sim/build/reports/tests/test
+          retention-days: 7
+          if-no-files-found: ignore
 
   wms:
     needs: changes
@@ -151,6 +191,14 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
       - run: chmod +x ./gradlew
       - run: ./gradlew build --no-daemon
+      - name: Upload test report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: wms-test-report
+          path: modules/pixel-wms/services/wms-service/build/reports/tests/test
+          retention-days: 7
+          if-no-files-found: ignore
 
   qms:
     needs: changes
@@ -166,6 +214,14 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
       - run: chmod +x ./gradlew
       - run: ./gradlew build --no-daemon
+      - name: Upload test report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: qms-test-report
+          path: modules/pixel-qms/services/qms-service/build/reports/tests/test
+          retention-days: 7
+          if-no-files-found: ignore
 
   dashboard:
     needs: changes
