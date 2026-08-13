@@ -19,6 +19,7 @@ import com.pixelfleet.location.LocationRegistry;
 import com.pixelfleet.order.domain.FleetOrder;
 import com.pixelfleet.order.repository.FleetOrderRepository;
 import com.pixelfleet.robot.domain.RobotStatus;
+import com.pixelfleet.robot.domain.RobotType;
 import com.pixelfleet.robot.dto.RobotResponse;
 import com.pixelfleet.robot.service.RobotService;
 import com.pixelfleet.task.dispatch.AssignmentPolicy;
@@ -84,7 +85,7 @@ class OrderServiceRegressionTest {
 
     private static RobotResponse robot(long id, String code) {
         return new RobotResponse(id, code, code, RobotStatus.MOVING, 80, 0, 0, true, (short) 1,
-                LocalDateTime.now());
+                LocalDateTime.now(), false, false, RobotType.AMR, null);
     }
 
     /** 픽업→하역 2스텝 주문. 접근 레그(step0)를 이미 확보하고 EXECUTING까지 진행시켜 둔다. */
@@ -120,7 +121,7 @@ class OrderServiceRegressionTest {
         FleetOrder order1 = inProgressOrder("O-1", ROBOT_1, SEG_HELD_BY_ROBOT_1);
         FleetOrder order2 = inProgressOrder("O-2", ROBOT_2, SEG_HELD_BY_ROBOT_2);
 
-        when(laneGraph.plan(any(), any()))
+        when(laneGraph.planByNode(any(), any()))
                 .thenReturn(new LaneGraph.RoutePlan(List.of(new double[]{1, 1}), List.of(SEG_HELD_BY_ROBOT_2), 1.0))
                 .thenReturn(new LaneGraph.RoutePlan(List.of(new double[]{2, 2}), List.of(SEG_HELD_BY_ROBOT_1), 1.0));
 
@@ -169,7 +170,7 @@ class OrderServiceRegressionTest {
         when(robots.findAll()).thenReturn(List.of(robot(ROBOT_1, "AMR-01")));
         LaneGraph graph = mock(LaneGraph.class);
         when(graph.nodePosition(anyString())).thenReturn(new double[]{0, 0});
-        when(graph.plan(any(), any())).thenReturn(
+        when(graph.planByNode(any(), any())).thenReturn(
                 new LaneGraph.RoutePlan(List.of(new double[]{1, 1}), List.of("SEG-X"), 1.0));
 
         OrderService service = new OrderService(
@@ -195,7 +196,7 @@ class OrderServiceRegressionTest {
     void 다음_스텝_오배달_회귀_같은_스텝_완료가_중복_도착해도_두_번_진행하지_않는다() {
         // MQTT는 최소 1회 전달이라 같은 step-done이 두 번 올 수 있다(실제로 겪었다).
         FleetOrder order = inProgressOrder("O-DUP", ROBOT_1, SEG_HELD_BY_ROBOT_1);
-        when(laneGraph.plan(any(), any())).thenReturn(
+        when(laneGraph.planByNode(any(), any())).thenReturn(
                 new LaneGraph.RoutePlan(List.of(new double[]{1, 1}), List.of("SEG-NEXT"), 1.0));
 
         orderService.markStepDone("O-DUP", 0); // 정상 진행 — step1로.
@@ -229,7 +230,7 @@ class OrderServiceRegressionTest {
     @Test
     void 다음_레그_명령은_해당_주문에_배정된_로봇에게만_간다() {
         FleetOrder order = inProgressOrder("O-TARGET", ROBOT_2, SEG_HELD_BY_ROBOT_2);
-        when(laneGraph.plan(any(), any())).thenReturn(
+        when(laneGraph.planByNode(any(), any())).thenReturn(
                 new LaneGraph.RoutePlan(List.of(new double[]{5, 5}), List.of("SEG-FREE"), 1.0));
 
         orderService.markStepDone("O-TARGET", 0);
