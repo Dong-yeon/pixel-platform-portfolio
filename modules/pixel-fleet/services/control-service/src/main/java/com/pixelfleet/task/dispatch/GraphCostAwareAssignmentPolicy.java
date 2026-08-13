@@ -2,6 +2,7 @@ package com.pixelfleet.task.dispatch;
 
 import com.pixelfleet.location.LocationRegistry;
 import com.pixelfleet.order.domain.FleetOrder;
+import com.pixelfleet.robot.domain.RobotType;
 import com.pixelfleet.robot.dto.RobotResponse;
 import com.pixelfleet.traffic.LaneGraph;
 import java.util.Comparator;
@@ -44,17 +45,34 @@ public class GraphCostAwareAssignmentPolicy implements AssignmentPolicy {
 
     @Override
     public Optional<RobotResponse> selectRobot(FleetOrder order, List<RobotResponse> candidates) {
-        double[] origin = locations.resolve(order.getSteps().get(0).getLocationNode());
+        String locationNode = order.getSteps().get(0).getLocationNode();
+        boolean rackOrigin = locations.isRackCode(locationNode);
+        double[] origin = rackOrigin ? locations.rackApproachPoint(locationNode) : locations.resolve(locationNode);
         return candidates.stream()
                 .filter(robot -> robot.floorNo() == order.getFloorNo())
+                // P21: 랙 피더 주문은 그 존 로봇만, AMR 주문은 AMR만(NearestBatteryAwareAssignmentPolicy와
+                // 같은 필터 — 두 정책 모두 같은 배차 불변식을 지켜야 한다).
+                .filter(robot -> robot.robotType() == order.getRobotType())
+                .filter(robot -> order.getRobotType() != RobotType.RACK_FEEDER
+                        || order.getZoneCode().equals(robot.zoneCode()))
                 .filter(robot -> robot.batteryPercent() >= MIN_BATTERY_PERCENT)
                 .min(Comparator
-                        .comparingDouble((RobotResponse robot) -> routeCost(robot, origin))
+                        .comparingDouble((RobotResponse robot) -> routeCost(robot, origin, rackOrigin))
                         .thenComparing(Comparator.comparingInt(RobotResponse::batteryPercent).reversed()));
     }
 
-    /** 로봇의 현재 위치에서 작업 출발지까지, 지금 장애물 상황을 반영한 실제 경로 비용. */
-    private double routeCost(RobotResponse robot, double[] origin) {
+    /**
+     * 로봇의 현재 위치에서 작업 출발지까지의 비용. AMR은 지금 장애물 상황을 반영한 실제
+     * 경로 비용({@link LaneGraph#plan}), 랙 피더는 그래프에 올라가지 않으므로(D2) 직선거리다
+     * — {@code LaneGraph}로 렉을 route하면 로봇 위치가 진입점(anchor)으로 잘못 편입될 위험이
+     * 있다(설계 근거: docs/p21-warehouse-rack-feeder-design.md D2).
+     */
+    private double routeCost(RobotResponse robot, double[] origin, boolean rackOrigin) {
+        if (rackOrigin) {
+            double dx = robot.posX() - origin[0];
+            double dy = robot.posY() - origin[1];
+            return Math.hypot(dx, dy);
+        }
         return laneGraph.plan(new double[]{robot.posX(), robot.posY()}, origin).cost();
     }
 }

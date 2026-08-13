@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.pixelfleet.sim.config.SimProperties;
 import com.pixelfleet.sim.map.NodeMap;
+import com.pixelfleet.sim.map.RackMap;
 import com.pixelfleet.sim.mqtt.SimMqttClient;
 import com.pixelfleet.sim.robot.RobotState;
 import com.pixelfleet.sim.robot.VirtualRobot;
@@ -14,6 +15,7 @@ import java.util.Map;
 import java.util.concurrent.ThreadLocalRandom;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.event.EventListener;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -51,8 +53,16 @@ public class Simulator {
 
     private final SimProperties properties;
     private final NodeMap nodeMap;
+    private final RackMap rackMap;
     private final SimMqttClient mqtt;
     private final ObjectMapper objectMapper;
+    /**
+     * 랙 피더가 렉 앞에서 멈춰 취출을 표현하는 시간(tick 수, P21). 없는 데이터를 애니메이션으로
+     * 지어내지 않는다는 원칙에 따라 "몇 단에서 꺼내는지"는 흉내내지 않고 불투명한 정지로만
+     * 표현한다 — 화물 엘리베이터의 {@code elevatorTravelSeconds}(fleet)와 같은 패턴이다
+     * (설계 근거: docs/p21-warehouse-rack-feeder-design.md D7).
+     */
+    private final int rackFetchTicks;
 
     private final Object lock = new Object();
     private final List<VirtualRobot> robots = new ArrayList<>();
@@ -70,11 +80,15 @@ public class Simulator {
     /** 하트비트 카운터 — 주기적으로 상태를 다시 알린다(아래 tick 참고). */
     private int tickCount = 0;
 
-    public Simulator(SimProperties properties, NodeMap nodeMap, SimMqttClient mqtt, ObjectMapper objectMapper) {
+    public Simulator(SimProperties properties, NodeMap nodeMap, RackMap rackMap, SimMqttClient mqtt,
+                     ObjectMapper objectMapper, @Value("${sim.rack.fetch-seconds:8}") int rackFetchSeconds) {
         this.properties = properties;
         this.nodeMap = nodeMap;
+        this.rackMap = rackMap;
         this.mqtt = mqtt;
         this.objectMapper = objectMapper;
+        long tickMs = Math.max(1, properties.getTickIntervalMs());
+        this.rackFetchTicks = Math.max(1, (int) Math.round(rackFetchSeconds * 1000.0 / tickMs));
     }
 
     @EventListener(ApplicationReadyEvent.class)
@@ -87,7 +101,7 @@ public class Simulator {
             }
             for (SimProperties.RobotDef def : properties.getRobots()) {
                 double[] home = spot(def.getHome(), def.getCode());
-                VirtualRobot robot = new VirtualRobot(def.getCode(), def.getName(), home[0], home[1]);
+                VirtualRobot robot = new VirtualRobot(def.getCode(), def.getName(), def.getType(), home[0], home[1]);
                 robots.add(robot);
                 byCode.put(def.getCode(), robot);
             }
@@ -153,6 +167,17 @@ public class Simulator {
     }
 
     private void tickMoving(VirtualRobot robot) {
+        // 랙 피더가 렉 앞에서 취출 중(P21) — 이동은 이미 끝났고, 배터리만 계속 닳는다
+        // (팔을 뻗어 꺼내는 동안도 로봇은 켜져 있다). 위치는 안 바뀌므로 다시 발행하지 않는다.
+        if (robot.isRetrieving()) {
+            robot.drain(properties.getBatteryDrainPerTick());
+            publishBattery(robot, false);
+            if (robot.tickRetrieval()) {
+                finishLeg(robot);
+            }
+            return;
+        }
+
         boolean reached = robot.advanceToward(properties.getSpeed());
         robot.drain(properties.getBatteryDrainPerTick());
         publishPosition(robot);
@@ -172,19 +197,32 @@ public class Simulator {
         }
         // 레그 목적지 도착.
         if (robot.hasOrder()) {
-            // 스텝 완료 — 싣기/내리기를 적재 상태에 반영하고 서버에 보고한 뒤,
-            // 다음 레그(또는 ORDER_DONE)를 기다린다. IDLE로 내리지 않는다(주문을 쥔 채다).
-            robot.completeLeg();
-            // 적재 상태가 바뀌었을 수 있으니 즉시 알린다 — 위치 채널에 실려 가므로
-            // 지도에 파렛트가 바로 나타나거나 사라진다(하트비트를 기다리면 최대 10초 늦다).
-            publishPosition(robot);
-            publishTask(robot, "step-done", null);
+            if (isRackFeeder(robot) && robot.isForLoadAtTarget() && rackMap.isRackCode(robot.getCurrentLocation())) {
+                // 렉 정면에 도착 — 아직 완료가 아니다. 몇 단에서 꺼내는지는 지어내지 않고
+                // (없는 데이터를 시각효과로 만들지 않는다), 불투명한 정지로만 취출을 표현한다.
+                robot.beginRetrieval(rackFetchTicks);
+                return;
+            }
+            finishLeg(robot);
         } else if (robot.isChargingIntent()) {
             robot.clearOrder();
             setState(robot, RobotState.CHARGING);
         } else {
             setState(robot, RobotState.IDLE);
         }
+    }
+
+    /** 스텝 완료 — 싣기/내리기를 적재 상태에 반영하고 서버에 보고한 뒤, 다음 레그를 기다린다. */
+    private void finishLeg(VirtualRobot robot) {
+        robot.completeLeg();
+        // 적재 상태가 바뀌었을 수 있으니 즉시 알린다 — 위치 채널에 실려 가므로
+        // 지도에 파렛트가 바로 나타나거나 사라진다(하트비트를 기다리면 최대 10초 늦다).
+        publishPosition(robot);
+        publishTask(robot, "step-done", null);
+    }
+
+    private boolean isRackFeeder(VirtualRobot robot) {
+        return "RACK_FEEDER".equals(robot.getRobotType());
     }
 
     private void tickIdle(VirtualRobot robot) {
@@ -317,9 +355,14 @@ public class Simulator {
      *
      * <p>중간 웨이포인트는 손대지 않는다 — 그것들이 예약한 레인이고, 옮기면 통제되지 않은
      * 자리를 달리게 된다.
+     *
+     * <p><b>렉 목적지는 건드리지 않는다(P21).</b> {@code NodeMap}은 렉 좌표를 모른다 —
+     * 그대로 부르면 해시 폴백 좌표로 덮어써 관제 서버가 계산해 보낸 접근점을 잃는다.
+     * 렉은 애초에 한 존에 로봇이 1~2대뿐이라(design doc D10) 겹칠 정차 자리를 나눠 줄
+     * 필요도 없다.
      */
     private List<double[]> parkAtOwnSlot(List<double[]> waypoints, String node, String robotCode) {
-        if (waypoints.isEmpty() || node == null || node.isBlank()) {
+        if (waypoints.isEmpty() || node == null || node.isBlank() || rackMap.isRackCode(node)) {
             return waypoints;
         }
         List<double[]> adjusted = new ArrayList<>(waypoints);
@@ -387,7 +430,7 @@ public class Simulator {
             if (stepIndex == robot.getCurrentStepIndex()) {
                 return; // QoS1 중복 전달 — 이미 이 레그를 받았다.
             }
-            robot.assignLeg(orderCode, stepIndex,
+            robot.assignLeg(orderCode, stepIndex, location,
                     json.path("forLoad").asBoolean(false), json.path("forUnload").asBoolean(false),
                     parkAtOwnSlot(waypoints, location, robotCode));
             log.info("Robot {} got step {} of {} ({} waypoints)", robotCode, stepIndex, orderCode, waypoints.size());
@@ -402,7 +445,7 @@ public class Simulator {
                     robotCode, robot.getState(), robot.hasOrder(), orderCode);
             return;
         }
-        robot.assignLeg(orderCode, stepIndex,
+        robot.assignLeg(orderCode, stepIndex, location,
                 json.path("forLoad").asBoolean(false), json.path("forUnload").asBoolean(false),
                 parkAtOwnSlot(waypoints, location, robotCode));
         publishStatus(robot);           // now MOVING

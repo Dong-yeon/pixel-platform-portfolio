@@ -12,9 +12,13 @@ export interface MapLayers {
   pop: boolean
   /** 품질 흐름 — 품질동 강조 + 부적합 정보 흐름 점선. */
   quality: boolean
+  /** 랙 피더(P21) — 창고동 렉 전용 로봇. AMR과 별개로 껐다 켤 수 있다. */
+  rackFeeder: boolean
 }
 
-const ALL_LAYERS: MapLayers = { equipment: true, amr: true, routes: true, pop: true, quality: true }
+const ALL_LAYERS: MapLayers = {
+  equipment: true, amr: true, routes: true, pop: true, quality: true, rackFeeder: true,
+}
 
 /**
  * 보고 있는 건물/층.
@@ -143,6 +147,10 @@ export function UnifiedMap({
   }
 
   const activeTasks = tasks.filter((t) => ACTIVE_TASK.has(t.status))
+  // 지금 랙 피더가 서비스 중인 렉(P21) — 진행 중인 작업의 출발지가 렉 코드인 것들.
+  // 실제 진행 중인 주문에서만 뽑는다(없는 데이터를 시각효과로 지어내지 않는다, 지도 시각 규칙).
+  const rackCodes = new Set(layout.racks.map((r) => r.rackCode))
+  const activeRackCodes = new Set(activeTasks.map((t) => t.originNode).filter((n) => rackCodes.has(n)))
   const robotById = new Map(robots.map((r) => [r.id, r]))
   // 일을 맡은 로봇에만 경로 색 테를 두른다 — 쉬는 로봇까지 두르면 화면만 시끄럽다.
   const workingRobotIds = new Set(activeTasks.map((t) => t.assignedRobotId).filter(Boolean))
@@ -216,7 +224,12 @@ export function UnifiedMap({
       {layout.racks
         .filter((rack) => rack.floorNo === view.floorNo)
         .map((rack) => (
-          <RackShape key={rack.rackCode} rack={rack} quantity={rackStock[rack.rackCode] ?? 0} />
+          <RackShape
+            key={rack.rackCode}
+            rack={rack}
+            quantity={rackStock[rack.rackCode] ?? 0}
+            active={activeRackCodes.has(rack.rackCode)}
+          />
         ))}
 
       {/* ---- AMR 이동 경로 ---- 설비/로봇보다 아래에 깔린다.
@@ -403,8 +416,11 @@ export function UnifiedMap({
         </g>
       )}
 
-      {/* ---- AMR ---- 항상 맨 위. 보고 있는 층의 로봇만(층마다 따로 있다) */}
-      {layers.amr && floorRobots.map((r) => (
+      {/* ---- AMR·랙 피더 ---- 항상 맨 위. 보고 있는 층의 로봇만(층마다 따로 있다).
+             종류별로 레이어를 따로 끌 수 있다 — 랙 피더는 AMR과 아예 다니는 곳이 다르다. */}
+      {floorRobots
+        .filter((r) => (r.robotType === 'RACK_FEEDER' ? layers.rackFeeder : layers.amr))
+        .map((r) => (
         <g
           key={r.robotCode}
           className="umap-robot"
@@ -417,7 +433,13 @@ export function UnifiedMap({
           {workingRobotIds.has(r.id) && (
             <circle r={1.45} fill="none" stroke={routeColorFor(r.robotCode)} strokeWidth={0.26} opacity={0.9} />
           )}
-          <circle r={0.95} fill={ROBOT_COLOR[r.status]} stroke="#fff" strokeWidth={0.18} />
+          {/* 랙 피더는 사각, AMR은 원 — 창고 안에서만 도는 다른 종류의 로봇임을 모양으로 구분한다. */}
+          {r.robotType === 'RACK_FEEDER' ? (
+            <rect x={-0.85} y={-0.85} width={1.7} height={1.7} rx={0.25}
+                  fill={ROBOT_COLOR[r.status]} className="umap-robot-feeder-mark" />
+          ) : (
+            <circle r={0.95} fill={ROBOT_COLOR[r.status]} stroke="#fff" strokeWidth={0.18} />
+          )}
           <text y={0.38} className="umap-robot-label" textAnchor="middle" style={fs(1.1)}>
             {r.robotCode.slice(-1)}
           </text>
@@ -493,7 +515,14 @@ function BuildingNameplate({ x, y, scale, text }: { x: number; y: number; scale:
 }
 
 /** 렉 — 열×단이 보이도록 칸을 긋고, 적재율로 색을 채운다. */
-function RackShape({ rack, quantity }: { rack: LayoutRack; quantity: number }) {
+function RackShape({
+  rack, quantity, active = false,
+}: {
+  rack: LayoutRack
+  quantity: number
+  /** 지금 랙 피더가 이 렉에서 취출 중인가(P21) — 실제 진행 중인 주문 근거만(지도 시각 규칙). */
+  active?: boolean
+}) {
   const ratio = rack.capacityQty > 0 ? Math.min(1, quantity / rack.capacityQty) : 0
   const vertical = rack.orientation !== 'H'
   const w = vertical ? 1.6 : 4.6
@@ -505,12 +534,15 @@ function RackShape({ rack, quantity }: { rack: LayoutRack; quantity: number }) {
     y + (h * (i + 1)) / rack.levelsCount)
 
   return (
-    <g className="umap-rack-g">
+    <g className={`umap-rack-g${active ? ' servicing' : ''}`}>
       <rect x={x} y={y} width={w} height={h} rx={0.2} fill={rackFill(ratio)} className="umap-rack" />
       {dividers.map((dy, i) => (
         <line key={i} x1={x} y1={dy} x2={x + w} y2={dy} className="umap-rack-divider" />
       ))}
-      <title>{`${rack.rackCode} · ${quantity}/${rack.capacityQty} EA (${Math.round(ratio * 100)}%) · ${rack.columnsCount}열 ${rack.levelsCount}단`}</title>
+      <title>
+        {`${rack.rackCode} · ${quantity}/${rack.capacityQty} EA (${Math.round(ratio * 100)}%) · `
+          + `${rack.columnsCount}열 ${rack.levelsCount}단${active ? ' · 랙 피더 취출 중' : ''}`}
+      </title>
     </g>
   )
 }

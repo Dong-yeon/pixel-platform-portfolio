@@ -1,5 +1,6 @@
 package com.pixelfleet.order.domain;
 
+import com.pixelfleet.robot.domain.RobotType;
 import com.pixelplatform.core.common.entity.BaseEntity;
 import com.pixelplatform.core.common.exception.BusinessException;
 import com.pixelplatform.core.common.exception.ErrorCode;
@@ -64,6 +65,21 @@ public class FleetOrder extends BaseEntity {
     @Column(nullable = false)
     private short floorNo;
 
+    /**
+     * 이 주문을 실행해야 하는 로봇 종류(P21) — 기본 AMR. 렉 기원 주문(창고동 렉 취출)의
+     * 앞 레그만 {@code RACK_FEEDER}다. 배차 후보 필터가 이 값과 로봇의 종류를 맞춘다.
+     */
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 20)
+    private RobotType robotType = RobotType.AMR;
+
+    /**
+     * 랙 피더 주문 전용 — 담당 존(피킹존 노드 코드). {@code robotType == RACK_FEEDER}일 때만
+     * 값이 있다. 배차 후보를 그 존의 로봇으로 좁힌다.
+     */
+    @Column(length = 30)
+    private String zoneCode;
+
     /** -1 = 시작 전. 그 외엔 지금 향하고 있거나 막 끝낸 스텝. */
     @Column(nullable = false)
     private int currentStepIndex;
@@ -112,8 +128,17 @@ public class FleetOrder extends BaseEntity {
         this.priority = priority;
         this.stepFixed = stepFixed;
         this.floorNo = floorNo;
+        this.robotType = RobotType.AMR;
         this.status = OrderStatus.TO_BE_ALLOCATED;
         this.currentStepIndex = -1;
+    }
+
+    /** 로봇 풀(P21)을 명시하는 생성자 — 랙 피더 주문처럼 AMR이 아닌 풀을 요구할 때 쓴다. */
+    public FleetOrder(String orderCode, String externalId, int priority, boolean stepFixed, short floorNo,
+                      RobotType robotType, String zoneCode) {
+        this(orderCode, externalId, priority, stepFixed, floorNo);
+        this.robotType = robotType;
+        this.zoneCode = zoneCode;
     }
 
     public OrderStep addStep(String locationNode, boolean forLoad, boolean forUnload) {

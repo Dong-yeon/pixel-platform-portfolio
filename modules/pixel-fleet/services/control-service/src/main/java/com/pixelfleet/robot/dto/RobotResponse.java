@@ -3,6 +3,7 @@ package com.pixelfleet.robot.dto;
 import com.pixelfleet.robot.domain.Robot;
 import com.pixelfleet.robot.domain.RobotLiveState;
 import com.pixelfleet.robot.domain.RobotStatus;
+import com.pixelfleet.robot.domain.RobotType;
 import java.time.LocalDateTime;
 
 /**
@@ -28,7 +29,11 @@ public record RobotResponse(
         /** 조작자가 배차 대상에서 뺐다(휴무). 텔레메트리로 안 바뀐다 — {@link Robot} 참고. */
         boolean offDuty,
         /** 조작자가 완전히 잠갔다. off-duty보다 강한 배제. */
-        boolean disabled
+        boolean disabled,
+        /** 로봇 종류(P21) — AMR / RACK_FEEDER. 배차 후보 필터가 주문의 robotType과 맞춘다. */
+        RobotType robotType,
+        /** 랙 피더 전용 담당 존(피킹존 노드 코드). AMR은 항상 {@code null}. */
+        String zoneCode
 ) {
 
     public static RobotResponse of(Robot master, RobotLiveState live) {
@@ -44,7 +49,9 @@ public record RobotResponse(
                 master.getFloorNo(),
                 live.lastHeartbeatAt(),
                 master.isOffDuty(),
-                master.isDisabled()
+                master.isDisabled(),
+                master.getRobotType(),
+                master.getZoneCode()
         );
     }
 }

@@ -2,6 +2,7 @@ package com.pixelfleet.task.dispatch;
 
 import com.pixelfleet.location.LocationRegistry;
 import com.pixelfleet.order.domain.FleetOrder;
+import com.pixelfleet.robot.domain.RobotType;
 import com.pixelfleet.robot.dto.RobotResponse;
 import java.util.Comparator;
 import java.util.List;
@@ -50,13 +51,26 @@ public class NearestBatteryAwareAssignmentPolicy implements AssignmentPolicy {
 
     @Override
     public Optional<RobotResponse> selectRobot(FleetOrder order, List<RobotResponse> candidates) {
-        double[] origin = locations.resolve(order.getSteps().get(0).getLocationNode());
+        double[] origin = resolveOrigin(order);
         return candidates.stream()
                 .filter(robot -> robot.floorNo() == order.getFloorNo())
+                // P21: 랙 피더 주문은 그 존 로봇만, AMR 주문은 AMR만 — 다른 로봇 종류는
+                // 애초에 그 렉/레인망에 갈 수 없다(설계 근거: docs/p21-warehouse-rack-feeder-design.md D6).
+                .filter(robot -> robot.robotType() == order.getRobotType())
+                .filter(robot -> order.getRobotType() != RobotType.RACK_FEEDER
+                        || order.getZoneCode().equals(robot.zoneCode()))
                 .filter(robot -> robot.batteryPercent() >= MIN_BATTERY_PERCENT)
                 .min(Comparator
                         .comparingDouble((RobotResponse robot) -> distanceSquared(robot, origin))
                         .thenComparing(Comparator.comparingInt(RobotResponse::batteryPercent).reversed()));
+    }
+
+    /** 주문 step0의 출발 좌표 — 렉 기원 주문(P21)이면 렉 접근점, 아니면 평소처럼 노드 좌표. */
+    private double[] resolveOrigin(FleetOrder order) {
+        String locationNode = order.getSteps().get(0).getLocationNode();
+        return locations.isRackCode(locationNode)
+                ? locations.rackApproachPoint(locationNode)
+                : locations.resolve(locationNode);
     }
 
     private double distanceSquared(RobotResponse robot, double[] point) {

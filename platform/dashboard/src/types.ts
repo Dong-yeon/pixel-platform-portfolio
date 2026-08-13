@@ -50,6 +50,14 @@ export interface Robot {
   offDuty: boolean
   /** 조작자가 완전히 잠갔다(고장/점검 등) — off-duty보다 강한 배제. */
   disabled: boolean
+  /**
+   * 로봇 종류(P21) — `AMR`은 공장 레인망을 타고, `RACK_FEEDER`(랙 피더)는 창고동 렉에서
+   * 물건을 꺼내 피킹존까지만 옮긴다(자기 존 밖으로 나가지 않는다). 지도가 마커 모양을
+   * 다르게 그린다.
+   */
+  robotType: 'AMR' | 'RACK_FEEDER'
+  /** 랙 피더 전용 담당 존(피킹존 노드 코드). AMR은 항상 null. */
+  zoneCode: string | null
 }
 
 export type TaskStatus = 'PENDING' | 'ASSIGNED' | 'IN_PROGRESS' | 'COMPLETED' | 'FAILED' | 'CANCELLED'

@@ -13,6 +13,7 @@ import com.pixelfleet.order.domain.OrderStep;
 import com.pixelfleet.order.domain.StepStatus;
 import com.pixelfleet.order.repository.FleetOrderRepository;
 import com.pixelfleet.robot.domain.RobotStatus;
+import com.pixelfleet.robot.domain.RobotType;
 import com.pixelfleet.robot.dto.RobotResponse;
 import com.pixelfleet.robot.service.RobotService;
 import com.pixelfleet.task.dispatch.AssignmentPolicy;
@@ -127,13 +128,33 @@ public class OrderService {
     }
 
     /**
+     * 스텝 하나가 요구하는 로봇 풀(P21) — (층, 로봇 종류, 존). 렉 코드면 랙 피더 풀(존 =
+     * {@link LocationRegistry#nearestPickNode}가 계산한 피킹존), 아니면 그 노드가 속한
+     * 층의 AMR 풀이다.
+     *
+     * <p>층 경계(엘리베이터)만 다루던 예전의 {@code crossFloor} 판정을 일반화한 것 —
+     * "로봇 풀이 바뀌는 경계"가 이제 층이 다른 경우와 로봇 종류가 다른 경우 두 가지다
+     * (설계 근거: {@code docs/p21-warehouse-rack-feeder-design.md} D5, 옵션 A).
+     */
+    private record RobotPool(short floorNo, RobotType robotType, String zoneCode) {}
+
+    private RobotPool requiredPool(String locationNode) {
+        if (locations.isRackCode(locationNode)) {
+            LocationRegistry.RackInfo rack = locations.rack(locationNode);
+            return new RobotPool(rack.floorNo(), RobotType.RACK_FEEDER, locations.nearestPickNode(locationNode));
+        }
+        return new RobotPool(locations.floorOf(locationNode), RobotType.AMR, null);
+    }
+
+    /**
      * 주문 생성.
      *
-     * <p>모든 스텝은 <b>같은 층</b>이어야 한다 — 로봇은 층을 오가지 못한다(엘리베이터는
-     * 화물용). 예외 하나: <b>2스텝(싣고→내리는) 주문이 층을 넘으면</b> 오늘까지의 규칙대로
-     * 승강장에서 두 주문으로 끊어 준다. 스텝이 셋 이상인데 층이 섞이면 어느 스텝까지가
-     * 어느 층 몫인지 서버가 판단할 수 없으므로 명확히 거부한다 — 호출자가 봉인 주문
-     * 여러 개로 스스로 끊는 것이 정직하다.
+     * <p>모든 스텝은 <b>같은 로봇 풀</b>이어야 한다 — 로봇은 층도, 자기 존도 벗어나지 못한다.
+     * 예외 하나: <b>2스텝(싣고→내리는) 주문이 풀 경계를 넘으면</b> 그 경계에서 두 주문으로
+     * 끊어 준다({@link #handoffNodeFor}) — 층이 다르면 엘리베이터 승강장, 로봇 종류가
+     * 다르면(렉→AMR) 랙 피더의 피킹존이 그 경계다. 스텝이 셋 이상인데 풀이 섞이면 어느
+     * 스텝까지가 어느 풀 몫인지 서버가 판단할 수 없으므로 명확히 거부한다 — 호출자가 봉인
+     * 주문 여러 개로 스스로 끊는 것이 정직하다.
      */
     @Transactional
     public FleetOrder create(String orderCode, String externalId, List<StepSpec> stepSpecs,
@@ -153,18 +174,20 @@ public class OrderService {
             }
         }
 
-        List<Short> floors = stepSpecs.stream().map(s -> locations.floorOf(s.location())).toList();
-        boolean crossFloor = floors.stream().distinct().count() > 1;
+        List<RobotPool> pools = stepSpecs.stream().map(s -> requiredPool(s.location())).toList();
+        boolean poolChanges = pools.stream().distinct().count() > 1;
 
-        if (crossFloor && isSimpleHaul(stepSpecs)) {
-            return createSplitAtElevator(orderCode, externalId, stepSpecs, priority, floors);
+        if (poolChanges && isSimpleHaul(stepSpecs)) {
+            return createSplitAtHandoff(orderCode, externalId, stepSpecs, priority, pools);
         }
-        if (crossFloor) {
+        if (poolChanges) {
             throw new BusinessException(ErrorCode.INVALID_REQUEST,
-                    "층이 섞인 다단 스텝 주문은 지원하지 않습니다. 층별로 주문을 나눠 주세요. 층: " + floors);
+                    "로봇 풀이 섞인 다단 스텝 주문은 지원하지 않습니다. 풀별로 주문을 나눠 주세요. 풀: " + pools);
         }
 
-        FleetOrder order = new FleetOrder(orderCode, externalId, priority, stepFixed, floors.get(0));
+        RobotPool pool = pools.get(0);
+        FleetOrder order = new FleetOrder(orderCode, externalId, priority, stepFixed,
+                pool.floorNo(), pool.robotType(), pool.zoneCode());
         stepSpecs.forEach(s -> order.addStep(s.location(), s.forLoad(), s.forUnload()));
         orderRepository.save(order);
         recordCreated(order, null);
@@ -175,37 +198,110 @@ public class OrderService {
         return specs.size() == 2 && specs.get(0).forLoad() && specs.get(1).forUnload();
     }
 
-    /** 층을 넘는 단순 이송 — 출발 층 승강장까지의 앞 주문을 만들고 최종 목적지를 달아 둔다. */
-    private FleetOrder createSplitAtElevator(String orderCode, String externalId,
-                                             List<StepSpec> specs, int priority, List<Short> floors) {
-        short originFloor = floors.get(0);
+    /**
+     * 로봇 풀이 바뀌는 지점까지의 앞 주문을 만들고, 최종 목적지는 handoff로 달아 둔다.
+     *
+     * <p><b>예외: 목적지가 이미 그 handoff 지점 자체면</b>(예: 렉 취출 주문의 목적지가 그
+     * 렉의 피킹존 그대로인 경우 — "그 자리까지만 옮겨 달라"는 정당한 요청이다) 인계할 다음
+     * 로봇 풀이 없다. 그대로 handoff를 걸면 뒷 주문의 두 스텝이 같은 지점이 되어(길이 0
+     * 레그) {@link #create}가 막는 것과 같은 문제가 생기므로, 랙 피더 혼자 끝까지 수행하는
+     * 평범한 단일 풀 주문으로 만든다.
+     */
+    private FleetOrder createSplitAtHandoff(String orderCode, String externalId,
+                                            List<StepSpec> specs, int priority, List<RobotPool> pools) {
+        RobotPool origin = pools.get(0);
+        RobotPool destination = pools.get(1);
         String finalDestination = specs.get(1).location();
+        String handoffNode = handoffNodeFor(origin, destination);
 
-        FleetOrder order = new FleetOrder(orderCode, externalId, priority, true, originFloor);
+        FleetOrder order = new FleetOrder(orderCode, externalId, priority, true,
+                origin.floorNo(), origin.robotType(), origin.zoneCode());
         order.addStep(specs.get(0).location(), true, false);
-        order.addStep(elevatorNode(originFloor), false, true);
+
+        if (finalDestination.equals(handoffNode)) {
+            order.addStep(finalDestination, false, true);
+            orderRepository.save(order);
+            recordCreated(order, null);
+            return order;
+        }
+
+        order.addStep(handoffNode, false, true);
         order.handOffTo(finalDestination);
         orderRepository.save(order);
-        recordCreated(order, "[엘리베이터로 " + floors.get(1) + "층 " + finalDestination + "까지]");
+        recordCreated(order, "[" + handoffLabel(origin, destination) + " " + finalDestination + "까지]");
         return order;
     }
 
-    /** 층간 체인 뒷 주문 — 물건이 도착한 층에서 이어받는다. 완료 보고 중복에 대비해 멱등. */
+    /**
+     * 두 로봇 풀 경계에서 물건을 넘길 지점. 층이 다르면 엘리베이터 승강장(관례상 노드),
+     * 로봇 종류만 다르면(같은 층) 랙 피더의 피킹존이 곧 그 지점이다(D4 — 렉이 어느
+     * 피킹존과 가까운지는 fleet이 좌표로 계산해 둔 값을 그대로 쓴다).
+     */
+    private String handoffNodeFor(RobotPool origin, RobotPool destination) {
+        if (origin.floorNo() != destination.floorNo()) {
+            // 렉↔층 경계를 동시에 넘는 주문은 아직 지원하지 않는다 — 엘리베이터 승강장은
+            // AMR끼리의 인계 지점이지 랙 피더가 갈 수 있는 곳이 아니다(자기 존 밖이다).
+            // 실제로 필요해지면 렉→피킹존→엘리베이터의 3단 체인으로 확장해야 한다(범위 밖).
+            if (origin.robotType() == RobotType.RACK_FEEDER || destination.robotType() == RobotType.RACK_FEEDER) {
+                throw new BusinessException(ErrorCode.INVALID_REQUEST,
+                        "렉과 다른 층을 동시에 넘는 주문은 아직 지원하지 않습니다. 렉과 같은 층의 "
+                                + "목적지로 만들거나, 피킹존까지 옮긴 뒤 층간 이송을 별도 주문으로 내주세요. "
+                                + "(" + origin + " -> " + destination + ")");
+            }
+            return elevatorNode(origin.floorNo());
+        }
+        if (origin.robotType() == RobotType.RACK_FEEDER) {
+            return origin.zoneCode();
+        }
+        if (destination.robotType() == RobotType.RACK_FEEDER) {
+            return destination.zoneCode();
+        }
+        throw new BusinessException(ErrorCode.INVALID_REQUEST,
+                "지원하지 않는 로봇 풀 경계입니다: " + origin + " -> " + destination);
+    }
+
+    private String handoffLabel(RobotPool origin, RobotPool destination) {
+        return origin.floorNo() != destination.floorNo() ? "엘리베이터로" : "랙 피더가 " + origin.zoneCode() + "에서";
+    }
+
+    /**
+     * 풀 경계 체인 뒷 주문 — 물건이 넘어간 쪽에서 이어받는다. 완료 보고 중복에 대비해 멱등.
+     *
+     * <p>층이 다르면(엘리베이터) 도착 층의 승강장에서 시작하고 승강 시간만큼 기다린다.
+     * 로봇 종류만 다르면(랙 피더 → AMR) <b>같은 물리 지점</b>에서 넘어가므로 — 앞 주문이
+     * 마지막으로 도착한 노드에서 그대로 시작하고, 물건이 이미 거기 있으므로 대기 시간이 없다.
+     */
     private void createHandoffOrder(FleetOrder finished) {
         String finalDestination = finished.getHandoffDestination();
         short arrivalFloor = locations.floorOf(finalDestination);
-        String code = finished.getOrderCode() + "-F" + arrivalFloor;
+        boolean crossesFloor = arrivalFloor != finished.getFloorNo();
+        String code = finished.getOrderCode() + (crossesFloor ? "-F" + arrivalFloor : "-H");
         if (orderRepository.findByOrderCode(code).isPresent()) {
             return;
+        }
+
+        String startNode;
+        LocalDateTime availableAt;
+        String logMessage;
+        if (crossesFloor) {
+            startNode = elevatorNode(arrivalFloor);
+            availableAt = LocalDateTime.now().plusSeconds(elevatorTravelSeconds);
+            logMessage = "엘리베이터: " + finished.getOrderCode() + " 화물이 " + arrivalFloor + "층으로 이동 중 "
+                    + "(" + elevatorTravelSeconds + "초 후 " + startNode + "에서 인수)";
+        } else {
+            // 랙 피더가 이미 물리적으로 가져다 놓은 자리 — AMR은 즉시 이어받는다.
+            startNode = finished.stepAt(finished.getSteps().size() - 1).getLocationNode();
+            availableAt = LocalDateTime.now();
+            logMessage = "랙 피더: " + finished.getOrderCode() + " 취출 완료, " + startNode + "에서 AMR 인수 대기";
         }
 
         // externalId를 물려받는다 — 상류는 체인이 쪼개진 사정을 모르고, 자기가 낸
         // 번호 하나로 최종 결과를 기다린다.
         FleetOrder leg = new FleetOrder(code, finished.getExternalId(),
                 finished.getPriority(), true, arrivalFloor);
-        leg.addStep(elevatorNode(arrivalFloor), true, false);
+        leg.addStep(startNode, true, false);
         leg.addStep(finalDestination, false, true);
-        leg.continues(finished.getOrderCode(), LocalDateTime.now().plusSeconds(elevatorTravelSeconds));
+        leg.continues(finished.getOrderCode(), availableAt);
         orderRepository.save(leg);
 
         fleetEventService.record(
@@ -213,12 +309,33 @@ public class OrderService {
                 SourceType.SYSTEM, null,
                 TargetType.TASK, leg.getId(),
                 leg.getId(), EventSeverity.INFO,
-                "엘리베이터: " + finished.getOrderCode() + " 화물이 " + arrivalFloor + "층으로 이동 중 "
-                        + "(" + elevatorTravelSeconds + "초 후 " + elevatorNode(arrivalFloor) + "에서 인수)", null);
+                logMessage, null);
     }
 
     private String elevatorNode(short floor) {
         return "WH-ELEV-" + floor + "F";
+    }
+
+    /**
+     * 스텝 하나의 이동 계획. AMR은 지금처럼 {@link LaneGraph}(공유 레인망, 구간 점유 통제)를
+     * 탄다. 랙 피더는 존 안 로컬 직선 이동이다 — {@code LaneGraph}에 렉을 노드로 넣지 않기로
+     * 했으므로(D2) 여기서 좌표를 직접 계산하고, 점유할 구간은 없다(빈 리스트 —
+     * {@link TrafficController#tryReserve}가 항상 그대로 성공하고, 그 로봇은 애초에
+     * 아무 구간도 쥔 적이 없어 {@code progress}/{@code release}도 자연히 no-op이다).
+     */
+    private LaneGraph.RoutePlan planLeg(double[] fromPos, FleetOrder order, String toNode) {
+        if (order.getRobotType() != RobotType.RACK_FEEDER) {
+            return laneGraph.planByNode(fromPos, toNode);
+        }
+        double[] to = resolveForRackFeeder(toNode);
+        double dx = to[0] - fromPos[0];
+        double dy = to[1] - fromPos[1];
+        return new LaneGraph.RoutePlan(List.of(to.clone()), List.of(), Math.hypot(dx, dy));
+    }
+
+    /** 렉 코드면 정면 접근점, 아니면(피킹존 등 일반 노드) 그대로 노드 좌표. */
+    private double[] resolveForRackFeeder(String node) {
+        return locations.isRackCode(node) ? locations.rackApproachPoint(node) : locations.resolve(node);
     }
 
     // ---- 배차 ----
@@ -269,8 +386,8 @@ public class OrderService {
         // 접근 레그(로봇→step0)만 예약하고 보낸다 — 주문 전체를 잡으면 먼 로봇이
         // 공장을 가로지르는 구간을 통째로 요구해 다른 로봇이 거의 못 움직인다.
         OrderStep first = order.stepAt(0);
-        LaneGraph.RoutePlan approach = laneGraph.planByNode(
-                new double[]{robot.posX(), robot.posY()}, first.getLocationNode());
+        LaneGraph.RoutePlan approach = planLeg(
+                new double[]{robot.posX(), robot.posY()}, order, first.getLocationNode());
         if (!trafficController.tryReserve(robot.id(), approach.segments())) {
             log.info("Traffic: robot {} cannot take {} — approach segments busy {}",
                     robot.robotCode(), order.getOrderCode(), laneGraph.describe(approach.segments()));
@@ -414,9 +531,10 @@ public class OrderService {
 
         LaneGraph.RoutePlan plan = nextLegCache.computeIfAbsent(order.getOrderCode(), k -> {
             OrderStep previous = order.stepAt(order.getCurrentStepIndex() - 1);
-            return laneGraph.plan(
-                    laneGraph.nodePosition(previous.getLocationNode()),
-                    laneGraph.nodePosition(current.getLocationNode()));
+            double[] fromPos = order.getRobotType() == RobotType.RACK_FEEDER
+                    ? resolveForRackFeeder(previous.getLocationNode())
+                    : laneGraph.nodePosition(previous.getLocationNode());
+            return planLeg(fromPos, order, current.getLocationNode());
         });
 
         if (!trafficController.tryReserve(order.getAssignedRobotId(), plan.segments())) {

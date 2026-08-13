@@ -6,6 +6,7 @@ import static org.mockito.Mockito.when;
 import com.pixelfleet.location.LocationRegistry;
 import com.pixelfleet.order.domain.FleetOrder;
 import com.pixelfleet.robot.domain.RobotStatus;
+import com.pixelfleet.robot.domain.RobotType;
 import com.pixelfleet.robot.dto.RobotResponse;
 import com.pixelfleet.traffic.LaneGraph;
 import com.pixelfleet.traffic.ObstacleStore;
@@ -80,13 +81,13 @@ class GraphCostAwareAssignmentPolicyTest {
         order.addStep("WH-RECV", false, true);
 
         RobotResponse lowBattery = new RobotResponse(1L, "AMR-LOW", "1호기", RobotStatus.IDLE,
-                10, 27, 6, false, (short) 1, LocalDateTime.now());
+                10, 27, 6, false, (short) 1, LocalDateTime.now(), false, false, RobotType.AMR, null);
 
         assertThat(graphCostPolicy.selectRobot(order, List.of(lowBattery))).isEmpty();
     }
 
     private RobotResponse robot(long id, String code, double x, double y) {
         return new RobotResponse(id, code, code, RobotStatus.IDLE, 80, x, y, false, (short) 1,
-                LocalDateTime.now());
+                LocalDateTime.now(), false, false, RobotType.AMR, null);
     }
 }

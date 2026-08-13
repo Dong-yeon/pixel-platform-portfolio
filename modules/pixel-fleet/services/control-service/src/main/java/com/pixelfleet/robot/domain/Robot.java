@@ -3,6 +3,8 @@ package com.pixelfleet.robot.domain;
 import com.pixelplatform.core.common.entity.BaseEntity;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
@@ -50,10 +52,34 @@ public class Robot extends BaseEntity {
     @Column(nullable = false)
     private boolean disabled;
 
+    /**
+     * 로봇 종류(P21) — {@code AMR}은 공장 레인망을 타고, {@code RACK_FEEDER}는 자기 존의
+     * 렉만 오간다. 기본값 AMR(기존 로봇 전부 이 값).
+     */
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 20)
+    private RobotType robotType = RobotType.AMR;
+
+    /**
+     * 랙 피더 전용 — 이 로봇이 담당하는 피킹 클러스터(피킹존 노드 코드 그대로 재사용,
+     * 예: {@code WH-2F-P1}). AMR은 항상 {@code null}이다.
+     */
+    @Column(length = 30)
+    private String zoneCode;
+
     public Robot(String robotCode, String name, short floorNo) {
         this.robotCode = robotCode;
         this.name = name;
         this.floorNo = floorNo;
+        this.robotType = RobotType.AMR;
+    }
+
+    public Robot(String robotCode, String name, short floorNo, RobotType robotType, String zoneCode) {
+        this.robotCode = robotCode;
+        this.name = name;
+        this.floorNo = floorNo;
+        this.robotType = robotType;
+        this.zoneCode = zoneCode;
     }
 
     public void markOffDuty() {

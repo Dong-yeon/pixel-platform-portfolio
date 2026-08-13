@@ -81,7 +81,15 @@ public class DemoTaskGenerator {
             new Flow("WH-3F-P1", "WH-3F-P2"),
             // P20-3: 신관(Building-A/B) 편입 확인용 — 판정 후 물건이 신관 물류 적재장까지 간다.
             // 게이트 2개(GATE-WH-A, GATE-A-B)를 거치는 경로가 실제로 계산되는지가 이 흐름의 목적.
-            new Flow("QC-OUT", "LOGI-1"));
+            new Flow("QC-OUT", "LOGI-1"),
+            // P21: 렉 취출 — 원본은 "이미 피킹존에 있다"고 치던 자리였다. 랙 피더가 실제로
+            // 렉까지 가서 꺼내 오는 구간이 이제 생겼다(OrderService.create()가 렉 코드를
+            // 보고 자동으로 랙 피더 레그 + AMR 레그로 쪼갠다 — 이 목록은 여전히 "어디서
+            // 어디로"만 말한다). 같은 층 목적지만 — 렉↔층 동시 경계는 아직 지원하지 않는다.
+            new Flow("WH-1F-R05", "PROD-A2"),
+            new Flow("WH-1F-R08", "WH-SHIP"),
+            new Flow("WH-2F-R04", "WH-2F-P2"),
+            new Flow("WH-3F-R02", "WH-3F-P1"));
 
     /**
      * 대기 작업이 이 수를 넘으면 새로 만들지 않는다.

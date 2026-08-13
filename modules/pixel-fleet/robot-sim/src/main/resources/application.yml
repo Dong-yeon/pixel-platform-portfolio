@@ -22,6 +22,10 @@ sim:
   # 유휴 순찰은 기본으로 끈다. 서버가 구간 점유로 교통을 통제하는데, 로봇이 제멋대로
   # 돌아다니면 통제 밖 이동이 생겨 충돌 회피 보장이 깨진다.
   roam: false
+  # 랙 피더가 렉 앞에서 멈춰 취출을 표현하는 시간(P21). 화물 엘리베이터의 승강 시간(fleet
+  # elevatorTravelSeconds=12초)과 같은 패턴이나, 렉은 훨씬 가까운 거리라 더 짧게 잡았다.
+  rack:
+    fetch-seconds: 8
   obstacle:
     # P20-4 — 통로가 막히는 상황을 만든다(ObstacleSimulator). false면 데모에서 끌 수 있다.
     enabled: true
@@ -69,6 +73,39 @@ sim:
       name: 8호기
       home: WH-DOCK-3F
       floor: 3
+    # 랙 피더(P21) — 창고동 렉에서 물건을 꺼내 피킹존까지만 옮긴다. AMR의 레인망을 타지
+    # 않으므로(fleet OrderService.planLeg가 로컬 직선 이동으로 계산) home은 자기 존의
+    # 피킹존 노드다 — 관제 서버 robots.zone_code(V10 마이그레이션)와 같아야 한다.
+    - code: RF-01
+      name: 1층 랙 피더 1호
+      home: WH-PICK
+      floor: 1
+      type: RACK_FEEDER
+    - code: RF-02
+      name: 1층 랙 피더 2호
+      home: WH-PICK
+      floor: 1
+      type: RACK_FEEDER
+    - code: RF-03
+      name: 2층 랙 피더 1호
+      home: WH-2F-P1
+      floor: 2
+      type: RACK_FEEDER
+    - code: RF-04
+      name: 2층 랙 피더 2호
+      home: WH-2F-P2
+      floor: 2
+      type: RACK_FEEDER
+    - code: RF-05
+      name: 3층 랙 피더 1호
+      home: WH-3F-P1
+      floor: 3
+      type: RACK_FEEDER
+    - code: RF-06
+      name: 3층 랙 피더 2호
+      home: WH-3F-P2
+      floor: 3
+      type: RACK_FEEDER
 
 logging:
   level:

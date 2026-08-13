@@ -30,8 +30,23 @@ public class SimProperties {
          */
         private int floor = 1;
 
+        /**
+         * 로봇 종류(P21) — {@code AMR} | {@code RACK_FEEDER}. <b>관제 서버 robots.robot_type과
+         * 같아야 한다</b>. 랙 피더는 렉에 도착하면(step0, forLoad) 곧바로 완료를 보고하지
+         * 않고 {@code sim.rack.fetch-seconds} 동안 멈춰서 취출을 표현한다(Simulator 참고).
+         */
+        private String type = "AMR";
+
         public String getCode() {
             return code;
+        }
+
+        public String getType() {
+            return type;
+        }
+
+        public void setType(String type) {
+            this.type = type;
         }
 
         public int getFloor() {

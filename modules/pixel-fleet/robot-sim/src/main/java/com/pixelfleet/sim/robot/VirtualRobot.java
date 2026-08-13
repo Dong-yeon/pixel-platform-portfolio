@@ -12,6 +12,8 @@ public class VirtualRobot {
 
     private final String code;
     private final String name;
+    /** 로봇 종류(P21) — {@code AMR} | {@code RACK_FEEDER}. application.yml sim.robots[].type 그대로. */
+    private final String robotType;
 
     private double x;
     private double y;
@@ -23,6 +25,8 @@ public class VirtualRobot {
     private boolean chargingIntent;
     /** 지금 달리고 있(었)는 스텝. -1 = 주문 없음. */
     private int currentStepIndex = -1;
+    /** 지금 레그의 목적지 노드 코드 — 렉인지(랙 피더 취출 타이머 대상인지) 판정하는 데 쓴다. */
+    private String currentLocation;
     /**
      * 적재 여부 — 스텝의 forLoad/forUnload를 <b>완료 시점에</b> 반영한 결과.
      * 예전엔 "픽업을 지났는가"로 추론했는데, 그건 스텝이 2개일 때만 맞는 우연이었다.
@@ -31,10 +35,13 @@ public class VirtualRobot {
     /** 지금 레그의 목적지에서 싣는가/내리는가 — 도착했을 때 laden에 반영한다. */
     private boolean forLoadAtTarget;
     private boolean forUnloadAtTarget;
+    /** 랙 피더가 렉 앞에서 취출 중(P21) — 이동은 끝났지만 아직 레그를 완료 보고하지 않은 상태. */
+    private int retrievalTicksRemaining = -1;
 
-    public VirtualRobot(String code, String name, double x, double y) {
+    public VirtualRobot(String code, String name, String robotType, double x, double y) {
         this.code = code;
         this.name = name;
+        this.robotType = robotType;
         this.x = x;
         this.y = y;
     }
@@ -66,15 +73,17 @@ public class VirtualRobot {
      * 공장을 가로지르는 구간을 한 번에 요구해 다른 로봇이 거의 못 움직인다.
      * 경로(웨이포인트)는 통로를 따라 꺾어 가므로 중간 지점이 여럿이다.
      */
-    public void assignLeg(String orderCode, int stepIndex, boolean forLoad, boolean forUnload,
+    public void assignLeg(String orderCode, int stepIndex, String location, boolean forLoad, boolean forUnload,
                           List<double[]> waypoints) {
         path.clear();
         path.addAll(waypoints);
         this.currentOrderCode = orderCode;
         this.currentStepIndex = stepIndex;
+        this.currentLocation = location;
         this.forLoadAtTarget = forLoad;
         this.forUnloadAtTarget = forUnload;
         this.chargingIntent = false;
+        this.retrievalTicksRemaining = -1;
         this.state = RobotState.MOVING;
     }
 
@@ -95,6 +104,11 @@ public class VirtualRobot {
 
     public boolean isLaden() {
         return laden;
+    }
+
+    /** 지금 레그의 목적지에서 싣는가 — 랙 피더의 취출 대상 판정(P21)에 쓴다. */
+    public boolean isForLoadAtTarget() {
+        return forLoadAtTarget;
     }
 
     public int getCurrentStepIndex() {
@@ -124,10 +138,27 @@ public class VirtualRobot {
         path.clear();
         this.currentOrderCode = null;
         this.currentStepIndex = -1;
+        this.currentLocation = null;
         this.chargingIntent = false;
         this.forLoadAtTarget = false;
         this.forUnloadAtTarget = false;
         this.laden = false;
+        this.retrievalTicksRemaining = -1;
+    }
+
+    /** 랙 피더가 렉 앞에 도착했다 — {@code ticks}번의 tick 동안 취출을 표현한다(P21). */
+    public void beginRetrieval(int ticks) {
+        this.retrievalTicksRemaining = Math.max(1, ticks);
+    }
+
+    public boolean isRetrieving() {
+        return retrievalTicksRemaining > 0;
+    }
+
+    /** 이번 tick만큼 취출 시간을 줄인다. @return 이번 tick에 다 됐으면 true. */
+    public boolean tickRetrieval() {
+        retrievalTicksRemaining--;
+        return retrievalTicksRemaining <= 0;
     }
 
     public void drain(double amount) {
@@ -189,5 +220,13 @@ public class VirtualRobot {
 
     public String getCurrentOrderCode() {
         return currentOrderCode;
+    }
+
+    public String getRobotType() {
+        return robotType;
+    }
+
+    public String getCurrentLocation() {
+        return currentLocation;
     }
 }

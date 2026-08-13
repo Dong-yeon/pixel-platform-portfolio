@@ -14,6 +14,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.TreeSet;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.regex.Pattern;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -135,7 +136,49 @@ public class LocationRegistry {
             new Object[]{"QC-OUT", "JCT-62-U", 3.0}, new Object[]{"QC-IN", "JCT-62-L", 3.0}
     );
 
+    /**
+     * 렉 하나의 물리 정보(P21). {@code nodes}/{@code floors}/{@code adjacency}와 <b>절대 섞지
+     * 않는다</b> — 렉을 AMR의 레인 그래프에 노드로 넣으면 진입점(anchor) 탐색이 렉 좌표를
+     * 가까운 연결로로 잘못 고를 위험이 있다(P20-3에서 실제로 겪은 종류의 버그, 설계 근거:
+     * {@code docs/p21-warehouse-rack-feeder-design.md} D2). 랙 피더는 이 맵만 보고 로컬
+     * 직선 이동을 한다 — {@code LaneGraph}/{@code TrafficController}를 타지 않는다.
+     */
+    public record RackInfo(String rackCode, short floorNo, double[] pos, String orientation) {}
+
+    /**
+     * 피킹존(랙 피더가 취출한 물건을 AMR에게 넘기는 자리) 노드 코드 관례 — {@code WH-PICK}
+     * (1층) 또는 {@code WH-{층}F-P{n}}(위층). 렉이 어느 피킹존과 가까운지는 WMS가 아니라
+     * 이 관례로 fleet이 좌표로 계산한다(D4 — WMS는 렉→피킹존 구간이 있다는 사실 자체를
+     * 몰라야 한다). {@code elevatorNode(floor)}(OrderService)와 같은 성격의 명명 관례다.
+     */
+    private static final Pattern PICK_NODE_PATTERN = Pattern.compile("^WH-(?:PICK|\\d+F-P\\d+)$");
+
+    /**
+     * factory에서 못 받았을 때 쓰는 렉 폴백 — factory V12 마이그레이션 시드와 같은 값
+     * (27기: 1층 9 · 2층 9 · 3층 9). 렉 피더가 factory 없이도 계속 취출 동작을 하려면
+     * 좌표가 있어야 한다({@code FALLBACK_NODES}와 같은 이유).
+     */
+    private static final List<Object[]> FALLBACK_RACKS = List.of(
+            new Object[]{"WH-1F-R01", (short) 1, 7.0, 4.0, "V"}, new Object[]{"WH-1F-R02", (short) 1, 11.5, 4.0, "V"},
+            new Object[]{"WH-1F-R03", (short) 1, 16.5, 4.0, "V"}, new Object[]{"WH-1F-R04", (short) 1, 7.0, 13.5, "V"},
+            new Object[]{"WH-1F-R05", (short) 1, 11.5, 13.5, "V"}, new Object[]{"WH-1F-R06", (short) 1, 16.5, 13.5, "V"},
+            new Object[]{"WH-1F-R07", (short) 1, 7.0, 22.0, "V"}, new Object[]{"WH-1F-R08", (short) 1, 11.5, 22.0, "V"},
+            new Object[]{"WH-1F-R09", (short) 1, 16.5, 22.0, "V"},
+            new Object[]{"WH-2F-R01", (short) 2, 7.0, 4.0, "V"}, new Object[]{"WH-2F-R02", (short) 2, 11.5, 4.0, "V"},
+            new Object[]{"WH-2F-R03", (short) 2, 16.5, 4.0, "V"}, new Object[]{"WH-2F-R04", (short) 2, 7.0, 13.5, "V"},
+            new Object[]{"WH-2F-R05", (short) 2, 11.5, 13.5, "V"}, new Object[]{"WH-2F-R06", (short) 2, 16.5, 13.5, "V"},
+            new Object[]{"WH-2F-R07", (short) 2, 7.0, 22.0, "V"}, new Object[]{"WH-2F-R08", (short) 2, 11.5, 22.0, "V"},
+            new Object[]{"WH-2F-R09", (short) 2, 16.5, 22.0, "V"},
+            new Object[]{"WH-3F-R01", (short) 3, 7.0, 4.0, "V"}, new Object[]{"WH-3F-R02", (short) 3, 11.5, 4.0, "V"},
+            new Object[]{"WH-3F-R03", (short) 3, 16.5, 4.0, "V"}, new Object[]{"WH-3F-R04", (short) 3, 7.0, 13.5, "V"},
+            new Object[]{"WH-3F-R05", (short) 3, 11.5, 13.5, "V"}, new Object[]{"WH-3F-R06", (short) 3, 16.5, 13.5, "V"},
+            new Object[]{"WH-3F-R07", (short) 3, 7.0, 22.0, "V"}, new Object[]{"WH-3F-R08", (short) 3, 11.5, 22.0, "V"},
+            new Object[]{"WH-3F-R09", (short) 3, 16.5, 22.0, "V"}
+    );
+
     private final Map<String, double[]> nodes = new ConcurrentHashMap<>(FALLBACK_NODES);
+
+    private final Map<String, RackInfo> racks = new ConcurrentHashMap<>(buildFallbackRacks());
 
     /**
      * 노드 → 층. 좌표만으로는 층을 알 수 없다 — 위층 노드는 아래층과 <b>같은 자리</b>에 있다
@@ -224,6 +267,17 @@ public class LocationRegistry {
                 }
             }
 
+            Map<String, RackInfo> loadedRacks = new HashMap<>();
+            for (JsonNode rack : data.path("racks")) {
+                String code = rack.path("rackCode").asText(null);
+                if (code == null) {
+                    continue;
+                }
+                loadedRacks.put(code, new RackInfo(code, (short) rack.path("floorNo").asInt(1),
+                        new double[]{rack.path("posX").asDouble(), rack.path("posY").asDouble()},
+                        rack.path("orientation").asText("V")));
+            }
+
             // 마스터에서 사라진 노드는 캐시에서도 지운다(폴백 값이 유령으로 남지 않게).
             nodes.keySet().retainAll(loadedNodes.keySet());
             nodes.putAll(loadedNodes);
@@ -231,6 +285,12 @@ public class LocationRegistry {
             floors.putAll(loadedFloors);
             adjacency.clear();
             adjacency.putAll(loadedAdjacency);
+            if (!loadedRacks.isEmpty()) {
+                // 응답에 racks 필드가 없거나(구버전 factory) 비어 있으면 폴백을 그대로 둔다 —
+                // 렉이 통째로 사라졌다고 보고 랙 피더를 전부 못 움직이게 만들 이유는 없다.
+                racks.clear();
+                racks.putAll(loadedRacks);
+            }
 
             double upper = data.path("upperAisleY").asDouble(Double.NaN);
             double lower = data.path("lowerAisleY").asDouble(Double.NaN);
@@ -333,6 +393,82 @@ public class LocationRegistry {
 
     public double lowerAisleY() {
         return lowerAisleY;
+    }
+
+    // ---- 렉(P21) ----
+
+    public boolean isRackCode(String code) {
+        return racks.containsKey(code);
+    }
+
+    /** @throws NullPointerException 존재하지 않는 렉 코드 — 호출부가 {@link #isRackCode}로 먼저 걸러야 한다. */
+    public RackInfo rack(String rackCode) {
+        RackInfo info = racks.get(rackCode);
+        if (info == null) {
+            throw new IllegalArgumentException("알 수 없는 렉 코드입니다: " + rackCode);
+        }
+        return info;
+    }
+
+    /**
+     * 랙 피더가 이 렉을 서비스하려 설 자리 — 렉 중심에서 방향(세로/가로)에 수직으로
+     * 한 걸음 뗀 점. 로컬 이동 전용 좌표라 {@code LaneGraph}가 쓰는 연결로·통로 개념과
+     * 무관하다(D2) — 정확한 간격보다 "렉 앞에 선다"는 사실 자체가 중요하다.
+     */
+    public double[] rackApproachPoint(String rackCode) {
+        RackInfo info = rack(rackCode);
+        double offset = 1.0;
+        return "H".equals(info.orientation())
+                ? new double[]{info.pos()[0], info.pos()[1] + offset}
+                : new double[]{info.pos()[0] + offset, info.pos()[1]};
+    }
+
+    /**
+     * 이 렉이 물건을 넘길 피킹존 노드 — 같은 층의 피킹존 노드(D4의 명명 관례) 중 렉과
+     * 가장 가까운 것. WMS는 이 매핑을 몰라도 된다(설계 근거: design doc D4 — 예전엔 WMS
+     * 마이그레이션이 렉마다 이 매핑을 손으로 갖고 있었다).
+     *
+     * <p>같은 층 후보가 하나도 없으면(폴백 모드 — {@code FALLBACK_NODES}는 위층 노드를
+     * 안 갖는다, 기존 1층 전용 폴백과 같은 한계) {@code "WH-PICK"}으로 물러선다 — 좌표가
+     * 정확하지 않을 수 있지만, {@link #resolve}가 모르는 노드도 절대 예외를 던지지 않고
+     * 해시 좌표를 주는 것과 같은 "로봇을 완전히 세우는 것보다 낫다" 원칙을 따른다.
+     */
+    public String nearestPickNode(String rackCode) {
+        RackInfo info = rack(rackCode);
+        String best = null;
+        double bestDist = Double.MAX_VALUE;
+        for (Map.Entry<String, double[]> entry : nodes.entrySet()) {
+            String code = entry.getKey();
+            if (!PICK_NODE_PATTERN.matcher(code).matches() || floorOf(code) != info.floorNo()) {
+                continue;
+            }
+            double dx = entry.getValue()[0] - info.pos()[0];
+            double dy = entry.getValue()[1] - info.pos()[1];
+            double dist = dx * dx + dy * dy;
+            if (dist < bestDist) {
+                bestDist = dist;
+                best = code;
+            }
+        }
+        if (best == null) {
+            log.warn("렉 {}({}층)에 대응하는 피킹존 노드를 못 찾았다 — WH-PICK으로 대체한다 "
+                    + "(factory 폴백 모드에서 위층 노드가 비어 있을 때 발생할 수 있음).", rackCode, info.floorNo());
+            return "WH-PICK";
+        }
+        return best;
+    }
+
+    private static Map<String, RackInfo> buildFallbackRacks() {
+        Map<String, RackInfo> result = new HashMap<>();
+        for (Object[] row : FALLBACK_RACKS) {
+            String code = (String) row[0];
+            short floor = (short) row[1];
+            double x = (double) row[2];
+            double y = (double) row[3];
+            String orientation = (String) row[4];
+            result.put(code, new RackInfo(code, floor, new double[]{x, y}, orientation));
+        }
+        return result;
     }
 
     private static Map<String, List<Edge>> buildAdjacency(List<Object[]> rows) {

@@ -302,6 +302,11 @@ button.mini { padding: 3px 10px; font-size: 12px; margin-left: auto; }
 .umap-rack { stroke: #7d8b9c; stroke-width: 0.1; }
 .umap-rack-divider { stroke: #ffffff; stroke-width: 0.08; opacity: 0.75; }
 .umap-rack-g { cursor: help; }
+/* 지금 랙 피더가 취출 중인 렉(P21) — 진행 중인 주문 근거가 있을 때만 그린다. */
+.umap-rack-g.servicing .umap-rack { stroke: #2d7ff9; stroke-width: 0.32; }
+
+/* 랙 피더(P21) — AMR(원)과 다른 사각 마커로 종류를 구분한다. */
+.umap-robot-feeder-mark { stroke: #fff; stroke-width: 0.18; }
 
 /* ===== 품질(QMS) — 품질동 배지 · 정보 흐름 · MRB ===== */
 /* 품질동은 이제 평면도 안의 건물이다(예전엔 바깥에 떠 있는 박스였다). */
