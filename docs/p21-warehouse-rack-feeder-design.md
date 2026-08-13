@@ -1,7 +1,8 @@
 # P21 설계 문서 — 창고동 렉 취출 로봇(랙 피더) + WMS 물리 흐름 정합
 
-> 상태: **설계 초안 — 착수 전, 승인 대기.** `docs/BACKLOG.md`의 관행("세부 설계를 먼저 문서로
-> 확정하고 승인받은 뒤 착수한다")을 따른다. `docs/p20-layout-routing-design.md`와 같은 형식.
+> 상태: **P21-1~P21-6 전부 완료(2026-08-13, 옵션 A).** `docs/BACKLOG.md`의 관행("세부 설계를
+> 먼저 문서로 확정하고 승인받은 뒤 착수한다")을 따랐다. `docs/p20-layout-routing-design.md`와
+> 같은 형식. 실행 단계(5절)에 검증 근거가 남아 있다.
 >
 > 선행 문서: P11(레이아웃 서버화, factory가 평면도 소유) · P13(WMS 모듈) · P19(스텝 기반 주문
 > 모델, 층간 엘리베이터 handoff) · P20(그래프 라우팅, `LaneGraph`/`TrafficController`).
@@ -281,39 +282,64 @@ update locations set node_code = location_code
 
 ---
 
-## 5. 실행 단계 (제안 — 각 단계 완료 후 검증, P19/P20 선례를 따름)
+## 5. 실행 단계 (P19/P20 선례를 따름 — 전부 완료, 2026-08-13)
 
-### P21-1. 데이터 모델
-- [ ] fleet Flyway — `robots.robot_type`/`zone_code`, `fleet_orders.robot_type`, 랙 피더 로봇
-      6대 시드(존별 배치, D10)
-- [ ] WMS Flyway V6 — 렉 로케이션의 `node_code`를 렉 코드 자체로 되돌림(D9)
-- [ ] fleet `LocationRegistry`(or 신설 `RackRegistry`) — `GET /api/layout`의 `racks[]` 캐싱,
-      정면 접근점 계산(D3), 폴백 포함
-- [ ] factory 변경 없음 확인 — 이미 필요한 걸 다 갖고 있다는 1절 전제가 맞는지 재확인
+### P21-1. 데이터 모델 ✅
+- [x] fleet Flyway(V10) — `robots.robot_type`/`zone_code`, `fleet_orders.robot_type`/`zone_code`,
+      랙 피더 6대 시드(D10 그대로: WH-PICK×2, 2F/3F 존별 1대) — 실기동 `GET /api/robots`로
+      14대(AMR 8 + RACK_FEEDER 6) 전부 올바른 zoneCode/floorNo로 조회됨을 확인
+- [x] WMS Flyway V6 — 렉 27기 로케이션의 `node_code`를 렉 코드 자체로 되돌림(D9)
+- [x] fleet `LocationRegistry` 확장(신설 클래스 대신 기존 클래스에 통합) — `racks` 맵을
+      `nodes`/`floors`/`adjacency`와 완전히 분리해 캐싱, `rackApproachPoint`/`nearestPickNode`
+      (D4), 폴백 27개 포함
+- [x] factory 변경 없음 확인 — 1절 전제 그대로 맞았다(이번 구현에서 factory 쪽 코드는 한 줄도
+      안 바뀜)
 
-### P21-2. 주문 엔진 일반화
-- [ ] `OrderService.create()`의 `crossFloor` 판정을 `requiredPool` 비교로 교체(D5)
-- [ ] 기존 엘리베이터 handoff 시나리오 회귀 테스트(가장 위험한 부분 — D5 표에 명시)
-- [ ] 렉 기원 주문의 앞 레그(랙 피더) / 뒷 레그(AMR, handoff_of로 연결) 생성 확인
-- [ ] `AssignmentPolicy` 양쪽 구현체에 robot_type/zone 필터 추가(D6)
+### P21-2. 주문 엔진 일반화 (옵션 A) ✅
+- [x] `OrderService.create()`의 `crossFloor` 판정을 `requiredPool`(층+로봇종류+존) 비교로 교체(D5)
+- [x] 기존 엘리베이터 handoff 시나리오 회귀 없음 — 실기동 중 층간 이송(`WH-RECV`→`WH-2F-P1` 등
+      기존 데모 흐름)이 계속 정상 동작(별도 코드 경로 아님 — `handoffNodeFor`가 층 차이는
+      그대로 예전 로직으로 분기)
+- [x] 렉 기원 주문의 앞 레그(랙 피더) / 뒷 레그(AMR, `handoff_of`로 연결) 생성 확인 — 실측
+      아래 참고
+- [x] `AssignmentPolicy` 양쪽 구현체(Nearest/GraphCost)에 robot_type+zone 필터 추가(D6)
+- [x] **구현 중 발견해 고친 설계 누락 1건**: D5 설계 당시 "렉과 층을 동시에 넘는 경우"를
+      검토하지 않았다 — `handoffNodeFor`가 층이 다르면 무조건 엘리베이터 노드를 반환하는데,
+      그 렉이 랙 피더 소속이면 랙 피더는 엘리베이터 노드에 갈 수 없다(자기 존 밖이다).
+      실행 중 코드로 이 조합을 검증하다 발견해, 그 경우 명확한 `INVALID_REQUEST`로 거부하도록
+      막았다(3단 체인 확장은 8절 범위 밖으로 남김) — 실기동으로 거부 메시지 확인
+- [x] **퇴화 케이스 추가 처리**: 목적지가 이미 그 렉의 피킹존 자체인 주문(예: 창고 안 재배치)은
+      handoff를 걸면 뒷 주문의 두 스텝이 같은 지점이 되어(길이 0 레그) 문제가 된다 —
+      `createSplitAtHandoff`가 이 경우 단일 풀(랙 피더 전용) 주문으로 축약. 실기동으로
+      `WH-2F-R04`→`WH-2F-P2` 주문이 handoff 없이 랙 피더 혼자 완료함을 확인
 
-### P21-3. robot-sim 랙 피더
-- [ ] `RackFeederRobot`(or 플래그) — 로컬 좌표 사본, D2의 로컬 이동(LaneGraph 미사용),
-      D7의 정지 타이머
-- [ ] 정합성 테스트 확장(D8) — factory 렉 마이그레이션과 어긋나면 빌드 실패
+### P21-3. robot-sim 랙 피더 ✅
+- [x] `VirtualRobot`에 로봇 종류(`robotType`) + 취출 타이머(retrieval) 상태 — D2의 로컬 이동
+      (`OrderService.planLeg`가 이미 좌표를 계산해 보내므로 robot-sim은 그대로 따라가기만
+      한다), D7의 정지 타이머(`sim.rack.fetch-seconds`, 기본 8초)
+- [x] `RackMap`(렉 코드 집합 사본) + `RackMapLayoutConsistencyTest`(D8) — factory V12와 대조,
+      최초 실행 시 `layout_charging_zones`(CZ-1F 등)까지 잘못 집던 정규식 버그를 테스트가
+      스스로 잡아내 수정(범위를 `insert into layout_racks` 이후로 좁힘)
 
-### P21-4. 배차·교통
-- [ ] 존 안에 로봇 1대뿐이므로 `TrafficController` 개입 없이 배차만으로 충분한지 실측
-- [ ] `StuckTaskWatchdog`이 랙 피더 레그에도 그대로 적용되는지 확인(코드 변경 없이 될 것으로
-      예상 — D6가 재사용하는 기존 상태 기계 덕분)
+### P21-4. 배차·교통 ✅
+- [x] 존 안에 로봇 1~2대뿐이라 `TrafficController` 개입 없이 배차만으로 충분함을 실기동으로
+      확인 — 랙 피더는 `tryReserve(id, [])`만 호출(항상 성공), 예상대로 무충돌
+- [x] `StuckTaskWatchdog`이 랙 피더 레그에도 코드 변경 없이 그대로 적용됨을 실측 확인 — 테스트
+      중 시뮬레이터의 무작위 실패(`localization lost`)가 랙 피더의 뒷 AMR 레그에서 실제로
+      발생했고, 기존 재시도(`TASK_RETRIED`) → 재배차 → 완료 경로가 그대로 작동함을 이벤트
+      로그로 확인(설계 근거대로 "일반화가 스스로 값을 증명"한 사례)
 
-### P21-5. 대시보드
-- [ ] 랙 피더 마커(AMR과 시각적으로 구분) + "지금 서비스 중인 렉" 강조(진행 중 주문의 origin
-      렉만 — 지어낸 정보 금지, 2절 원칙)
-- [ ] 레이어 토글에 "랙 피더" 추가(기존 "설비/AMR/운송경로/POP" 옆)
+### P21-5. 대시보드 ✅
+- [x] 랙 피더 사각 마커(AMR 원과 구분) + "지금 서비스 중인 렉" 강조(진행 중 주문의 origin
+      렉만 — 지어낸 정보 금지, 2절 원칙) — `UnifiedMap`에 구현, `tsc --noEmit`/`vite build`
+      통과
+- [x] 레이어 토글에 "랙 피더" 추가(기존 "설비/AMR/운송경로/POP" 옆), `RobotPanel`에 존 배지
 
-### P21-6. WMS 계층 정정 검증
-- [ ] `createOutbound` 무변경 확인(D9) — WMS 쪽에 fleet 내부 구조 변경이 새어나가지 않았는가
+### P21-6. WMS 계층 정정 검증 ✅
+- [x] `createOutbound` 무변경 확인(D9) — 마이그레이션(V6)만으로 실기동 확인: `POST
+      /api/outbound-orders`(원본 코드 그대로)로 렉 재고 출고지시를 내자 fleet에 랙 피더
+      레그 + AMR 레그가 자동 생성됨을 확인(주문 `FO-00000014`, `originNode: WH-1F-R05`,
+      `destinationNode: WH-PICK`, `handoffDestination: WH-SHIP`)
 
 ---
 
@@ -331,15 +357,22 @@ update locations set node_code = location_code
 
 ---
 
-## 7. 완료 기준 (전체)
+## 7. 완료 기준 (전체) — 전부 실기동으로 확인(2026-08-13)
 
-- [ ] WMS에서 렉 재고로 출고지시를 내면, 랙 피더가 실제로 그 렉까지 이동해 멈췄다가(취출),
-      피킹존으로 이동하고, 그 다음에야 AMR이 이어받아 최종 목적지까지 옮긴다
-- [ ] 이 전체 과정이 `fleet_events`에서 한 흐름(handoff_of로 연결된 두 주문)으로 추적된다
-- [ ] 랙 피더는 자기 존 밖으로 나가지 않는다(다른 존 렉·AMR 레인에 나타나지 않음)
-- [ ] 기존 AMR 전용 흐름(랙과 무관한 PROD/QC 간 이동, 엘리베이터 층간 이동)이 회귀 없이
-      그대로 동작한다
-- [ ] WMS 코드는 이번 변경으로 한 줄도 바뀌지 않는다(마이그레이션 데이터만 변경, D9)
+- [x] WMS에서 렉 재고로 출고지시를 내면, 랙 피더가 실제로 그 렉까지 이동해 멈췄다가(취출),
+      피킹존으로 이동하고, 그 다음에야 AMR이 이어받아 최종 목적지까지 옮긴다 — `FO-00000010`
+      (직접 생성)이 전체 체인을 끝까지 완주(랙 피더 RF-01 → AMR-03)함을 확인. 자동 데모
+      흐름에서도 12/12건 랙 피더 레그 성공(1~3층, 4개 렉)
+- [x] 이 전체 과정이 `fleet_events`에서 한 흐름(handoff_of로 연결된 두 주문)으로 추적된다 —
+      `TASK_COMPLETED`(랙 피더) → `랙 피더: ... 취출 완료, WH-PICK에서 AMR 인수 대기`
+      (`TASK_CREATED`) → `TASK_ASSIGNED`/`TASK_STARTED`/`TASK_COMPLETED`(AMR)로 이벤트 로그에
+      순서대로 남음을 확인
+- [x] 랙 피더는 자기 존 밖으로 나가지 않는다 — `AssignmentPolicy` 필터(D6)로 배차 시점에
+      원천 차단, 실기동에서도 다른 존 렉으로 배차된 사례 없음
+- [x] 기존 AMR 전용 흐름(랙과 무관한 PROD/QC 간 이동, 엘리베이터 층간 이동)이 회귀 없이
+      그대로 동작한다 — 실기동 중 배경 데모 트래픽(기존 22개 흐름)이 계속 정상 처리됨
+- [x] WMS 코드는 이번 변경으로 한 줄도 바뀌지 않는다 — `POST /api/outbound-orders`(원본 코드,
+      원본 경로)만으로 렉 기원 출고가 fleet의 랙 피더 분할 로직을 그대로 통과함을 확인
 
 ---
 
