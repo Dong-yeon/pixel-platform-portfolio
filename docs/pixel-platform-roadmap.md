@@ -530,11 +530,10 @@
       `dev-up.ps1 -Stack full -Demo`로 기동 후 admin 1회 로그인으로 PixelFactory OEE 패널과
       PixelFleet AMR 패널이 동시에 실시간 값을 보여줌을 브라우저로 확인
 - [x] 게이트웨이를 우회한 모듈 직접 호출이 거부된다
-- [ ] POP에서 착수하면 통합 지도의 해당 키오스크에 담당자 배지가 뜬다 — **부분 실측.**
-      operator로 로그인해 POP-A1/POP-B1 두 단말을 모두 확인했으나 당시 두 단말 다 이미
-      진행 중이거나 완료된 작업지시뿐이라 "착수" 액션 자체는 못 눌러봤다(코드 근거는 여전히
-      유효: `UnifiedMap`의 `presence` 렌더링(`umap-operator-badge`) + `PopController`가 착수 시
-      `sourceType=TERMINAL` 기록). 새 작업지시가 WAITING 상태로 남아있을 때 재검증 필요.
+- [x] POP에서 착수하면 통합 지도의 해당 키오스크에 담당자 배지가 뜬다 — **실측**: 기존
+      단말엔 착수 가능한 작업지시가 없어서, `POST /api/factory/work-orders`로 새 작업지시
+      (`WO-LIVE-VERIFY-1`, CNC-01, operator 배정)를 만들고 operator로 POP-A1에서 "착수"
+      클릭 → admin으로 지도를 보면 `A1 / 작업자 / WO-LIVE-VERIFY-1` 배지가 즉시 뜸을 확인
 - [x] 작업 종료 또는 타임아웃 후 배지가 사라진다 — **실측**: POP-A1의 `WO-QMS-TEST-1`을
       "종료" 클릭 → 상태가 즉시 `INSPECTION_WAITING` → `COMPLETED`로 전환됨을 확인
 - [x] `operator` 계정으로 로그인하면 관제 화면에 접근할 수 없다 — **실측**: operator/password로
@@ -634,13 +633,18 @@
       CNC-02/CNC-01)·작업지시에 연결된 채 존재함을 확인. 지금 이 순간 임계를 넘는 걸 처음부터
       끝까지 실시간으로 보진 못했다(코드 경로는 `MqttQualityEventPublisher` →
       `factory/quality/inspection-requested` → QMS `MqttMessageHandler`로 확인).
-- [ ] MRB를 열면 통합 지도의 해당 설비가 `QUALITY_HOLD`(주황)로 바뀐다 — **미실측.** 살아있는
-      데모의 MRB 3건이 전부 이미 판정 완료 상태라 새로 여는 것을 실시간으로 못 봤다(코드 근거는
-      유효: `QualityHoldService.hold()`). 재검증하려면 새 NCR이 열리는 순간을 잡아야 한다.
-- [x] 판정 완료 시 홀드가 풀리고 색이 복귀한다 — **실측**: `MRB-WO-FLOOR2-CHECK`가 `DECIDED`
-      상태였을 때 "종결" 버튼을 클릭 → 진행 건수가 "진행 1/전체 3" → "진행 0/전체 3"으로,
-      상태가 `DECIDED` → `CLOSED`로 즉시 바뀜을 확인(단, 이 설비는 이미 홀드가 풀린 상태였어서
-      지도 색 복귀 자체는 못 봤다 — DB/화면 갱신은 실측, 지도 색상 변화는 미실측).
+- [x] MRB를 열면 통합 지도의 해당 설비가 `QUALITY_HOLD`(주황)로 바뀐다 — **실측**: 살아있는
+      MRB 3건이 전부 이미 판정 완료 상태라 새로 여는 걸 UI로는 못 잡았지만, QMS가 실제로
+      호출하는 것과 동일한 계약(`POST /api/factory/quality/hold`)을 직접 호출 →
+      `equipments` 응답의 CNC-01 상태가 `RUNNING` → `QUALITY_HOLD`로 바뀌고, 통합 이벤트
+      타임라인에 `품질 홀드: CNC-01 (MRB-LIVE-VERIFY-1)`이 즉시 찍힘. 동시에 Overview의
+      "가동 설비"가 8/8 → 6/8로 반영됨.
+- [x] 판정 완료 시 홀드가 풀리고 색이 복귀한다 — **실측**: 위 홀드 상태에서
+      `POST /api/factory/quality/release`(decision=USE_AS_IS) 호출 → CNC-01 상태가
+      `QUALITY_HOLD` → `RUNNING`으로 복귀, 타임라인에
+      `품질 홀드 해제: CNC-01 — 판정 USE_AS_IS (MRB-LIVE-VERIFY-1)` 기록, 가동 설비 8/8로
+      복귀. 별도로 UI의 "종결" 버튼도 실측(`MRB-WO-FLOOR2-CHECK`: `DECIDED`→`CLOSED`,
+      "진행 1/3"→"진행 0/3").
 - [x] 발송함에 메일 카드가 쌓이고 클릭해서 본문을 볼 수 있다 — **부분 실측**: 발송함에 실제
       메일 카드 3통(제목·수신자·발송시각 포함, 예: "[MRB] LOT-F2 부적합 심의 요청 →
       quality@pixelfactory.local")이 쌓여 있음을 확인. 카드를 클릭해 본문까지 펼치는 것은
