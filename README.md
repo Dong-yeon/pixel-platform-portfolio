@@ -88,7 +88,8 @@ A*/Dijkstra 경로탐색**으로 전면 교체했습니다. 그래프 엣지 비
 * **Backend:** Java 17, Spring Boot 3.3, Spring Cloud Gateway, Spring Data JPA/QueryDSL, Flyway
 * **Frontend:** React, Vite (Tailwind 미사용 — CSS 변수 기반 커스텀 스타일)
 * **Database & Infrastructure:** PostgreSQL 16(모듈별 독립 DB), Redis 7(PixelFleet 실시간 상태 전용), Eclipse Mosquitto(MQTT Broker), Docker Compose
-* **Environment:** Windows / PowerShell, Gradle Wrapper(모듈별 독립 빌드 — 루트 통합 빌드 없음)
+* **Environment:** Windows / PowerShell 기준으로 작성됐지만, `./gradlew`(bash)도 동일하게
+  동작합니다(CI가 Linux에서 이 방식으로 빌드). Gradle Wrapper — 모듈별 독립 빌드, 루트 통합 빌드 없음
 
 ---
 

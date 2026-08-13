@@ -121,7 +121,14 @@
 3. **DB per module.** 새 모듈은 자기 DB를 갖는다.
 4. **스키마는 Flyway 마이그레이션으로.** `ddl-auto` 의존 금지.
 5. **게임 메커닉 금지.** 점수·레벨·보상 없음. 단, "조작하면 실시간 반응"은 핵심 경험이므로 유지.
-6. **빌드는 PowerShell `.\gradlew.bat`.** bash `./gradlew`는 Windows에서 `-Xmx` 파싱이 깨진다.
+6. ~~빌드는 PowerShell `.\gradlew.bat`. bash `./gradlew`는 Windows에서 `-Xmx` 파싱이 깨진다.~~
+   → **정정(2026-08-13):** Windows 문제가 아니라 gradlew 스크립트 자체의 버그였다.
+   `DEFAULT_JVM_OPTS='"-Xmx64m" "-Xms64m"'`처럼 따옴표가 변수 값에 리터럴로 박혀 있어서,
+   `exec`에서 unquoted expansion될 때 java가 `-Xmx64m`이 아니라 `"-Xmx64m"`(따옴표 포함
+   문자열)을 받아 JVM 옵션이 아닌 **메인 클래스명으로 오인**했다(`Could not find or load
+   main class "-Xmx64m"`). CI(GitHub Actions, 진짜 Linux)에서 처음 재현됐고, 따옴표를 뺀
+   `DEFAULT_JVM_OPTS='-Xmx64m -Xms64m'`로 고치니 `bash ./gradlew`가 로컬(git-bash)·CI
+   양쪽에서 정상 동작한다. 7개 모듈 gradlew 전부 같은 버그였다.
 7. **파일 삭제·대규모 이동은 사전 계획 제시 후 승인받고 진행.**
 
 ### 지도 시각 규칙 (P11 이후 계속 적용)
@@ -717,7 +724,7 @@ P11은 P8~P10과 독립이므로 병행 가능하다. **P12는 반드시 P13·P1
 
 | 함정 | 대응 |
 |---|---|
-| bash `./gradlew` | Windows에서 `-Xmx` 파싱 깨짐 → PowerShell `.\gradlew.bat` |
+| ~~bash `./gradlew`~~ | ~~Windows에서 `-Xmx` 파싱 깨짐~~ → **정정: gradlew 스크립트 자체 버그(`DEFAULT_JVM_OPTS`에 따옴표가 리터럴로 박힘), 2026-08-13 수정 완료. 지금은 OS 무관하게 `./gradlew` 가능** |
 | 게이트웨이 WS 라우트 `uri`를 `ws://`로 | 업그레이드 아닌 요청이 400 → `http://` 유지 |
 | CORS 헤더 중복 | 모듈이 자체 CORS를 붙이면 브라우저가 거부 → `DedupeResponseHeader` 유지 |
 | 상태 구간 계산 시 캐리인 누락 | 조회 시작 이전 마지막 상태 이벤트 1건을 반드시 끌어온다 |

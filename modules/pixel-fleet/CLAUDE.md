@@ -74,7 +74,9 @@ Postgres UPDATE 제거. WebSocket 브로드캐스트도 Redis Pub/Sub(`fleet:rea
 - Java 17 (Gradle toolchain), Spring Boot 3.3, PostgreSQL 16, Redis 7, Gradle wrapper 사용
 - 로컬: `infra/docker-compose.yml`로 Postgres + Mosquitto + Redis 기동 후
   `services/control-service`에서 `.\gradlew.bat bootRun` (포트 9002)
-- **빌드는 PowerShell `.\gradlew.bat`로.** bash `./gradlew`는 Windows에서 `-Xmx` 파싱이 깨짐.
+- ~~빌드는 PowerShell `.\gradlew.bat`로. bash `./gradlew`는 Windows에서 `-Xmx` 파싱이 깨짐.~~
+  → **정정(2026-08-13):** gradlew 스크립트 자체 버그(`DEFAULT_JVM_OPTS` 따옴표 오류)였다.
+  수정 후 `./gradlew`가 OS 무관하게 동작한다.
 - 데모 계정: `admin` / `dispatcher` / `operator`, 비밀번호 `password`
 - `fleet_events`는 계속 쌓이는 테이블 — 시뮬레이터 발행 주기와 보존 정책을 함께 고려한다.
 
