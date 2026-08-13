@@ -1,5 +1,7 @@
 # Pixel Platform
 
+[![CI](https://github.com/Dong-yeon/pixel-platform-portfolio/actions/workflows/ci.yml/badge.svg)](https://github.com/Dong-yeon/pixel-platform-portfolio/actions/workflows/ci.yml)
+
 > **Spring Cloud Gateway + MQTT 기반 실시간 IoT/로봇 군집 관제(FMS) 마이크로서비스 플랫폼**
 
 ## 🚀 라이브 데모
