@@ -3,9 +3,15 @@
   pixel-platform 로컬 스택을 내린다.
 
 .DESCRIPTION
-  PID 파일을 두지 않는다 — 명령줄에 pixel-platform 경로가 박혀 있으므로 그걸로 고른다.
+  PID 파일을 두지 않는다 — 명령줄에 이 저장소의 실제 경로가 박혀 있으므로 그걸로 고른다.
   스크립트로 띄우지 않은 프로세스(직접 실행한 bootRun 등)도 같이 정리되고,
   다른 프로젝트의 JVM은 건드리지 않는다.
+
+  **저장소 폴더명을 하드코딩하지 않는다.** 예전엔 명령줄에 리터럴 문자열 "pixel-platform"이
+  있는지로 골랐는데, 클론 경로가 그 이름을 안 쓰면(포크·이름 변경·`D:\ppub_clean` 같은 임시
+  클론) 전부 놓친다 — 실제로 겪었다(dev-up.ps1으로 띄운 8개 프로세스를 dev-down.ps1이
+  "실행 중인 서비스 없음"으로 보고). 대신 스크립트가 서 있는 위치에서 역산한 `$Root`
+  절대경로로 매칭한다 — 어디에 클론해도 항상 맞다.
 
   **Gradle 데몬은 죽이지 않고 정식으로 내린다.** 강제 종료하면 그 데몬이 붙들고 있던
   bootRun 자식들이 함께 죽는다(실제로 스택이 통째로 내려갔다).
@@ -31,8 +37,9 @@ $ErrorActionPreference = 'Continue'
 $Root = Split-Path -Parent $PSScriptRoot
 
 $stopped = @()
+$rootPattern = [regex]::Escape($Root)
 Get-CimInstance Win32_Process -Filter "Name='java.exe' or Name='node.exe'" |
-    Where-Object { $_.CommandLine -match 'pixel-platform' -and $_.CommandLine -notmatch 'GradleDaemon' } |
+    Where-Object { $_.CommandLine -match $rootPattern -and $_.CommandLine -notmatch 'GradleDaemon' } |
     ForEach-Object {
         $cl = $_.CommandLine
         $name = if ($cl -match 'control-service') { 'fleet' }
