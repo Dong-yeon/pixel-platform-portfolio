@@ -3,15 +3,17 @@
 Pixel Platform을 Railway에 올리는 절차. **배포 실행에는 동연님의 Railway 계정 인증이
 필요**하므로, 이 문서는 그대로 따라 하면 되도록 설정값을 전부 적어 두었다.
 
-## 서비스 구성 (7개 + 플러그인 2개)
+## 서비스 구성 (9개 + 플러그인 2개)
 
 ```
 [퍼블릭]  gateway (+대시보드 번들)  ← 유일하게 도메인을 여는 서비스
              │
 [프라이빗] ├─ pixel-factory
            ├─ pixel-fleet
+           ├─ pixel-wms
+           ├─ pixel-qms
            ├─ mosquitto
-           ├─ robot-sim     (AMR 6대)
+           ├─ robot-sim     (AMR 6대 + 랙 피더 6대)
            └─ factory-sim   (설비 8대)
 [플러그인] Postgres · Redis
 ```
@@ -35,18 +37,22 @@ GitHub 저장소(`Dong-yeon/pixel-platform-portfolio` — 공개용 사본)를 R
 
 | 플러그인 | 용도 |
 |---|---|
-| PostgreSQL | 두 모듈의 DB (아래에서 DB 2개로 나눈다) |
+| PostgreSQL | 네 모듈의 DB (아래에서 DB 4개로 나눈다) |
 | Redis | pixel-fleet 라이브 상태 + Pub/Sub |
 
-### Postgres에 두 번째 DB 만들기 (1회)
+### Postgres에 모듈별 DB 만들기 (1회)
 
 로컬과 동일하게 **DB per module**을 유지한다. Railway Postgres 플러그인은 DB를 하나만
-주므로, fleet용 DB와 롤을 한 번 만들어 준다. Railway의 Postgres → *Data* 탭이나
+주므로, fleet·wms·qms용 DB와 롤을 한 번 만들어 준다. Railway의 Postgres → *Data* 탭이나
 `psql`로 접속해 실행:
 
 ```sql
 create role fleet with login password '<원하는-비밀번호>';
 create database pixelfleet owner fleet;
+create role wms with login password '<원하는-비밀번호>';
+create database pixelwms owner wms;
+create role qms with login password '<원하는-비밀번호>';
+create database pixelqms owner qms;
 ```
 
 factory는 플러그인이 준 기본 DB를 그대로 쓴다.
@@ -56,9 +62,9 @@ factory는 플러그인이 준 기본 DB를 그대로 쓴다.
 각 서비스는 **New Service → GitHub Repo → 같은 저장소** 로 만들고, 아래대로 설정한다.
 `railway.json`이 각 디렉터리에 있으므로 빌드 방식(Dockerfile)은 자동으로 잡힌다.
 
-> **두 모듈(pixel-factory·pixel-fleet)은 Root Directory가 `/`다.** 공통 코어 `shared/`를
+> **네 모듈(factory·fleet·wms·qms)은 Root Directory가 `/`다.** 공통 코어 `shared/`를
 > Gradle 복합 빌드로 참조하는데, Docker는 컨텍스트 밖(`../`)을 못 읽으므로 이미지 빌드에
-> 레포 전체가 필요하다. 두 서비스가 루트를 공유하면 `/railway.json` 하나를 서로 다른
+> 레포 전체가 필요하다. 루트를 공유하는 서비스들은 `/railway.json` 하나를 서로 다른
 > Dockerfile로 쓸 수 없으므로, 대신 **`RAILWAY_DOCKERFILE_PATH` 환경변수**로 각자
 > Dockerfile을 지정한다(UI의 Dockerfile Path 설정도 동일한 역할).
 >
@@ -94,7 +100,8 @@ SPRING_DATASOURCE_USERNAME=${{Postgres.PGUSER}}
 SPRING_DATASOURCE_PASSWORD=${{Postgres.PGPASSWORD}}
 MQTT_BROKER_URL=tcp://mosquitto.railway.internal:1883
 MQTT_CLIENT_ID=oee-service
-PLATFORM_JWT_SECRET=<32바이트 이상 랜덤 문자열>   ← 세 서비스가 같은 값
+PLATFORM_JWT_SECRET=<32바이트 이상 랜덤 문자열>   ← 게이트웨이·모든 모듈이 같은 값
+DASHBOARD_ORIGIN=https://<게이트웨이 도메인>      ← P16 CORS. gateway·factory·fleet 세 곳 동일
 ```
 
 ### 2-3. pixel-fleet (프라이빗)
@@ -115,9 +122,58 @@ SPRING_DATASOURCE_PASSWORD=<1단계에서 정한 비밀번호>
 REDIS_URL=${{Redis.REDIS_URL}}
 MQTT_BROKER_URL=tcp://mosquitto.railway.internal:1883
 MQTT_CLIENT_ID=control-service
-PLATFORM_JWT_SECRET=<32바이트 이상 랜덤 문자열>   ← 세 서비스가 같은 값
+PLATFORM_JWT_SECRET=<32바이트 이상 랜덤 문자열>   ← 게이트웨이·모든 모듈이 같은 값
+DASHBOARD_ORIGIN=https://<게이트웨이 도메인>      ← P16 CORS. gateway·factory·fleet 세 곳 동일
 DISPATCH_ENABLED=true
 ```
+
+### 2-3b. pixel-wms (프라이빗)
+
+| 항목 | 값 |
+|---|---|
+| Root Directory | `/` ← **레포 루트** (shared/가 빌드에 필요) |
+| Dockerfile Path | `modules/pixel-wms/services/wms-service/Dockerfile` |
+
+```
+RAILWAY_DOCKERFILE_PATH=modules/pixel-wms/services/wms-service/Dockerfile
+SPRING_PROFILES_ACTIVE=dev
+SERVER_ADDRESS=::
+PORT=9003
+SPRING_DATASOURCE_URL=jdbc:postgresql://${{Postgres.PGHOST}}:${{Postgres.PGPORT}}/pixelwms
+SPRING_DATASOURCE_USERNAME=wms
+SPRING_DATASOURCE_PASSWORD=<1단계에서 정한 비밀번호>
+MQTT_BROKER_URL=tcp://mosquitto.railway.internal:1883
+MQTT_CLIENT_ID=wms-service
+FLEET_BASE_URL=http://pixel-fleet.railway.internal:9002
+PLATFORM_JWT_SECRET=<32바이트 이상 랜덤 문자열>   ← 게이트웨이·모든 모듈이 같은 값
+```
+
+> WMS는 운송 주문을 fleet에 REST로 넘긴다(`FLEET_BASE_URL`). 프라이빗 네트워크 전제로
+> M2M 인증은 아직 없다(백로그 — P16 2파).
+
+### 2-3c. pixel-qms (프라이빗)
+
+| 항목 | 값 |
+|---|---|
+| Root Directory | `/` ← **레포 루트** (shared/가 빌드에 필요) |
+| Dockerfile Path | `modules/pixel-qms/services/qms-service/Dockerfile` |
+
+```
+RAILWAY_DOCKERFILE_PATH=modules/pixel-qms/services/qms-service/Dockerfile
+SPRING_PROFILES_ACTIVE=dev
+SERVER_ADDRESS=::
+PORT=9004
+SPRING_DATASOURCE_URL=jdbc:postgresql://${{Postgres.PGHOST}}:${{Postgres.PGPORT}}/pixelqms
+SPRING_DATASOURCE_USERNAME=qms
+SPRING_DATASOURCE_PASSWORD=<1단계에서 정한 비밀번호>
+MQTT_BROKER_URL=tcp://mosquitto.railway.internal:1883
+MQTT_CLIENT_ID=qms-service
+FACTORY_BASE_URL=http://pixel-factory.railway.internal:9001
+PLATFORM_JWT_SECRET=<32바이트 이상 랜덤 문자열>   ← 게이트웨이·모든 모듈이 같은 값
+```
+
+> QMS는 불량 임계 초과 이벤트로 검사를 만들고, MRB 홀드/릴리즈 때 factory 설비 상태를
+> REST로 전환한다(`FACTORY_BASE_URL`). 역시 M2M 인증은 백로그.
 
 ### 2-4. robot-sim (프라이빗)
 
@@ -171,8 +227,24 @@ MODULE_FACTORY_URI=http://pixel-factory.railway.internal:9001
 MODULE_FLEET_URI=http://pixel-fleet.railway.internal:9002
 MODULE_FLEET_WS_URI=http://pixel-fleet.railway.internal:9002
 MODULE_FACTORY_WS_URI=http://pixel-factory.railway.internal:9001
-PLATFORM_JWT_SECRET=<32바이트 이상 랜덤 문자열>   ← 세 서비스가 같은 값
+MODULE_WMS_URI=http://pixel-wms.railway.internal:9003
+MODULE_QMS_URI=http://pixel-qms.railway.internal:9004
+PLATFORM_JWT_SECRET=<32바이트 이상 랜덤 문자열>   ← 게이트웨이·모든 모듈이 같은 값
+DASHBOARD_ORIGIN=https://<게이트웨이 도메인>      ← P16 CORS. gateway·factory·fleet 세 곳 동일
 ```
+
+> **`DASHBOARD_ORIGIN`이 없으면 로그인부터 403이다(P16 이후).** CORS 허용 목록이 이 변수
+> 하나로 제한되고 폴백은 `http://localhost:9200`이다. 브라우저 fetch는 같은 오리진 POST에도
+> `Origin` 헤더를 붙이므로, 변수가 빠지면 게이트웨이가 자기 대시보드의 요청을 거절한다.
+> gateway·factory·fleet **세 곳이 같은 값**이어야 한다(SockJS 핸드셰이크는 globalcors를
+> 안 거치고 모듈이 직접 처리). 값은 도메인 생성 후에 알 수 있으므로 마지막에 넣게 되는
+> 변수라는 점도 함정이다.
+>
+> **Raw Editor는 변수 목록 전체를 교체한다.** 변수 정리·이관 작업 때 Raw Editor에 일부만
+> 붙여넣으면 나머지 변수가 통째로 증발한다 — 실제로 `DASHBOARD_ORIGIN`이 이렇게 사라져
+> 로그인 403으로 나타났다. 공유 값(`PLATFORM_JWT_SECRET`·`DASHBOARD_ORIGIN`)은 Railway
+> **Shared Variables**에 한 번 정의하고 각 서비스에서 `${{shared.변수명}}`으로 참조하는 것을
+> 권한다 — 서비스가 늘어도 어긋날 수 없다.
 
 > **포트는 참조하지 말고 고정한다.** `${{pixel-factory.PORT}}` 같은 참조는 **빈 값으로
 >풀린다**(PORT는 Railway가 런타임에 주입하는 값이라 다른 서비스에서 참조할 수 없다).
@@ -208,6 +280,8 @@ TOKEN=$(curl -s -X POST $DOMAIN/api/auth/login \
 
 curl -H "Authorization: Bearer $TOKEN" $DOMAIN/api/factory/equipments
 curl -H "Authorization: Bearer $TOKEN" $DOMAIN/api/fleet/robots
+curl -H "Authorization: Bearer $TOKEN" $DOMAIN/api/wms/stocks
+curl -H "Authorization: Bearer $TOKEN" $DOMAIN/api/qms/nonconformances
 ```
 
 브라우저로 `https://<도메인>` 접속 → `admin` / `password` 로 로그인.
@@ -229,20 +303,24 @@ Mosquitto도 같은 이유로 배포용 설정(`mosquitto.railway.conf`)에서 b
 **3. MQTT 인증 없음** — 브로커는 익명 접속을 허용한다. Railway 프라이빗 네트워크 안에서만
 접근 가능하다는 전제이므로 **mosquitto에 퍼블릭 도메인을 만들면 안 된다.**
 
-**4. 이벤트 테이블 증가** — `fleet_events`/`factory_events`는 계속 쌓인다. 시뮬레이터를
-오래 켜 두면 DB 사용량이 늘어난다. 보존 정책을 넣기 전까지는 필요할 때만 켜는 것을 권한다.
+**4. 이벤트 테이블 증가** — `fleet_events`/`factory_events`는 계속 쌓이되, 매일 새벽
+90일 초과분을 벌크 DELETE하는 보존 정책이 돈다. 무한히 자라지는 않지만 시뮬레이터를
+계속 켜 두면 90일 치는 유지되므로, 사용량이 부담이면 시뮬레이터를 꺼 둔다.
 
-**5. PLATFORM_JWT_SECRET은 세 서비스에 같은 값** — gateway·pixel-factory·pixel-fleet이
-같은 키로 서명·검증한다. 하나라도 다르면 로그인은 되는데 이후 모든 조회가 **401**이 되고,
-대시보드는 로그인 화면으로 되튕긴다(증상이 "로그인이 안 된다"로 보여 원인을 찾기 어렵다).
-P6 이전의 `JWT_SECRET`을 쓰고 있었다면 변수명을 바꾸고 값을 통일해야 한다.
+**5. PLATFORM_JWT_SECRET은 모든 서비스에 같은 값** — gateway와 네 모듈(factory·fleet·
+wms·qms)이 같은 키로 서명·검증한다. 하나라도 다르면(변수가 **없어서 코드 기본값으로
+폴백하는 경우 포함**) 로그인은 되는데 이후 모든 조회가 **401**이 되고, 대시보드는 로그인
+화면으로 되튕긴다(증상이 "로그인이 안 된다"로 보여 원인을 찾기 어렵다). **Shared
+Variables에 한 번 정의하고 참조**하면 애초에 어긋날 수 없다. P6 이전의 `JWT_SECRET`을
+쓰고 있었다면 변수명을 바꾸고 값을 통일해야 한다.
 
-**6. `/ws/**`는 아직 인증 없이 열려 있다** — SockJS 핸드셰이크에 Authorization 헤더를
-실을 수 없어서다. 퍼블릭 도메인에서는 누구나 실시간 스트림을 구독할 수 있다(읽기 전용).
+**6. 실시간 스트림 인증(P16)** — `/ws/**` 핸드셰이크는 헤더를 실을 수 없어 열려 있지만,
+**STOMP CONNECT 프레임에서 JWT를 검증**한다. 토큰 없는 구독은 CONNECT에서 거부된다.
+CORS는 `DASHBOARD_ORIGIN` 하나로 gateway·factory·fleet 세 곳이 통일돼야 한다(§2-5 참고).
 
 ## 비용 감각
 
-상시 구동 서비스가 6개(gateway/factory/fleet/mosquitto/robot-sim/factory-sim) + 플러그인 2개다.
+상시 구동 서비스가 8개(gateway/factory/fleet/wms/qms/mosquitto/robot-sim/factory-sim) + 플러그인 2개다.
 리소스를 가장 많이 쓰는 건 **두 시뮬레이터**다 — robot-sim은 초당 텔레메트리를,
 factory-sim은 설비 8대의 사이클을 계속 만든다. 데모하지 않을 때는 이 둘을 꺼 두면
 사용량과 DB 증가가 크게 줄어든다(대시보드는 계속 뜨고 설비·로봇만 멈춰 보인다).
