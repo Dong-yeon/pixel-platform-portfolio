@@ -290,6 +290,12 @@ curl -H "Authorization: Bearer $TOKEN" $DOMAIN/api/qms/nonconformances
 배포해서 로그인·설비 8대·AMR 8대 실시간 스트림(장애물 이벤트 포함)까지 브라우저로 확인했다.
 유일하게 걸린 것이 위에 적은 gateway `PORT` 미설정 하나였다.
 
+**실측(2026-08-17):** wms·qms 서비스 추가 배포(§2-3b·§2-3c) — 통합 현황 지도에 창고동
+렉 재고(만재/여유)와 품질동 MRB 대기 건수가 표시되는 것까지 확인했다. 걸린 것 두 가지:
+qms 서비스에 wms 값(Dockerfile 경로·PORT·DB명)을 복사해 넣을 뻔한 것과, Data 탭 쿼리
+실행기가 문장을 트랜잭션으로 묶어 `CREATE DATABASE`가 거부된 것(한 문장씩 실행하거나
+psql로 접속해 해결).
+
 ## 반드시 알아둘 점
 
 **1. IPv6 바인딩** — Railway 프라이빗 네트워크는 IPv6로 통신한다. Spring Boot는 기본으로
