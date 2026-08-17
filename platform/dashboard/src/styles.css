@@ -34,6 +34,8 @@ input, select {
 }
 .login-card label { display: flex; flex-direction: column; gap: 4px; font-size: 13px; color: var(--muted); }
 .login-card button { margin-top: 6px; }
+/* 게스트 입장 — 주 로그인 버튼과 위계를 나누는 아웃라인 보조 버튼 */
+.login-card button.guest { margin-top: 0; background: transparent; color: var(--accent); border: 1px solid var(--accent); }
 
 /* layout — 왼쪽 세로 메뉴 + 오른쪽 본문.
    가로 탭은 항목이 6개가 되자 좁은 폭에서 한글 라벨이 글자 단위로 쪼개졌다. */
