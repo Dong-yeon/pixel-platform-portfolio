@@ -287,7 +287,12 @@ button.mini { padding: 3px 10px; font-size: 12px; margin-left: auto; }
 .b-QC .umap-building-fill { fill: #fdf7f5; }
 .b-QC .umap-wall { stroke: #d95d39; }
 .b-QC .umap-building-label { fill: #a53d20; }
-.b-WH .umap-building-fill { fill: #f5f8f6; }
+/* 창고동 — 렉 피더가 도는 자동화 보관 구역이라는 것을 벽 색으로 신호한다.
+   생산동(중립)·품질동(주황)과 나란히 놓았을 때 세 번째 색으로 바로 갈리게 슬레이트 톤을 쓴다. */
+.b-WH .umap-nameplate rect { stroke: #46586b; }
+.b-WH .umap-building-fill { fill: #f2f6f9; }
+.b-WH .umap-wall { stroke: #46586b; }
+.b-WH .umap-building-label { fill: #33465a; }
 
 /* 충전존 — 베이를 감싸는 구역. 비워 둔 자리라는 게 읽히도록 옅은 빗금 느낌으로. */
 .umap-charge-zone rect { fill: #eef4ff; stroke: #2d7ff9; stroke-width: 0.14; stroke-dasharray: 0.7 0.5; opacity: 0.75; }
@@ -300,12 +305,13 @@ button.mini { padding: 3px 10px; font-size: 12px; margin-left: auto; }
 .umap-elevator-mark { fill: #a86a00; font-weight: 700; }
 .umap-elevator-label { fill: #a86a00; }
 
-/* 렉 — 단(levels)만큼 가로줄을 그어 선반처럼. 색은 적재율. */
-.umap-rack { stroke: #7d8b9c; stroke-width: 0.1; }
-.umap-rack-divider { stroke: #ffffff; stroke-width: 0.08; opacity: 0.75; }
+/* 렉 — 실제 열×단 낱칸을 그린다. 칸 사이 여백이 곧 구분선이라 별도 divider가 없다. */
+.umap-rack-frame { fill: none; stroke: #7d8b9c; stroke-width: 0.1; }
+.umap-rack-cell { stroke: #ffffff; stroke-width: 0.05; }
+.umap-rack-cell.empty { fill: #eef1f6; }
 .umap-rack-g { cursor: help; }
 /* 지금 랙 피더가 취출 중인 렉(P21) — 진행 중인 주문 근거가 있을 때만 그린다. */
-.umap-rack-g.servicing .umap-rack { stroke: #2d7ff9; stroke-width: 0.32; }
+.umap-rack-g.servicing .umap-rack-frame { stroke: #2d7ff9; stroke-width: 0.32; }
 
 /* 랙 피더(P21) — AMR(원)과 다른 사각 마커로 종류를 구분한다. */
 .umap-robot-feeder-mark { stroke: #fff; stroke-width: 0.18; }

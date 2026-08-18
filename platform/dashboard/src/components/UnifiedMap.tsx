@@ -514,7 +514,15 @@ function BuildingNameplate({ x, y, scale, text }: { x: number; y: number; scale:
   )
 }
 
-/** 렉 — 열×단이 보이도록 칸을 긋고, 적재율로 색을 채운다. */
+/**
+ * 렉 — 실제 열×단(columnsCount×levelsCount) 격자로 낱칸을 그린다.
+ *
+ * <p>재고는 렉 단위로만 집계되고 칸 단위 데이터는 없다(지도 시각 규칙 — 없는 데이터를
+ * 지어내지 않는다). 그래서 "몇 칸이 찼는지"는 지어내지 않고, 적재율을 칸 수에 결정적으로
+ * 환산한다(`round(ratio × 총칸수)`) — 같은 비율이면 항상 같은 칸 수가 찬다. 채운 칸의 색은
+ * 기존 4단계 적재율 색을 그대로 쓰고, 빈 칸은 옅게 비워 둔다. 아래 단부터 채워 보이게 해
+ * "바닥부터 쌓는다"는 창고 직관을 따른다.
+ */
 function RackShape({
   rack, quantity, active = false,
 }: {
@@ -529,19 +537,40 @@ function RackShape({
   const h = vertical ? 4.4 : 1.6
   const x = rack.posX - w / 2
   const y = rack.posY - h / 2
-  // 단(levels)만큼 가로줄을 그어 선반처럼 보이게 한다.
-  const dividers = Array.from({ length: Math.max(0, rack.levelsCount - 1) }, (_, i) =>
-    y + (h * (i + 1)) / rack.levelsCount)
+
+  const cols = Math.max(1, rack.columnsCount)
+  const levels = Math.max(1, rack.levelsCount)
+  const totalCells = cols * levels
+  const filledCells = Math.round(ratio * totalCells)
+  const cellW = w / cols
+  const cellH = h / levels
+  const filledColor = rackFill(ratio)
+
+  // 아래 단(level 0)부터, 한 단 안에서는 왼쪽부터 채운다.
+  const cells: { cx: number; cy: number; filled: boolean }[] = []
+  let seq = 0
+  for (let level = levels - 1; level >= 0; level--) {
+    for (let col = 0; col < cols; col++) {
+      cells.push({ cx: x + col * cellW, cy: y + level * cellH, filled: seq < filledCells })
+      seq++
+    }
+  }
 
   return (
     <g className={`umap-rack-g${active ? ' servicing' : ''}`}>
-      <rect x={x} y={y} width={w} height={h} rx={0.2} fill={rackFill(ratio)} className="umap-rack" />
-      {dividers.map((dy, i) => (
-        <line key={i} x1={x} y1={dy} x2={x + w} y2={dy} className="umap-rack-divider" />
+      <rect x={x} y={y} width={w} height={h} rx={0.15} className="umap-rack-frame" />
+      {cells.map((c, i) => (
+        <rect
+          key={i}
+          x={c.cx + cellW * 0.08} y={c.cy + cellH * 0.08}
+          width={Math.max(0, cellW * 0.84)} height={Math.max(0, cellH * 0.84)}
+          fill={c.filled ? filledColor : undefined}
+          className={`umap-rack-cell${c.filled ? '' : ' empty'}`}
+        />
       ))}
       <title>
         {`${rack.rackCode} · ${quantity}/${rack.capacityQty} EA (${Math.round(ratio * 100)}%) · `
-          + `${rack.columnsCount}열 ${rack.levelsCount}단${active ? ' · 랙 피더 취출 중' : ''}`}
+          + `${cols}열 ${levels}단 (${filledCells}/${totalCells}칸)${active ? ' · 랙 피더 취출 중' : ''}`}
       </title>
     </g>
   )
