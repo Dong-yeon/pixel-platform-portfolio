@@ -420,7 +420,15 @@ export function UnifiedMap({
              종류별로 레이어를 따로 끌 수 있다 — 랙 피더는 AMR과 아예 다니는 곳이 다르다. */}
       {floorRobots
         .filter((r) => (r.robotType === 'RACK_FEEDER' ? layers.rackFeeder : layers.amr))
-        .map((r) => (
+        .map((r) => {
+          // 랙 피더는 렉 낱칸(칸 하나가 대략 0.3~0.9 단위) 사이를 다니므로, AMR과 같은 크기면
+          // 렉보다 로봇이 훨씬 커 보인다. 마커·파렛트·작업 테를 한 단계 작게 그린다.
+          const isFeeder = r.robotType === 'RACK_FEEDER'
+          const markHalf = isFeeder ? 0.55 : 0.95
+          const palletHalf = isFeeder ? 0.75 : 1.15
+          const ringR = isFeeder ? 0.95 : 1.45
+          const battY = isFeeder ? -1.05 : -1.55
+          return (
         <g
           key={r.robotCode}
           className="umap-robot"
@@ -428,26 +436,30 @@ export function UnifiedMap({
         >
           {/* 적재 중이면 파렛트를 얹어 그린다 — "가지러 가는 중"과 "옮기는 중"의 구분이
               물류 화면에서 가장 먼저 읽혀야 하는 정보다. 로봇 뒤에 깔아 원을 가리지 않는다. */}
-          {r.laden && <rect x={-1.15} y={-1.15} width={2.3} height={2.3} rx={0.2} className="umap-pallet" />}
+          {r.laden && (
+            <rect x={-palletHalf} y={-palletHalf} width={palletHalf * 2} height={palletHalf * 2}
+                  rx={0.2} className="umap-pallet" />
+          )}
           {/* 자기 경로와 같은 색 테 — 선이 겹쳐도 어느 로봇 것인지 눈으로 잇는다. */}
           {workingRobotIds.has(r.id) && (
-            <circle r={1.45} fill="none" stroke={routeColorFor(r.robotCode)} strokeWidth={0.26} opacity={0.9} />
+            <circle r={ringR} fill="none" stroke={routeColorFor(r.robotCode)} strokeWidth={0.26} opacity={0.9} />
           )}
           {/* 랙 피더는 사각, AMR은 원 — 창고 안에서만 도는 다른 종류의 로봇임을 모양으로 구분한다. */}
-          {r.robotType === 'RACK_FEEDER' ? (
-            <rect x={-0.85} y={-0.85} width={1.7} height={1.7} rx={0.25}
+          {isFeeder ? (
+            <rect x={-markHalf} y={-markHalf} width={markHalf * 2} height={markHalf * 2} rx={0.16}
                   fill={ROBOT_COLOR[r.status]} className="umap-robot-feeder-mark" />
           ) : (
-            <circle r={0.95} fill={ROBOT_COLOR[r.status]} stroke="#fff" strokeWidth={0.18} />
+            <circle r={markHalf} fill={ROBOT_COLOR[r.status]} stroke="#fff" strokeWidth={0.18} />
           )}
-          <text y={0.38} className="umap-robot-label" textAnchor="middle" style={fs(1.1)}>
+          <text y={0.38} className="umap-robot-label" textAnchor="middle" style={fs(isFeeder ? 0.8 : 1.1)}>
             {r.robotCode.slice(-1)}
           </text>
-          <text y={-1.55} className="umap-robot-batt" textAnchor="middle" style={fs(0.95)}>
+          <text y={battY} className="umap-robot-batt" textAnchor="middle" style={fs(isFeeder ? 0.75 : 0.95)}>
             {r.batteryPercent}%
           </text>
         </g>
-      ))}
+          )
+        })}
     </svg>
   )
 }

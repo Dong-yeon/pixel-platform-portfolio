@@ -221,11 +221,32 @@ export function nodeIndex(layout: Layout | null): Record<string, [number, number
   return Object.fromEntries(layout.nodes.map((n) => [n.nodeCode, [n.posX, n.posY]]))
 }
 
+/** 이 x에 가장 가까운 실제 연결로 x(모든 노드의 x — 서버 `LocationRegistry#columns()`와 같은 전제). */
+function nearestLaneX(layout: Layout, x: number): number {
+  let best = x
+  let bestDist = Infinity
+  for (const node of layout.nodes) {
+    const dist = Math.abs(node.posX - x)
+    if (dist < bestDist) {
+      bestDist = dist
+      best = node.posX
+    }
+  }
+  return best
+}
+
 /**
  * 두 지점 사이의 주행 경로(통로 경유)를 폴리라인으로 만든다.
  *
  * **서버 `LaneGraph`·robot-sim `NodeMap#route` 와 같은 규칙이어야** 그린 선과 실제 주행이
  * 일치한다: 목적지가 속한 쪽 통로를 탄다.
+ *
+ * <p>from·to가 연결로 x 위에 있지 않을 수 있다 — 로봇의 실좌표(이동 중)나 렉 접근점
+ * (서버 `LocationRegistry#rackApproachPoint` — 렉 앞은 레인망 밖의 로컬 이동이라 연결로
+ * 개념이 없다, 설계 근거: p21 문서 D2)이 그 예다. 그 경우 그대로 세로선의 통과 x로 쓰면
+ * 렉 칸을 관통하는 것처럼 보인다(실제로 겪음) — 가장 가까운 실제 연결로로 스냅하고,
+ * 그 x에서 실좌표까지 짧은 곁가지를 하나 더 그린다. 이미 연결로 위에 있으면(일반 노드 간
+ * 이동) 스냅해도 자기 자신이라 기존 동작과 같다.
  */
 export function routePoints(
   layout: Layout,
@@ -237,7 +258,15 @@ export function routePoints(
   }
   const midY = (layout.upperAisleY + layout.lowerAisleY) / 2
   const aisleY = to[1] < midY ? layout.upperAisleY : layout.lowerAisleY
-  return [from, [from[0], aisleY], [to[0], aisleY], to]
+  const fromLaneX = nearestLaneX(layout, from[0])
+  const toLaneX = nearestLaneX(layout, to[0])
+
+  const points: [number, number][] = [from]
+  if (Math.abs(fromLaneX - from[0]) > 0.6) points.push([fromLaneX, from[1]])
+  points.push([fromLaneX, aisleY], [toLaneX, aisleY])
+  if (Math.abs(toLaneX - to[0]) > 0.6) points.push([toLaneX, to[1]])
+  points.push(to)
+  return points
 }
 
 // ---------- pixel-factory (OEE) ----------
