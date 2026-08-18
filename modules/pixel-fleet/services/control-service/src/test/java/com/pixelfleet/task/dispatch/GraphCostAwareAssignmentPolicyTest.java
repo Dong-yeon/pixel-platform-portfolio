@@ -31,20 +31,23 @@ class GraphCostAwareAssignmentPolicyTest {
 
     @Test
     void 장애물이_있으면_직선최근접과_그래프비용_최적이_서로_다른_로봇을_고른다() {
-        // 작업 출발지: PROD-B1(27,21). 후보 둘 다 생산동 상단(A열)에 있다.
-        //   - AMR-NEAR = PROD-A1(27,6) — PROD-B1과 같은 연결로. 직선거리 15로 더 가깝다.
-        //   - AMR-FAR  = PROD-A2(34,6) — 직선거리 √274≈16.55로 더 멀다.
-        // 연결로 27의 중간 대역(JCT-27-U~JCT-27-L)을 막으면 AMR-NEAR는 연결로 34를 거쳐
-        // 돌아가야 한다(비용 29) — 반면 AMR-FAR는 애초에 연결로 34 중간 대역을 거치므로
-        // 이 장애물의 영향을 받지 않는다(비용 22). 그래서 실제로는 AMR-FAR가 더 싸다.
+        // 작업 출발지: PROD-B1(39,21) — V15에서 창고동이 넓어진 만큼(+12) 생산동도 옮겨졌다
+        // (코드는 그대로, 실제 x만 39/46로 바뀜). 후보 둘 다 생산동 상단(A열)에 있다.
+        //   - AMR-NEAR = PROD-A1(39,6) — PROD-B1과 같은 연결로. 직선거리 15로 더 가깝다.
+        //   - AMR-FAR  = PROD-A2(46,6) — 직선거리 √274≈16.55로 더 멀다.
+        // 연결로 39(코드는 JCT-27, V15 이후 실제 x=39)의 중간 대역을 막으면 AMR-NEAR는
+        // 연결로 46(코드 JCT-34)을 거쳐 돌아가야 한다(비용 29) — 반면 AMR-FAR는 애초에
+        // 그 연결로 중간 대역을 거치므로 이 장애물의 영향을 받지 않는다(비용 22, 두 값 모두
+        // PROD 내부 상대 거리라 V15의 +12 이동에 영향받지 않는다). 그래서 실제로는
+        // AMR-FAR가 더 싸다.
         when(obstacles.isBlocked(LaneGraph.canonicalEdgeId("JCT-27-U", "JCT-27-L"))).thenReturn(true);
 
         FleetOrder order = new FleetOrder("P20-5-TEST", null, 1, true, (short) 1);
         order.addStep("PROD-B1", true, false);
         order.addStep("WH-RECV", false, true); // 목적지는 이 테스트와 무관, 스텝 2개만 있으면 됨
 
-        RobotResponse near = robot(1L, "AMR-NEAR", 27, 6);
-        RobotResponse far = robot(2L, "AMR-FAR", 34, 6);
+        RobotResponse near = robot(1L, "AMR-NEAR", 39, 6);
+        RobotResponse far = robot(2L, "AMR-FAR", 46, 6);
         List<RobotResponse> candidates = List.of(near, far);
 
         // 직선거리 정책은 더 가까운 AMR-NEAR를 고른다 — 장애물을 모른다.
@@ -64,8 +67,8 @@ class GraphCostAwareAssignmentPolicyTest {
         order.addStep("PROD-B1", true, false);
         order.addStep("WH-RECV", false, true);
 
-        RobotResponse near = robot(1L, "AMR-NEAR", 27, 6);
-        RobotResponse far = robot(2L, "AMR-FAR", 34, 6);
+        RobotResponse near = robot(1L, "AMR-NEAR", 39, 6);
+        RobotResponse far = robot(2L, "AMR-FAR", 46, 6);
         List<RobotResponse> candidates = List.of(near, far);
 
         assertThat(nearestPolicy.selectRobot(order, candidates)).contains(near);
