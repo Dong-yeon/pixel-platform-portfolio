@@ -291,10 +291,25 @@ curl -H "Authorization: Bearer $TOKEN" $DOMAIN/api/qms/nonconformances
 유일하게 걸린 것이 위에 적은 gateway `PORT` 미설정 하나였다.
 
 **실측(2026-08-17):** wms·qms 서비스 추가 배포(§2-3b·§2-3c) — 통합 현황 지도에 창고동
-렉 재고(만재/여유)와 품질동 MRB 대기 건수가 표시되는 것까지 확인했다. 걸린 것 두 가지:
-qms 서비스에 wms 값(Dockerfile 경로·PORT·DB명)을 복사해 넣을 뻔한 것과, Data 탭 쿼리
-실행기가 문장을 트랜잭션으로 묶어 `CREATE DATABASE`가 거부된 것(한 문장씩 실행하거나
-psql로 접속해 해결).
+렉 재고(만재/여유)와 품질동 MRB 대기 건수가 표시되는 것까지 확인했다. 걸린 것은 넷:
+
+1. qms 서비스에 wms 값(Dockerfile 경로·PORT·DB명)을 복사해 넣을 뻔한 것.
+2. Data 탭 쿼리 실행기가 여러 문장을 트랜잭션으로 묶어 `CREATE DATABASE`가 거부된 것
+   (한 문장씩 실행하거나 psql로 접속해 해결).
+3. **`PLATFORM_JWT_SECRET`을 Shared Variable 참조(`${{shared.PLATFORM_JWT_SECRET}}`)로
+   바꿨는데 정작 Shared Variables에 그 이름의 변수를 만들지 않아 빈 문자열로 풀린 것.**
+   `Keys.hmacShaKeyFor(...)`가 빈/짧은 키를 거부해 `JwtTokenProvider` 빈 생성이 실패하고
+   wms가 부팅 도중 계속 크래시했다(Railway엔 Active로 보이는데 재시작을 반복하는 상태 —
+   REST가 전부 500이 되는 원인 중 가장 찾기 어려운 유형). 참조를 쓰려면 참조 대상을
+   **먼저 Shared Variables에 만들어야** 한다 — 참조 문법이 유효한 것과 값이 존재하는 것은
+   별개다(§2-5의 "포트는 참조하지 말고 고정한다"와 같은 패턴의 함정).
+4. **`MODULE_FLEET_WS_URI`에 fleet이 아니라 wms의 URI를 넣은 것** — 변수 이름이 비슷해
+   wms 추가 작업 중 값이 섞였다. 증상은 REST(로그인·로봇 목록)는 전부 정상인데 지도만
+   갱신되지 않는 것(새로고침하면 위치가 바뀌므로 로봇·백엔드는 정상, push만 안 옴).
+   `/ws/fleet/info`가 401을 냈는데, 응답 헤더의 `X-Content-Type-Options`·`X-Frame-Options`
+   같은 Spring Security 기본 헤더가 결정적 단서였다 — 게이트웨이는 리액티브 스택이라
+   이 헤더를 안 붙이므로, **엉뚱한(서블릿 기반) 모듈까지 요청이 도달했다**는 뜻이었다.
+   wms에는 `/ws/**` permitAll 규칙이 없어 `anyRequest().authenticated()`에 걸려 401.
 
 ## 반드시 알아둘 점
 
