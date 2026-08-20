@@ -5,28 +5,29 @@ import java.util.Map;
 import org.springframework.stereotype.Component;
 
 /**
- * 공장 평면도(150 × 26) — 건물 5채. 통로는 둘이고, <b>창고동·생산동·품질동 세 건물을
+ * 공장 평면도(160 × 26) — 건물 5채. 통로는 둘이고, <b>창고동·생산동·품질동 세 건물을
  * 관통한다</b>(신관 두 채는 통로 뒤에 별도 체인으로 이어진다 — 아래 "신관" 참고).
  *
  * <pre>
- *   창고동(1~31)                생산동(35~67)                 품질동(71~79)
- *   [렉][렉][렉]           [CNC-01][CNC-02][CNC-03][MCT-01]
- *   ○입고  ○도크1            ○A1    ○A2    ○A3    ○A4         ○QC-OUT(판정 출고)
- *   ══════════════════ 상단 통로 (y=9) ═══════════════════════════════
+ *   창고동(1~41)                   생산동(45~77)                  품질동(81~89)
+ *   [렉]  [렉]  [렉]           [CNC-01][CNC-02][CNC-03][MCT-01]
+ *   ○입고   ○도크1               ○A1    ○A2    ○A3    ○A4          ○QC-OUT(판정 출고)
+ *   ══════════════════════ 상단 통로 (y=9) ══════════════════════════════
  *   [렉] ○피킹존
- *   ══════════════════ 하단 통로 (y=18) ══════════════════════════════
- *   [렉] ○출하 ○도크2         ○B1    ○B2    ○B3    ○B4         ○QC-IN(검사 입고)
- *                          [ASM-01][ASM-02][INS-01][PKG-01]
+ *   ══════════════════════ 하단 통로 (y=18) ═════════════════════════════
+ *   [렉] ○출하 ○도크2            ○B1    ○B2    ○B3    ○B4          ○QC-IN(검사 입고)
+ *                             [ASM-01][ASM-02][INS-01][PKG-01]
  * </pre>
  *
  * <p><b>왜 통로가 건물을 관통하나.</b> 경로 규칙(수직→통로→수평→수직)이 고정이라, 통로가
  * 벽을 지나는 자리를 출입구로 삼아야 로봇이 벽을 뚫지 않는다. 모든 노드는 커넥터 x 위,
- * 통로 밖에 있다. 창고동 내부 연결로는 4·13·22 — 렉 27기(3열×3행×3개 층)가 그 사이에 선다.
+ * 통로 밖에 있다. 창고동 내부 연결로는 4·17·30 — 렉 27기(3열×3행×3개 층)가 그 사이에 선다.
+ * 창고동이 생산동(32)보다 넓은 최대 건물이다(V16 — 폭 40).
  *
  * <p>물류 흐름: 창고동(자재) → 생산동(가공) → <b>품질동(전수 검사)</b> →
  * 합격이면 창고동 입고 / 불합격이면 생산동 재작업.
  *
- * <p><b>신관(BLDG-A/B, x=85~144)</b>은 통로 체인이 아니라 QC-OUT에서 시작하는 별도 체인으로
+ * <p><b>신관(BLDG-A/B, x=95~154)</b>은 통로 체인이 아니라 QC-OUT에서 시작하는 별도 체인으로
  * 이어진다(GATE-WH-A → MACH-1/2 → GATE-A-B → ASM-1 → LOGI-1). 시뮬레이션 활동은 없고,
  * 좌표 정합 테스트가 요구해서 여기 있다(신관 자체엔 아직 아무도 안 돌아다닌다).
  *
@@ -34,8 +35,8 @@ import org.springframework.stereotype.Component;
  * 받아 오지 않고 자기 복사본을 갖는다 — 시뮬레이터는 물리 세계를 흉내내는 쪽이라 실제 설비처럼
  * 서버가 알려주는 대로 위치를 바꾸지 않아야 하고, 서버가 죽어도 계속 돌아야 한다.
  *
- * <p>대신 {@code NodeMapLayoutConsistencyTest}가 서버 마스터(V15 마이그레이션 — 평면도를
- * 다시 그리는 마이그레이션마다 이 경로도 함께 옮긴다, V9→V12→V15)와 대조해 <b>어긋나면
+ * <p>대신 {@code NodeMapLayoutConsistencyTest}가 서버 마스터(V16 마이그레이션 — 평면도를
+ * 다시 그리는 마이그레이션마다 이 경로도 함께 옮긴다, V9→V12→V15→V16)와 대조해 <b>어긋나면
  * 빌드를 깨뜨린다.</b> 런타임 의존을 만들지 않으면서 조용한 불일치를 막는 방법이다.
  * 좌표를 바꿀 일이 있으면 마스터를 고치고 여기를 맞춘다(순서가 반대면 테스트가 잡아 준다).
  */
@@ -43,42 +44,42 @@ import org.springframework.stereotype.Component;
 public class NodeMap {
 
     /** 평면도 가로. 서버 마스터(layout_settings.width)와 같아야 한다 — 대조 테스트가 확인한다. */
-    public static final double MAX_X = 150.0;
+    public static final double MAX_X = 160.0;
     /** 평면도 세로. 서버 마스터(layout_settings.height)와 같아야 한다. */
     public static final double MAX_Y = 26.0;
 
     private static final Map<String, double[]> NODES = Map.ofEntries(
-            // 창고동 1층 — 충전 베이는 충전존 안에 나란히(렉을 비운 자리다)
+            // 창고동 1층 — 도크는 그대로(연결로 4는 V16에서도 안 움직인다)
             Map.entry("WH-DOCK-1", new double[]{4, 3}),
             Map.entry("WH-DOCK-2", new double[]{4, 5}),
             Map.entry("WH-DOCK-3", new double[]{4, 21}),
             Map.entry("WH-DOCK-4", new double[]{4, 23}),
-            Map.entry("WH-RECV", new double[]{13, 6}),
-            Map.entry("WH-PICK", new double[]{13, 13}),
-            Map.entry("WH-SHIP", new double[]{22, 21}),
-            Map.entry("WH-ELEV-1F", new double[]{22, 13}),
+            Map.entry("WH-RECV", new double[]{17, 6}),
+            Map.entry("WH-PICK", new double[]{17, 13}),
+            Map.entry("WH-SHIP", new double[]{30, 21}),
+            Map.entry("WH-ELEV-1F", new double[]{30, 13}),
             // 창고동 2·3층 — **1층과 좌표가 겹친다**(샤프트·베이가 수직으로 같은 자리다).
             // 지상 로봇은 여기 오지 않는다(층을 오가지 못한다). 층별 AMR이 생기면 쓰인다.
             Map.entry("WH-DOCK-2F", new double[]{4, 3}),
-            Map.entry("WH-2F-P1", new double[]{13, 6}),
-            Map.entry("WH-2F-P2", new double[]{13, 13}),
-            Map.entry("WH-ELEV-2F", new double[]{22, 13}),
+            Map.entry("WH-2F-P1", new double[]{17, 6}),
+            Map.entry("WH-2F-P2", new double[]{17, 13}),
+            Map.entry("WH-ELEV-2F", new double[]{30, 13}),
             Map.entry("WH-DOCK-3F", new double[]{4, 3}),
-            Map.entry("WH-3F-P1", new double[]{13, 6}),
-            Map.entry("WH-3F-P2", new double[]{13, 13}),
-            Map.entry("WH-ELEV-3F", new double[]{22, 13}),
-            // 생산동 (V15에서 창고동이 넓어진 만큼 +12)
-            Map.entry("PROD-A1", new double[]{39, 6}),
-            Map.entry("PROD-A2", new double[]{46, 6}),
-            Map.entry("PROD-A3", new double[]{53, 6}),
-            Map.entry("PROD-A4", new double[]{60, 6}),
-            Map.entry("PROD-B1", new double[]{39, 21}),
-            Map.entry("PROD-B2", new double[]{46, 21}),
-            Map.entry("PROD-B3", new double[]{53, 21}),
-            Map.entry("PROD-B4", new double[]{60, 21}),
-            // 품질동 (+12)
-            Map.entry("QC-IN", new double[]{74, 21}),
-            Map.entry("QC-OUT", new double[]{74, 6}),
+            Map.entry("WH-3F-P1", new double[]{17, 6}),
+            Map.entry("WH-3F-P2", new double[]{17, 13}),
+            Map.entry("WH-ELEV-3F", new double[]{30, 13}),
+            // 생산동 (V16에서 창고동이 다시 넓어진 만큼 +10 — 균일 이동이라 내부 상대거리는 그대로)
+            Map.entry("PROD-A1", new double[]{49, 6}),
+            Map.entry("PROD-A2", new double[]{56, 6}),
+            Map.entry("PROD-A3", new double[]{63, 6}),
+            Map.entry("PROD-A4", new double[]{70, 6}),
+            Map.entry("PROD-B1", new double[]{49, 21}),
+            Map.entry("PROD-B2", new double[]{56, 21}),
+            Map.entry("PROD-B3", new double[]{63, 21}),
+            Map.entry("PROD-B4", new double[]{70, 21}),
+            // 품질동 (+10)
+            Map.entry("QC-IN", new double[]{84, 21}),
+            Map.entry("QC-OUT", new double[]{84, 6}),
             // 통로·연결로 교차점(JUNCTION) — V13에서 처음 생겼을 땐 대조 테스트가 V12만 읽어서
             // 검사 대상이 아니었다. V15로 정본 파일이 바뀌며(레이아웃을 다시 그리는 마이그레이션
             // 이라 노드·엣지를 한 파일에 전부 다시 선언해야 한다) 교차점도 같이 검사 대상이
@@ -86,27 +87,28 @@ public class NodeMap {
             // "서버 마스터의 모든 노드가 일치해야 한다"는 테스트를 통과하려면 여기도 있어야 한다.
             Map.entry("JCT-4-U", new double[]{4, 9}),
             Map.entry("JCT-4-L", new double[]{4, 18}),
-            Map.entry("JCT-9-U", new double[]{13, 9}),
-            Map.entry("JCT-9-L", new double[]{13, 18}),
-            Map.entry("JCT-14-U", new double[]{22, 9}),
-            Map.entry("JCT-14-L", new double[]{22, 18}),
-            Map.entry("JCT-27-U", new double[]{39, 9}),
-            Map.entry("JCT-27-L", new double[]{39, 18}),
-            Map.entry("JCT-34-U", new double[]{46, 9}),
-            Map.entry("JCT-34-L", new double[]{46, 18}),
-            Map.entry("JCT-41-U", new double[]{53, 9}),
-            Map.entry("JCT-41-L", new double[]{53, 18}),
-            Map.entry("JCT-48-U", new double[]{60, 9}),
-            Map.entry("JCT-48-L", new double[]{60, 18}),
-            Map.entry("JCT-62-U", new double[]{74, 9}),
-            Map.entry("JCT-62-L", new double[]{74, 18}),
-            // 신관(BLDG-A/B, V14) — 시뮬레이션 활동은 없지만 좌표 정합 테스트 대상이라 둔다.
-            Map.entry("GATE-WH-A", new double[]{85, 6}),
-            Map.entry("MACH-1", new double[]{95, 6}),
-            Map.entry("MACH-2", new double[]{105, 6}),
-            Map.entry("GATE-A-B", new double[]{112, 6}),
-            Map.entry("ASM-1", new double[]{122, 6}),
-            Map.entry("LOGI-1", new double[]{135, 6})
+            Map.entry("JCT-9-U", new double[]{17, 9}),
+            Map.entry("JCT-9-L", new double[]{17, 18}),
+            Map.entry("JCT-14-U", new double[]{30, 9}),
+            Map.entry("JCT-14-L", new double[]{30, 18}),
+            Map.entry("JCT-27-U", new double[]{49, 9}),
+            Map.entry("JCT-27-L", new double[]{49, 18}),
+            Map.entry("JCT-34-U", new double[]{56, 9}),
+            Map.entry("JCT-34-L", new double[]{56, 18}),
+            Map.entry("JCT-41-U", new double[]{63, 9}),
+            Map.entry("JCT-41-L", new double[]{63, 18}),
+            Map.entry("JCT-48-U", new double[]{70, 9}),
+            Map.entry("JCT-48-L", new double[]{70, 18}),
+            Map.entry("JCT-62-U", new double[]{84, 9}),
+            Map.entry("JCT-62-L", new double[]{84, 18}),
+            // 신관(BLDG-A/B, V14) — V16에서 품질동과 안 겹치도록 균일 +10로 같이 옮겼다.
+            // 시뮬레이션 활동은 없지만 좌표 정합 테스트 대상이라 둔다.
+            Map.entry("GATE-WH-A", new double[]{95, 6}),
+            Map.entry("MACH-1", new double[]{105, 6}),
+            Map.entry("MACH-2", new double[]{115, 6}),
+            Map.entry("GATE-A-B", new double[]{122, 6}),
+            Map.entry("ASM-1", new double[]{132, 6}),
+            Map.entry("LOGI-1", new double[]{145, 6})
     );
 
     /**

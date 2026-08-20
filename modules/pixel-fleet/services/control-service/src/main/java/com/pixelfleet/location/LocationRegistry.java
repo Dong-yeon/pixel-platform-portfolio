@@ -48,7 +48,7 @@ public class LocationRegistry {
 
     private static final Logger log = LoggerFactory.getLogger(LocationRegistry.class);
 
-    private static final double MAX_X = 150.0;
+    private static final double MAX_X = 160.0;
     private static final double MAX_Y = 26.0;
 
     /** 좌표 일치 판정 허용오차. 부동소수 비교와 "거의 그 자리" 판정에 같이 쓴다. */
@@ -58,12 +58,13 @@ public class LocationRegistry {
     public record Edge(String to, double cost) {}
 
     /**
-     * factory에서 못 받았을 때 쓰는 노드 폴백. V15 마이그레이션 시드와 같은 값이다 —
+     * factory에서 못 받았을 때 쓰는 노드 폴백. V16 마이그레이션 시드와 같은 값이다 —
      * 명명된 노드(1층만, 위층은 배차 대상이 아니라 제외) + 교차점(JUNCTION) 16개.
      *
-     * <p><b>코드가 실제 x와 안 맞는 항목이 있다.</b> JCT-9-*는 x=13, JCT-14-*는 x=22다 —
-     * V15에서 창고동을 넓히며 연결로 간격만 벌리고 이름은 그대로 뒀다(마이그레이션 헤더 참고,
-     * FK 때문에 이름을 바꾸려면 layout_edges를 통째로 다시 넣어야 해서 위험만 커진다).
+     * <p><b>코드가 실제 x와 안 맞는 항목이 있다.</b> JCT-9-*는 x=17, JCT-14-*는 x=30다 —
+     * V15·V16에서 창고동을 두 번 넓히며 연결로 간격만 벌리고 이름은 그대로 뒀다(마이그레이션
+     * 헤더 참고, FK 때문에 이름을 바꾸려면 layout_edges를 통째로 다시 넣어야 해서 위험만
+     * 커진다).
      */
     private static final Map<String, double[]> FALLBACK_NODES = Map.ofEntries(
             // 창고동 1층
@@ -71,44 +72,44 @@ public class LocationRegistry {
             Map.entry("WH-DOCK-2", new double[]{4, 5}),
             Map.entry("WH-DOCK-3", new double[]{4, 21}),
             Map.entry("WH-DOCK-4", new double[]{4, 23}),
-            Map.entry("WH-RECV", new double[]{13, 6}),
-            Map.entry("WH-PICK", new double[]{13, 13}),
-            Map.entry("WH-SHIP", new double[]{22, 21}),
-            Map.entry("WH-ELEV-1F", new double[]{22, 13}),
-            // 생산동 (V15에서 창고동이 넓어진 만큼 +12)
-            Map.entry("PROD-A1", new double[]{39, 6}),
-            Map.entry("PROD-A2", new double[]{46, 6}),
-            Map.entry("PROD-A3", new double[]{53, 6}),
-            Map.entry("PROD-A4", new double[]{60, 6}),
-            Map.entry("PROD-B1", new double[]{39, 21}),
-            Map.entry("PROD-B2", new double[]{46, 21}),
-            Map.entry("PROD-B3", new double[]{53, 21}),
-            Map.entry("PROD-B4", new double[]{60, 21}),
-            // 품질동 — 가공이 끝난 물건은 무조건 여기를 거친다 (+12)
-            Map.entry("QC-IN", new double[]{74, 21}),
-            Map.entry("QC-OUT", new double[]{74, 6}),
+            Map.entry("WH-RECV", new double[]{17, 6}),
+            Map.entry("WH-PICK", new double[]{17, 13}),
+            Map.entry("WH-SHIP", new double[]{30, 21}),
+            Map.entry("WH-ELEV-1F", new double[]{30, 13}),
+            // 생산동 (V16에서 창고동이 다시 넓어진 만큼 +10 — 균일 이동이라 내부 상대거리는 그대로)
+            Map.entry("PROD-A1", new double[]{49, 6}),
+            Map.entry("PROD-A2", new double[]{56, 6}),
+            Map.entry("PROD-A3", new double[]{63, 6}),
+            Map.entry("PROD-A4", new double[]{70, 6}),
+            Map.entry("PROD-B1", new double[]{49, 21}),
+            Map.entry("PROD-B2", new double[]{56, 21}),
+            Map.entry("PROD-B3", new double[]{63, 21}),
+            Map.entry("PROD-B4", new double[]{70, 21}),
+            // 품질동 — 가공이 끝난 물건은 무조건 여기를 거친다 (+10)
+            Map.entry("QC-IN", new double[]{84, 21}),
+            Map.entry("QC-OUT", new double[]{84, 6}),
             // 통로·연결로 교차점 (P20) — 로봇이 정차하는 자리가 아니라 경로 그래프의 분기점.
-            // V15__widen_warehouse.sql과 같은 값.
+            // V16__warehouse_biggest_building.sql과 같은 값.
             Map.entry("JCT-4-U", new double[]{4, 9}),
             Map.entry("JCT-4-L", new double[]{4, 18}),
-            Map.entry("JCT-9-U", new double[]{13, 9}),
-            Map.entry("JCT-9-L", new double[]{13, 18}),
-            Map.entry("JCT-14-U", new double[]{22, 9}),
-            Map.entry("JCT-14-L", new double[]{22, 18}),
-            Map.entry("JCT-27-U", new double[]{39, 9}),
-            Map.entry("JCT-27-L", new double[]{39, 18}),
-            Map.entry("JCT-34-U", new double[]{46, 9}),
-            Map.entry("JCT-34-L", new double[]{46, 18}),
-            Map.entry("JCT-41-U", new double[]{53, 9}),
-            Map.entry("JCT-41-L", new double[]{53, 18}),
-            Map.entry("JCT-48-U", new double[]{60, 9}),
-            Map.entry("JCT-48-L", new double[]{60, 18}),
-            Map.entry("JCT-62-U", new double[]{74, 9}),
-            Map.entry("JCT-62-L", new double[]{74, 18})
+            Map.entry("JCT-9-U", new double[]{17, 9}),
+            Map.entry("JCT-9-L", new double[]{17, 18}),
+            Map.entry("JCT-14-U", new double[]{30, 9}),
+            Map.entry("JCT-14-L", new double[]{30, 18}),
+            Map.entry("JCT-27-U", new double[]{49, 9}),
+            Map.entry("JCT-27-L", new double[]{49, 18}),
+            Map.entry("JCT-34-U", new double[]{56, 9}),
+            Map.entry("JCT-34-L", new double[]{56, 18}),
+            Map.entry("JCT-41-U", new double[]{63, 9}),
+            Map.entry("JCT-41-L", new double[]{63, 18}),
+            Map.entry("JCT-48-U", new double[]{70, 9}),
+            Map.entry("JCT-48-L", new double[]{70, 18}),
+            Map.entry("JCT-62-U", new double[]{84, 9}),
+            Map.entry("JCT-62-L", new double[]{84, 18})
     );
 
     /**
-     * 폴백 엣지 — V15 마이그레이션의 엣지 중 위 폴백 노드(1층 + 교차점)만으로 이뤄진 것들.
+     * 폴백 엣지 — V16 마이그레이션의 엣지 중 위 폴백 노드(1층 + 교차점)만으로 이뤄진 것들.
      * {@code {from, to, cost}} 3항. 양방향 취급은 로딩 시 자동으로 반대 방향도 추가한다.
      */
     private static final List<Object[]> FALLBACK_EDGES = List.of(
@@ -117,15 +118,15 @@ public class LocationRegistry {
             new Object[]{"JCT-14-U", "JCT-14-L", 9.0}, new Object[]{"JCT-27-U", "JCT-27-L", 9.0},
             new Object[]{"JCT-34-U", "JCT-34-L", 9.0}, new Object[]{"JCT-41-U", "JCT-41-L", 9.0},
             new Object[]{"JCT-48-U", "JCT-48-L", 9.0}, new Object[]{"JCT-62-U", "JCT-62-L", 9.0},
-            // 통로(가로) — 인접 연결로 교차점끼리. 창고동 내부 두 구간(4~13, 13~22)이 5→9로,
-            // 창고동↔생산동 경계(22~39)가 13→17로 늘었다(V15) — 나머지는 양 끝이 같이
-            // +12로 움직여 거리가 그대로다.
-            new Object[]{"JCT-4-U", "JCT-9-U", 9.0}, new Object[]{"JCT-9-U", "JCT-14-U", 9.0},
-            new Object[]{"JCT-14-U", "JCT-27-U", 17.0}, new Object[]{"JCT-27-U", "JCT-34-U", 7.0},
+            // 통로(가로) — 인접 연결로 교차점끼리. 창고동 내부 두 구간(4~17, 17~30)이 9→13으로,
+            // 창고동↔생산동 경계(30~49)가 17→19로 늘었다(V16) — 나머지는 양 끝이 같이
+            // +10로 움직여 거리가 그대로다.
+            new Object[]{"JCT-4-U", "JCT-9-U", 13.0}, new Object[]{"JCT-9-U", "JCT-14-U", 13.0},
+            new Object[]{"JCT-14-U", "JCT-27-U", 19.0}, new Object[]{"JCT-27-U", "JCT-34-U", 7.0},
             new Object[]{"JCT-34-U", "JCT-41-U", 7.0}, new Object[]{"JCT-41-U", "JCT-48-U", 7.0},
             new Object[]{"JCT-48-U", "JCT-62-U", 14.0},
-            new Object[]{"JCT-4-L", "JCT-9-L", 9.0}, new Object[]{"JCT-9-L", "JCT-14-L", 9.0},
-            new Object[]{"JCT-14-L", "JCT-27-L", 17.0}, new Object[]{"JCT-27-L", "JCT-34-L", 7.0},
+            new Object[]{"JCT-4-L", "JCT-9-L", 13.0}, new Object[]{"JCT-9-L", "JCT-14-L", 13.0},
+            new Object[]{"JCT-14-L", "JCT-27-L", 19.0}, new Object[]{"JCT-27-L", "JCT-34-L", 7.0},
             new Object[]{"JCT-34-L", "JCT-41-L", 7.0}, new Object[]{"JCT-41-L", "JCT-48-L", 7.0},
             new Object[]{"JCT-48-L", "JCT-62-L", 14.0},
             // 명명된 노드 → 교차점
@@ -160,26 +161,26 @@ public class LocationRegistry {
     private static final Pattern PICK_NODE_PATTERN = Pattern.compile("^WH-(?:PICK|\\d+F-P\\d+)$");
 
     /**
-     * factory에서 못 받았을 때 쓰는 렉 폴백 — factory V15 마이그레이션 시드와 같은 값
+     * factory에서 못 받았을 때 쓰는 렉 폴백 — factory V16 마이그레이션 시드와 같은 값
      * (27기: 1층 9 · 2층 9 · 3층 9). 렉 피더가 factory 없이도 계속 취출 동작을 하려면
      * 좌표가 있어야 한다({@code FALLBACK_NODES}와 같은 이유).
      */
     private static final List<Object[]> FALLBACK_RACKS = List.of(
-            new Object[]{"WH-1F-R01", (short) 1, 8.5, 4.0, "V"}, new Object[]{"WH-1F-R02", (short) 1, 17.5, 4.0, "V"},
-            new Object[]{"WH-1F-R03", (short) 1, 26.5, 4.0, "V"}, new Object[]{"WH-1F-R04", (short) 1, 8.5, 13.5, "V"},
-            new Object[]{"WH-1F-R05", (short) 1, 17.5, 13.5, "V"}, new Object[]{"WH-1F-R06", (short) 1, 26.5, 13.5, "V"},
-            new Object[]{"WH-1F-R07", (short) 1, 8.5, 22.0, "V"}, new Object[]{"WH-1F-R08", (short) 1, 17.5, 22.0, "V"},
-            new Object[]{"WH-1F-R09", (short) 1, 26.5, 22.0, "V"},
-            new Object[]{"WH-2F-R01", (short) 2, 8.5, 4.0, "V"}, new Object[]{"WH-2F-R02", (short) 2, 17.5, 4.0, "V"},
-            new Object[]{"WH-2F-R03", (short) 2, 26.5, 4.0, "V"}, new Object[]{"WH-2F-R04", (short) 2, 8.5, 13.5, "V"},
-            new Object[]{"WH-2F-R05", (short) 2, 17.5, 13.5, "V"}, new Object[]{"WH-2F-R06", (short) 2, 26.5, 13.5, "V"},
-            new Object[]{"WH-2F-R07", (short) 2, 8.5, 22.0, "V"}, new Object[]{"WH-2F-R08", (short) 2, 17.5, 22.0, "V"},
-            new Object[]{"WH-2F-R09", (short) 2, 26.5, 22.0, "V"},
-            new Object[]{"WH-3F-R01", (short) 3, 8.5, 4.0, "V"}, new Object[]{"WH-3F-R02", (short) 3, 17.5, 4.0, "V"},
-            new Object[]{"WH-3F-R03", (short) 3, 26.5, 4.0, "V"}, new Object[]{"WH-3F-R04", (short) 3, 8.5, 13.5, "V"},
-            new Object[]{"WH-3F-R05", (short) 3, 17.5, 13.5, "V"}, new Object[]{"WH-3F-R06", (short) 3, 26.5, 13.5, "V"},
-            new Object[]{"WH-3F-R07", (short) 3, 8.5, 22.0, "V"}, new Object[]{"WH-3F-R08", (short) 3, 17.5, 22.0, "V"},
-            new Object[]{"WH-3F-R09", (short) 3, 26.5, 22.0, "V"}
+            new Object[]{"WH-1F-R01", (short) 1, 10.5, 4.0, "V"}, new Object[]{"WH-1F-R02", (short) 1, 23.5, 4.0, "V"},
+            new Object[]{"WH-1F-R03", (short) 1, 36.5, 4.0, "V"}, new Object[]{"WH-1F-R04", (short) 1, 10.5, 13.5, "V"},
+            new Object[]{"WH-1F-R05", (short) 1, 23.5, 13.5, "V"}, new Object[]{"WH-1F-R06", (short) 1, 36.5, 13.5, "V"},
+            new Object[]{"WH-1F-R07", (short) 1, 10.5, 22.0, "V"}, new Object[]{"WH-1F-R08", (short) 1, 23.5, 22.0, "V"},
+            new Object[]{"WH-1F-R09", (short) 1, 36.5, 22.0, "V"},
+            new Object[]{"WH-2F-R01", (short) 2, 10.5, 4.0, "V"}, new Object[]{"WH-2F-R02", (short) 2, 23.5, 4.0, "V"},
+            new Object[]{"WH-2F-R03", (short) 2, 36.5, 4.0, "V"}, new Object[]{"WH-2F-R04", (short) 2, 10.5, 13.5, "V"},
+            new Object[]{"WH-2F-R05", (short) 2, 23.5, 13.5, "V"}, new Object[]{"WH-2F-R06", (short) 2, 36.5, 13.5, "V"},
+            new Object[]{"WH-2F-R07", (short) 2, 10.5, 22.0, "V"}, new Object[]{"WH-2F-R08", (short) 2, 23.5, 22.0, "V"},
+            new Object[]{"WH-2F-R09", (short) 2, 36.5, 22.0, "V"},
+            new Object[]{"WH-3F-R01", (short) 3, 10.5, 4.0, "V"}, new Object[]{"WH-3F-R02", (short) 3, 23.5, 4.0, "V"},
+            new Object[]{"WH-3F-R03", (short) 3, 36.5, 4.0, "V"}, new Object[]{"WH-3F-R04", (short) 3, 10.5, 13.5, "V"},
+            new Object[]{"WH-3F-R05", (short) 3, 23.5, 13.5, "V"}, new Object[]{"WH-3F-R06", (short) 3, 36.5, 13.5, "V"},
+            new Object[]{"WH-3F-R07", (short) 3, 10.5, 22.0, "V"}, new Object[]{"WH-3F-R08", (short) 3, 23.5, 22.0, "V"},
+            new Object[]{"WH-3F-R09", (short) 3, 36.5, 22.0, "V"}
     );
 
     private final Map<String, double[]> nodes = new ConcurrentHashMap<>(FALLBACK_NODES);
