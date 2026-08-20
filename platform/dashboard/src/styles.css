@@ -310,6 +310,9 @@ button.mini { padding: 3px 10px; font-size: 12px; margin-left: auto; }
 .umap-rack-g { cursor: help; }
 /* 지금 AGV가 취출 중인 렉(P21) — 진행 중인 주문 근거가 있을 때만 그린다. */
 .umap-rack-g.servicing .umap-rack-frame { stroke: #2d7ff9; stroke-width: 0.32; }
+/* 렉 번호 라벨 — 27개 렉이 색만 다른 막대로 뭉뚱그려 보이지 않도록, 각 렉 아래 짧은
+   번호(R01 등)를 상시 표시한다(호버 전용 title과 별개). */
+.umap-rack-label { font-size: 0.7px; fill: #8a95a5; }
 
 /* AGV(P21/P22, 옛 이름: 랙 피더) — AMR(원)과 다른 사각 마커로 종류를 구분한다. */
 .umap-robot-agv-mark { stroke: #fff; stroke-width: 0.18; }

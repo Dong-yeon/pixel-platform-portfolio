@@ -586,6 +586,11 @@ function RackShape({
     }
   }
 
+  // 렉 코드에서 "R01" 같은 짧은 번호만 뽑는다 — 풀네임(WH-1F-R01)은 title 툴팁에 그대로
+  // 남긴다. 라벨이 없으면 27개 렉이 색만 다른 똑같은 막대로 보여 "몇 번 렉인지" 한눈에
+  // 셀 수가 없다(사용자 피드백: "렉들이 덩어리로 보인다, 렉 하나가 개수로 있어야 할 것 같다").
+  const shortLabel = rack.rackCode.replace(/^WH-\d+F-/, '')
+
   return (
     <g className={`umap-rack-g${active ? ' servicing' : ''}`}>
       <rect x={x} y={y} width={w} height={h} rx={0.15} className="umap-rack-frame" />
@@ -598,6 +603,9 @@ function RackShape({
           className={`umap-rack-cell${c.filled ? '' : ' empty'}`}
         />
       ))}
+      <text x={rack.posX} y={y + h + 0.9} textAnchor="middle" className="umap-rack-label">
+        {shortLabel}
+      </text>
       <title>
         {`${rack.rackCode} · ${quantity}/${rack.capacityQty} EA (${Math.round(ratio * 100)}%) · `
           + `${cols}열 ${levels}단 (${filledCells}/${totalCells}칸)${active ? ' · AGV 취출 중' : ''}`}
