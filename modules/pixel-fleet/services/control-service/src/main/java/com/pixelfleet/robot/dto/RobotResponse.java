@@ -30,9 +30,9 @@ public record RobotResponse(
         boolean offDuty,
         /** 조작자가 완전히 잠갔다. off-duty보다 강한 배제. */
         boolean disabled,
-        /** 로봇 종류(P21) — AMR / RACK_FEEDER. 배차 후보 필터가 주문의 robotType과 맞춘다. */
+        /** 로봇 종류(P21) — AMR / AGV. 배차 후보 필터가 주문의 robotType과 맞춘다. */
         RobotType robotType,
-        /** 랙 피더 전용 담당 존(피킹존 노드 코드). AMR은 항상 {@code null}. */
+        /** AGV 전용 담당 존(피킹존 노드 코드). AMR은 항상 {@code null}. */
         String zoneCode
 ) {
 

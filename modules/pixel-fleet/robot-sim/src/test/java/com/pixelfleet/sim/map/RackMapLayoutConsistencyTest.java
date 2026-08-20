@@ -18,10 +18,10 @@ import org.junit.jupiter.api.Test;
  * robot-sim이 아는 렉 코드가 factory 마스터(layout_racks)와 어긋나면 <b>빌드를 깨뜨린다</b>
  * (P21) — {@link NodeMapLayoutConsistencyTest}와 같은 이유·같은 방식이다.
  *
- * <p>여기서는 좌표까지는 대조하지 않는다. {@link RackMap}은 <b>코드 집합만</b> 안다 — 랙
- * 피더가 렉으로 가는 좌표는 관제 서버가 계산해 GOTO에 실어 보내고(design doc D2·D3),
- * robot-sim은 "이 목적지가 렉인가"만 판정해 취출 타이머를 돈다(Simulator 참고). 코드가
- * 하나라도 어긋나면 그 렉으로 가는 랙 피더 주문이 조용히 "일반 노드"로 취급돼 취출 대기
+ * <p>여기서는 좌표까지는 대조하지 않는다. {@link RackMap}은 <b>코드 집합만</b> 안다 — AGV
+ * (옛 이름: 랙 피더)가 렉으로 가는 좌표는 관제 서버가 계산해 GOTO에 실어 보내고(design doc
+ * D2·D3), robot-sim은 "이 목적지가 렉인가"만 판정해 취출 타이머를 돈다(Simulator 참고). 코드가
+ * 하나라도 어긋나면 그 렉으로 가는 AGV 주문이 조용히 "일반 노드"로 취급돼 취출 대기
  * 없이 즉시 완료된다 — 그래서 코드 집합의 일치는 반드시 지켜야 한다.
  */
 class RackMapLayoutConsistencyTest {

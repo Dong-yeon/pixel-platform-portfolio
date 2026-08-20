@@ -53,7 +53,7 @@ public class Robot extends BaseEntity {
     private boolean disabled;
 
     /**
-     * 로봇 종류(P21) — {@code AMR}은 공장 레인망을 타고, {@code RACK_FEEDER}는 자기 존의
+     * 로봇 종류(P21) — {@code AMR}은 공장 레인망을 타고, {@code AGV}(옛 이름: 랙 피더)는 자기 존의
      * 렉만 오간다. 기본값 AMR(기존 로봇 전부 이 값).
      */
     @Enumerated(EnumType.STRING)
@@ -61,7 +61,7 @@ public class Robot extends BaseEntity {
     private RobotType robotType = RobotType.AMR;
 
     /**
-     * 랙 피더 전용 — 이 로봇이 담당하는 피킹 클러스터(피킹존 노드 코드 그대로 재사용,
+     * AGV 전용 — 이 로봇이 담당하는 피킹 클러스터(피킹존 노드 코드 그대로 재사용,
      * 예: {@code WH-2F-P1}). AMR은 항상 {@code null}이다.
      */
     @Column(length = 30)

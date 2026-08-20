@@ -26,7 +26,7 @@ function Stat({ label, value, sub, tone }: { label: string; value: string; sub?:
 const LAYER_LABEL: { key: keyof MapLayers; label: string }[] = [
   { key: 'equipment', label: '설비' },
   { key: 'amr', label: 'AMR' },
-  { key: 'rackFeeder', label: '랙 피더' },
+  { key: 'agv', label: 'AGV' },
   { key: 'routes', label: '운송경로' },
   { key: 'pop', label: 'POP·작업자' },
   { key: 'quality', label: '품질 흐름' },
@@ -57,7 +57,7 @@ export function OverviewView({
 }) {
   // 지도 레이어 토글 — 밀도가 빠듯해 겹치는 시스템을 끌 수 있게 한다(지도 시각 규칙).
   const [layers, setLayers] = useState<MapLayers>({
-    equipment: true, amr: true, routes: true, pop: true, quality: true, rackFeeder: true,
+    equipment: true, amr: true, routes: true, pop: true, quality: true, agv: true,
   })
   const toggleLayer = (key: keyof MapLayers) => setLayers((prev) => ({ ...prev, [key]: !prev[key] }))
 

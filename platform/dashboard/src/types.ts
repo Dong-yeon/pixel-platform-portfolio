@@ -51,12 +51,13 @@ export interface Robot {
   /** 조작자가 완전히 잠갔다(고장/점검 등) — off-duty보다 강한 배제. */
   disabled: boolean
   /**
-   * 로봇 종류(P21) — `AMR`은 공장 레인망을 타고, `RACK_FEEDER`(랙 피더)는 창고동 렉에서
-   * 물건을 꺼내 피킹존까지만 옮긴다(자기 존 밖으로 나가지 않는다). 지도가 마커 모양을
-   * 다르게 그린다.
+   * 로봇 종류(P21, P22) — `AMR`은 공장 레인망을 타지만 창고동 1층 안쪽엔 못 들어간다.
+   * `AGV`(옛 이름: 랙 피더)는 그 반대 — 창고동 1층 안쪽(렉·입고장·피킹존·출하장)에서만
+   * 돌고 AMR의 레인망에는 안 올라간다. 두 로봇이 만나는 유일한 접점은 게이트
+   * (`WH-GATE-U`/`WH-GATE-L`)다. 지도가 마커 모양을 다르게 그린다.
    */
-  robotType: 'AMR' | 'RACK_FEEDER'
-  /** 랙 피더 전용 담당 존(피킹존 노드 코드). AMR은 항상 null. */
+  robotType: 'AMR' | 'AGV'
+  /** AGV 전용 담당 존(피킹존 노드 코드 — 1층은 전부 `WH-PICK` 하나). AMR은 항상 null. */
   zoneCode: string | null
 }
 
@@ -108,6 +109,10 @@ export type LayoutNodeType =
   | 'DOCK' | 'WAREHOUSE' | 'STATION' | 'SHIPPING' | 'INSPECTION'
   /** 엘리베이터 승강장 — 노드 사각형 대신 샤프트로 따로 그린다. */
   | 'ELEVATOR'
+  /** 통로 교차점(P20) — 경로 그래프의 분기점일 뿐, 로봇이 서는 목적지가 아니다. 지도에 안 그린다. */
+  | 'JUNCTION'
+  /** 건물 사이 문(P20-3). P22부터는 AMR↔AGV 구역 경계이기도 하다(창고동 게이트). */
+  | 'GATE'
 
 export interface LayoutNode {
   nodeCode: string

@@ -36,23 +36,26 @@ sim:
     max-duration-seconds: 40
   # 로봇은 층을 오가지 못한다(창고동 엘리베이터는 화물용이라 물건만 태운다).
   # 그래서 층은 배치다 — **관제 서버 robots.floor_no(V5 마이그레이션)와 같아야 한다.**
-  # 1층은 창고·생산·품질을 다 돌아야 하므로 4대, 위층은 그 층 안에서만 일하므로 1대씩.
+  #
+  # P22: AMR/AGV 분리 — 창고동 1층 안쪽(랙·입고장·피킹존·출하장)은 AGV 전용, 그 밖(생산동·
+  # 품질동·창고동 2·3층)은 AMR 전용이다. 그래서 1층 AMR의 집은 이제 창고동 도크가 아니라
+  # 생산동 도크(PROD-DOCK-*)다 — AMR은 창고동에 못 들어가므로 그 도크를 쓸 수 없다.
   robots:
     - code: AMR-01
       name: 1호기
-      home: WH-DOCK-1
+      home: PROD-DOCK-1
       floor: 1
     - code: AMR-02
       name: 2호기
-      home: WH-DOCK-2
+      home: PROD-DOCK-2
       floor: 1
     - code: AMR-03
       name: 3호기
-      home: WH-DOCK-3
+      home: PROD-DOCK-3
       floor: 1
     - code: AMR-04
       name: 4호기
-      home: WH-DOCK-4
+      home: PROD-DOCK-4
       floor: 1
     - code: AMR-05
       name: 5호기
@@ -65,6 +68,7 @@ sim:
     # 위층 증차분 — 층간 이송이 늘면서 층당 1대가 병목이 됐다(fleet V6과 짝).
     # 도크는 층에 하나라 같은 집을 쓴다 — 정차 자리는 spot()이 세로로 줄 세워 갈라 준다.
     # 위층 충전 베이는 층마다 하나뿐이라 집을 같이 쓴다 — 정차 슬롯이 앞뒤로 갈라 세운다.
+    # P22 범위 밖 — 창고동 2·3층은 그대로 AMR이 담당한다(P21 D10).
     - code: AMR-07
       name: 7호기
       home: WH-DOCK-2F
@@ -73,39 +77,41 @@ sim:
       name: 8호기
       home: WH-DOCK-3F
       floor: 3
-    # 랙 피더(P21) — 창고동 렉에서 물건을 꺼내 피킹존까지만 옮긴다. AMR의 레인망을 타지
-    # 않으므로(fleet OrderService.planLeg가 로컬 직선 이동으로 계산) home은 자기 존의
-    # 피킹존 노드다 — 관제 서버 robots.zone_code(V10 마이그레이션)와 같아야 한다.
-    - code: RF-01
-      name: 1층 랙 피더 1호
-      home: WH-PICK
+    # AGV(P21에서 신설, P22에서 랙 피더→AGV로 이름과 담당 구역을 넓혔다) — 창고동 1층
+    # 안쪽 전체(렉·입고장·피킹존·출하장)를 담당한다. AMR의 레인망을 타지 않으므로(fleet
+    # OrderService.planLeg가 로컬 직선 이동으로 계산) home은 창고동 도크다 — 관제 서버
+    # robots.zone_code(V10/V11 마이그레이션)와 같아야 한다.
+    - code: AGV-01
+      name: 1층 AGV 1호
+      home: WH-DOCK-1
       floor: 1
-      type: RACK_FEEDER
-    - code: RF-02
-      name: 1층 랙 피더 2호
-      home: WH-PICK
+      type: AGV
+    - code: AGV-02
+      name: 1층 AGV 2호
+      home: WH-DOCK-2
       floor: 1
-      type: RACK_FEEDER
-    - code: RF-03
-      name: 2층 랙 피더 1호
+      type: AGV
+    # P22 범위 밖 — 창고동 2·3층 AGV는 그대로 좁은 존(P21 D10) 배치를 유지한다.
+    - code: AGV-03
+      name: 2층 AGV 1호
       home: WH-2F-P1
       floor: 2
-      type: RACK_FEEDER
-    - code: RF-04
-      name: 2층 랙 피더 2호
+      type: AGV
+    - code: AGV-04
+      name: 2층 AGV 2호
       home: WH-2F-P2
       floor: 2
-      type: RACK_FEEDER
-    - code: RF-05
-      name: 3층 랙 피더 1호
+      type: AGV
+    - code: AGV-05
+      name: 3층 AGV 1호
       home: WH-3F-P1
       floor: 3
-      type: RACK_FEEDER
-    - code: RF-06
-      name: 3층 랙 피더 2호
+      type: AGV
+    - code: AGV-06
+      name: 3층 AGV 2호
       home: WH-3F-P2
       floor: 3
-      type: RACK_FEEDER
+      type: AGV
 
 logging:
   level:

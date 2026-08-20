@@ -31,9 +31,10 @@ public class SimProperties {
         private int floor = 1;
 
         /**
-         * 로봇 종류(P21) — {@code AMR} | {@code RACK_FEEDER}. <b>관제 서버 robots.robot_type과
-         * 같아야 한다</b>. 랙 피더는 렉에 도착하면(step0, forLoad) 곧바로 완료를 보고하지
+         * 로봇 종류(P21/P22) — {@code AMR} | {@code AGV}. <b>관제 서버 robots.robot_type과
+         * 같아야 한다</b>. AGV는 렉에 도착하면(step0, forLoad) 곧바로 완료를 보고하지
          * 않고 {@code sim.rack.fetch-seconds} 동안 멈춰서 취출을 표현한다(Simulator 참고).
+         * P22부터 AGV는 창고동 1층 안쪽 전체를 담당한다(렉뿐 아니라 입고장·출하장·도크도).
          */
         private String type = "AMR";
 

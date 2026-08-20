@@ -34,12 +34,15 @@ public class ObstacleSimulator {
     private record BlockableEdge(String from, String to, String buildingCode) {}
 
     private static final List<BlockableEdge> BLOCKABLE_EDGES = List.of(
-            new BlockableEdge("JCT-14-U", "JCT-27-U", "PROD"),
+            // P22: JCT-14↔JCT-27 직결 엣지는 게이트 경유 두 구간으로 바뀌었다 — 둘 다 막을 수 있다.
+            new BlockableEdge("JCT-14-U", "WH-GATE-U", "WH"),
+            new BlockableEdge("WH-GATE-U", "JCT-27-U", "PROD"),
             new BlockableEdge("JCT-27-U", "JCT-34-U", "PROD"),
             new BlockableEdge("JCT-34-U", "JCT-41-U", "PROD"),
             new BlockableEdge("JCT-41-U", "JCT-48-U", "PROD"),
             new BlockableEdge("JCT-4-U", "JCT-4-L", "WH"),
-            new BlockableEdge("JCT-14-L", "JCT-27-L", "PROD"),
+            new BlockableEdge("JCT-14-L", "WH-GATE-L", "WH"),
+            new BlockableEdge("WH-GATE-L", "JCT-27-L", "PROD"),
             // P20-3 신관 — 새 건물의 엣지도 똑같이 막을 수 있는지 데모로 보여준다.
             new BlockableEdge("GATE-WH-A", "MACH-1", "BLDG-A"),
             new BlockableEdge("MACH-1", "MACH-2", "BLDG-A"));

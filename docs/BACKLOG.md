@@ -513,3 +513,48 @@ handoff 회귀 위험)이라 design doc 6절에 롤백 수단을 별도로 적�
   그대로 물려받는다.** 설계로 완전히 없앨 수 없어 운영 관찰 후 조정하는 단계로 남겨 뒀다
   (design doc D10).
 - 착수 전 design doc 9절의 열린 질문(로봇 이름·대수·취출 소요시간·D5 범위) 확인 필요.
+
+---
+
+### P22. AMR/AGV 경계 확정 — 창고동 1층 AMR 진입 차단 🚧 구현 + 로컬 검증 완료, 배포 검증 대기
+
+> 세부 설계·결정 근거(D1~D6)·실행 단계: [`docs/p22-amr-agv-boundary-design.md`](./p22-amr-agv-boundary-design.md)
+
+> 요청 원문: "AMR이 창고동 까지는 들어오지 않는 구조", "창고동에서는 AMR모다는 AGV가
+> 움직여야할꺼같아". P21은 "렉 → 피킹존" 구간만 랙 피더에게 맡겼다 — 창고동 1층의
+> 나머지(입고장·출하장·도크·엘리베이터 승강장)는 여전히 AMR이 `LaneGraph`를 타고 자유롭게
+> 드나들었다. 이번 작업은 그 경계를 창고동 **건물 전체**로 넓힌다.
+
+목표
+
+- AMR은 창고동(WH) 1층 안쪽 어디에도 배차되지 않는다 — 렉뿐 아니라 입고장·출하장·도크·
+  엘리베이터 승강장까지 전부.
+- P21의 "랙 피더"를 **AGV**로 이름을 일반화하고(`RobotType.RACK_FEEDER` → `AGV`), 담당
+  범위를 렉에서 창고동 1층 전체로 넓힌다 — 2·3층은 P21 그대로(좁은 피킹존 단위) 유지.
+- AMR↔AGV 경계를 **게이트 노드**(`WH-GATE-U`/`WH-GATE-L`)로 물리적으로 고정한다 — WH·PROD
+  건물 사이 기존 직통 연결로를 게이트에서 한 번 끊는다(라우팅 비용은 분할 전후 동일하게
+  보존).
+
+핵심 결정(design doc D3): 1층은 기존 `WH-PICK` 존 코드를 그대로 재사용해 "창고동 1층
+전체가 하나의 넓은 AGV 존"으로 취급하되, 2·3층은 P21의 층 경계 제약(자기 존 밖 엘리베이터로
+못 감)을 그대로 물려받는다 — 1층만 엘리베이터 접근을 예외로 허용하는 층 기반 분기가 이번
+작업에서 가장 조심해야 할 지점이다(design doc 6절 리스크 참고).
+
+완료 기준 — 로컬 구현 완료, 배포 후 실기동 확인 필요(근거: design doc 5·7절)
+
+- [x] factory V17/fleet V11 마이그레이션 작성(게이트·PROD-DOCK 추가, RACK_FEEDER→AGV 변환)
+- [x] `OrderService`(`requiredPool`/`handoffNodeFor`/`createHandoffOrder`) 확장
+- [x] robot-sim(`NodeMap`/`Simulator`/`ObstacleSimulator`/`VirtualRobot`) 반영
+- [x] 대시보드(게이트 마커, AGV 이름 변경, 노드 필터) 반영
+- [x] 로컬 Gradle/TS 빌드 검증 — control-service/robot-sim 테스트 전부 통과(검증 중 게이트
+      분할을 반영 못 한 `LaneGraphTest` 2건 발견·수정), `tsc --noEmit`/`vite build` 통과
+- [ ] Railway 배포 후 실기동 확인(AMR 창고동 진입 차단, AGV 1층 경계 준수, 2·3층 회귀 없음)
+
+주의
+
+- **게이트 비용 분할이 라우팅 결과를 바꾸지 않는지가 핵심 검증 포인트다** — 기존 직통 간선
+  (`JCT-14↔JCT-27`, cost 19)을 게이트를 낀 두 구간(13+6=19)으로 정확히 등가 분할했지만,
+  `NodeMapLayoutConsistencyTest`로 좌표·비용 일치를 반드시 확인해야 한다.
+- **`LaneGraph`/`TrafficController`에는 이번에도 손대지 않는다**(P21 D2를 그대로 계승) — 게이트도
+  평범한 그래프 노드일 뿐, AGV는 여전히 로컬 직선 이동이라 그래프에 올라가지 않는다.
+- 착수 전 design doc 0절의 범위(1층만, 2·3층은 무변경) 재확인 필요.

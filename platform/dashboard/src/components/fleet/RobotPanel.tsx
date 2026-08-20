@@ -27,9 +27,9 @@ export function RobotPanel({ robots }: { robots: Robot[] }) {
           <div className="robot-head">
             <strong>{r.robotCode}</strong>
             <span className={`badge status-${r.status}`}>{r.status}</span>
-            {r.robotType === 'RACK_FEEDER' && (
-              <span className="badge muted" title="창고동 렉 전용 — 자기 존 밖으로 나가지 않는다">
-                랙 피더{r.zoneCode ? ` · ${r.zoneCode}` : ''}
+            {r.robotType === 'AGV' && (
+              <span className="badge muted" title="창고동 1층 전용 — AMR의 레인망을 타지 않고 자기 존 밖으로 나가지 않는다">
+                AGV{r.zoneCode ? ` · ${r.zoneCode}` : ''}
               </span>
             )}
             {r.offDuty && <span className="badge muted">휴무</span>}

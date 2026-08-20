@@ -12,7 +12,7 @@ public class VirtualRobot {
 
     private final String code;
     private final String name;
-    /** 로봇 종류(P21) — {@code AMR} | {@code RACK_FEEDER}. application.yml sim.robots[].type 그대로. */
+    /** 로봇 종류(P21) — {@code AMR} | {@code AGV}(옛 이름: 랙 피더). application.yml sim.robots[].type 그대로. */
     private final String robotType;
 
     private double x;
@@ -25,7 +25,7 @@ public class VirtualRobot {
     private boolean chargingIntent;
     /** 지금 달리고 있(었)는 스텝. -1 = 주문 없음. */
     private int currentStepIndex = -1;
-    /** 지금 레그의 목적지 노드 코드 — 렉인지(랙 피더 취출 타이머 대상인지) 판정하는 데 쓴다. */
+    /** 지금 레그의 목적지 노드 코드 — 렉인지(AGV 취출 타이머 대상인지) 판정하는 데 쓴다. */
     private String currentLocation;
     /**
      * 적재 여부 — 스텝의 forLoad/forUnload를 <b>완료 시점에</b> 반영한 결과.
@@ -35,7 +35,7 @@ public class VirtualRobot {
     /** 지금 레그의 목적지에서 싣는가/내리는가 — 도착했을 때 laden에 반영한다. */
     private boolean forLoadAtTarget;
     private boolean forUnloadAtTarget;
-    /** 랙 피더가 렉 앞에서 취출 중(P21) — 이동은 끝났지만 아직 레그를 완료 보고하지 않은 상태. */
+    /** AGV가 렉 앞에서 취출 중(P21) — 이동은 끝났지만 아직 레그를 완료 보고하지 않은 상태. */
     private int retrievalTicksRemaining = -1;
 
     public VirtualRobot(String code, String name, String robotType, double x, double y) {
@@ -106,7 +106,7 @@ public class VirtualRobot {
         return laden;
     }
 
-    /** 지금 레그의 목적지에서 싣는가 — 랙 피더의 취출 대상 판정(P21)에 쓴다. */
+    /** 지금 레그의 목적지에서 싣는가 — AGV의 취출 대상 판정(P21)에 쓴다. */
     public boolean isForLoadAtTarget() {
         return forLoadAtTarget;
     }
@@ -146,7 +146,7 @@ public class VirtualRobot {
         this.retrievalTicksRemaining = -1;
     }
 
-    /** 랙 피더가 렉 앞에 도착했다 — {@code ticks}번의 tick 동안 취출을 표현한다(P21). */
+    /** AGV가 렉 앞에 도착했다 — {@code ticks}번의 tick 동안 취출을 표현한다(P21). */
     public void beginRetrieval(int ticks) {
         this.retrievalTicksRemaining = Math.max(1, ticks);
     }

@@ -12,12 +12,12 @@ export interface MapLayers {
   pop: boolean
   /** 품질 흐름 — 품질동 강조 + 부적합 정보 흐름 점선. */
   quality: boolean
-  /** 랙 피더(P21) — 창고동 렉 전용 로봇. AMR과 별개로 껐다 켤 수 있다. */
-  rackFeeder: boolean
+  /** AGV(P21/P22, 옛 이름: 랙 피더) — 창고동 1층 전용 로봇. AMR과 별개로 껐다 켤 수 있다. */
+  agv: boolean
 }
 
 const ALL_LAYERS: MapLayers = {
-  equipment: true, amr: true, routes: true, pop: true, quality: true, rackFeeder: true,
+  equipment: true, amr: true, routes: true, pop: true, quality: true, agv: true,
 }
 
 /**
@@ -147,7 +147,7 @@ export function UnifiedMap({
   }
 
   const activeTasks = tasks.filter((t) => ACTIVE_TASK.has(t.status))
-  // 지금 랙 피더가 서비스 중인 렉(P21) — 진행 중인 작업의 출발지가 렉 코드인 것들.
+  // 지금 AGV가 서비스 중인 렉(P21) — 진행 중인 작업의 출발지가 렉 코드인 것들.
   // 실제 진행 중인 주문에서만 뽑는다(없는 데이터를 시각효과로 지어내지 않는다, 지도 시각 규칙).
   const rackCodes = new Set(layout.racks.map((r) => r.rackCode))
   const activeRackCodes = new Set(activeTasks.map((t) => t.originNode).filter((n) => rackCodes.has(n)))
@@ -315,9 +315,13 @@ export function UnifiedMap({
         </g>
       ))}
 
-      {/* ---- 하역 지점·도크·검사 기착지 ---- 보고 있는 층의 것만(위층은 같은 자리를 쓴다) */}
+      {/* ---- 하역 지점·도크·검사 기착지 ---- 보고 있는 층의 것만(위층은 같은 자리를 쓴다).
+          JUNCTION은 LaneGraph 내부 분기점일 뿐 실제 기착지가 아니라 원래도 안 그렸고,
+          GATE(P22, AMR↔AGV 경계)는 아래에서 전용 "문" 마커로 따로 그린다. */}
       {layout.nodes
-        .filter((node) => node.floorNo === view.floorNo && node.nodeType !== 'ELEVATOR')
+        .filter((node) =>
+          node.floorNo === view.floorNo && node.nodeType !== 'ELEVATOR'
+          && node.nodeType !== 'JUNCTION' && node.nodeType !== 'GATE')
         .map((node) => (
           <g key={node.nodeCode}>
             <rect x={node.posX - 0.7} y={node.posY - 0.7} width={1.4} height={1.4}
@@ -325,6 +329,19 @@ export function UnifiedMap({
             <text x={node.posX} y={node.posY + 2} className="umap-node-label"
                   textAnchor="middle" style={fs(0.85)}>
               {node.nodeCode}
+            </text>
+          </g>
+        ))}
+
+      {/* ---- 게이트(P22) ---- WH↔PROD 사이, AMR의 LaneGraph 경로가 끝나고 AGV의 로컬
+          이동 구역이 시작되는 유일한 물리적 경계. 문(door) 모양으로 눈에 띄게 그린다. */}
+      {layout.nodes
+        .filter((node) => node.floorNo === view.floorNo && node.nodeType === 'GATE')
+        .map((node) => (
+          <g key={node.nodeCode} className="umap-gate-mark">
+            <rect x={node.posX - 0.35} y={node.posY - 1.6} width={0.7} height={3.2} rx={0.15} />
+            <text x={node.posX} y={node.posY + 2.6} className="umap-gate-label" textAnchor="middle">
+              AMR⇄AGV
             </text>
           </g>
         ))}
@@ -416,18 +433,19 @@ export function UnifiedMap({
         </g>
       )}
 
-      {/* ---- AMR·랙 피더 ---- 항상 맨 위. 보고 있는 층의 로봇만(층마다 따로 있다).
-             종류별로 레이어를 따로 끌 수 있다 — 랙 피더는 AMR과 아예 다니는 곳이 다르다. */}
+      {/* ---- AMR·AGV ---- 항상 맨 위. 보고 있는 층의 로봇만(층마다 따로 있다).
+             종류별로 레이어를 따로 끌 수 있다 — AGV는 창고동 1층 안쪽에서만 돌고 AMR은
+             거기 못 들어간다(P22) — 아예 다니는 곳이 다르다. */}
       {floorRobots
-        .filter((r) => (r.robotType === 'RACK_FEEDER' ? layers.rackFeeder : layers.amr))
+        .filter((r) => (r.robotType === 'AGV' ? layers.agv : layers.amr))
         .map((r) => {
-          // 랙 피더는 렉 낱칸(칸 하나가 대략 0.3~0.9 단위) 사이를 다니므로, AMR과 같은 크기면
+          // AGV는 렉 낱칸(칸 하나가 대략 0.3~0.9 단위) 사이를 다니므로, AMR과 같은 크기면
           // 렉보다 로봇이 훨씬 커 보인다. 마커·파렛트·작업 테를 한 단계 작게 그린다.
-          const isFeeder = r.robotType === 'RACK_FEEDER'
-          const markHalf = isFeeder ? 0.55 : 0.95
-          const palletHalf = isFeeder ? 0.75 : 1.15
-          const ringR = isFeeder ? 0.95 : 1.45
-          const battY = isFeeder ? -1.05 : -1.55
+          const isAgv = r.robotType === 'AGV'
+          const markHalf = isAgv ? 0.55 : 0.95
+          const palletHalf = isAgv ? 0.75 : 1.15
+          const ringR = isAgv ? 0.95 : 1.45
+          const battY = isAgv ? -1.05 : -1.55
           return (
         <g
           key={r.robotCode}
@@ -444,17 +462,17 @@ export function UnifiedMap({
           {workingRobotIds.has(r.id) && (
             <circle r={ringR} fill="none" stroke={routeColorFor(r.robotCode)} strokeWidth={0.26} opacity={0.9} />
           )}
-          {/* 랙 피더는 사각, AMR은 원 — 창고 안에서만 도는 다른 종류의 로봇임을 모양으로 구분한다. */}
-          {isFeeder ? (
+          {/* AGV는 사각, AMR은 원 — 창고 안에서만 도는 다른 종류의 로봇임을 모양으로 구분한다. */}
+          {isAgv ? (
             <rect x={-markHalf} y={-markHalf} width={markHalf * 2} height={markHalf * 2} rx={0.16}
-                  fill={ROBOT_COLOR[r.status]} className="umap-robot-feeder-mark" />
+                  fill={ROBOT_COLOR[r.status]} className="umap-robot-agv-mark" />
           ) : (
             <circle r={markHalf} fill={ROBOT_COLOR[r.status]} stroke="#fff" strokeWidth={0.18} />
           )}
-          <text y={0.38} className="umap-robot-label" textAnchor="middle" style={fs(isFeeder ? 0.8 : 1.1)}>
+          <text y={0.38} className="umap-robot-label" textAnchor="middle" style={fs(isAgv ? 0.8 : 1.1)}>
             {r.robotCode.slice(-1)}
           </text>
-          <text y={battY} className="umap-robot-batt" textAnchor="middle" style={fs(isFeeder ? 0.75 : 0.95)}>
+          <text y={battY} className="umap-robot-batt" textAnchor="middle" style={fs(isAgv ? 0.75 : 0.95)}>
             {r.batteryPercent}%
           </text>
         </g>
@@ -540,7 +558,7 @@ function RackShape({
 }: {
   rack: LayoutRack
   quantity: number
-  /** 지금 랙 피더가 이 렉에서 취출 중인가(P21) — 실제 진행 중인 주문 근거만(지도 시각 규칙). */
+  /** 지금 AGV가 이 렉에서 취출 중인가(P21) — 실제 진행 중인 주문 근거만(지도 시각 규칙). */
   active?: boolean
 }) {
   const ratio = rack.capacityQty > 0 ? Math.min(1, quantity / rack.capacityQty) : 0
@@ -582,7 +600,7 @@ function RackShape({
       ))}
       <title>
         {`${rack.rackCode} · ${quantity}/${rack.capacityQty} EA (${Math.round(ratio * 100)}%) · `
-          + `${cols}열 ${levels}단 (${filledCells}/${totalCells}칸)${active ? ' · 랙 피더 취출 중' : ''}`}
+          + `${cols}열 ${levels}단 (${filledCells}/${totalCells}칸)${active ? ' · AGV 취출 중' : ''}`}
       </title>
     </g>
   )

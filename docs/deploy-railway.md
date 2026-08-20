@@ -13,7 +13,7 @@ Pixel Platform을 Railway에 올리는 절차. **배포 실행에는 동연님�
            ├─ pixel-wms
            ├─ pixel-qms
            ├─ mosquitto
-           ├─ robot-sim     (AMR 6대 + 랙 피더 6대)
+           ├─ robot-sim     (AMR 6대 + AGV 6대)
            └─ factory-sim   (설비 8대)
 [플러그인] Postgres · Redis
 ```

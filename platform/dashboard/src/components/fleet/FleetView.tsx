@@ -20,7 +20,7 @@ const FLEET_LAYERS: MapLayers = {
   routes: true,
   pop: false,
   quality: false,
-  rackFeeder: true,
+  agv: true,
 }
 
 /**

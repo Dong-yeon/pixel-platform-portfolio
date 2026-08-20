@@ -76,6 +76,14 @@ public class LocationRegistry {
             Map.entry("WH-PICK", new double[]{17, 13}),
             Map.entry("WH-SHIP", new double[]{30, 21}),
             Map.entry("WH-ELEV-1F", new double[]{30, 13}),
+            // P22: AMR ↔ AGV 게이트 — 창고동 벽 밖, 생산동 벽 앞의 중립 지대(x=43)
+            Map.entry("WH-GATE-U", new double[]{43, 9}),
+            Map.entry("WH-GATE-L", new double[]{43, 18}),
+            // P22: 생산동 쪽 AMR 충전 베이 — 창고동 도크가 AGV 전용이 되며 새로 생겼다.
+            Map.entry("PROD-DOCK-1", new double[]{49, 3}),
+            Map.entry("PROD-DOCK-2", new double[]{49, 5}),
+            Map.entry("PROD-DOCK-3", new double[]{49, 21}),
+            Map.entry("PROD-DOCK-4", new double[]{49, 23}),
             // 생산동 (V16에서 창고동이 다시 넓어진 만큼 +10 — 균일 이동이라 내부 상대거리는 그대로)
             Map.entry("PROD-A1", new double[]{49, 6}),
             Map.entry("PROD-A2", new double[]{56, 6}),
@@ -118,15 +126,17 @@ public class LocationRegistry {
             new Object[]{"JCT-14-U", "JCT-14-L", 9.0}, new Object[]{"JCT-27-U", "JCT-27-L", 9.0},
             new Object[]{"JCT-34-U", "JCT-34-L", 9.0}, new Object[]{"JCT-41-U", "JCT-41-L", 9.0},
             new Object[]{"JCT-48-U", "JCT-48-L", 9.0}, new Object[]{"JCT-62-U", "JCT-62-L", 9.0},
-            // 통로(가로) — 인접 연결로 교차점끼리. 창고동 내부 두 구간(4~17, 17~30)이 9→13으로,
-            // 창고동↔생산동 경계(30~49)가 17→19로 늘었다(V16) — 나머지는 양 끝이 같이
-            // +10로 움직여 거리가 그대로다.
+            // 통로(가로) — 인접 연결로 교차점끼리. 창고동 내부 두 구간(4~17, 17~30)이 9→13으로
+            // 늘었다(V16). 창고동↔생산동 경계(옛 JCT-14↔JCT-27, 30~49, 비용19)는 P22에서
+            // WH-GATE를 경유하는 두 구간(13+6)으로 바뀌었다 — 총비용은 그대로다.
             new Object[]{"JCT-4-U", "JCT-9-U", 13.0}, new Object[]{"JCT-9-U", "JCT-14-U", 13.0},
-            new Object[]{"JCT-14-U", "JCT-27-U", 19.0}, new Object[]{"JCT-27-U", "JCT-34-U", 7.0},
+            new Object[]{"JCT-14-U", "WH-GATE-U", 13.0}, new Object[]{"WH-GATE-U", "JCT-27-U", 6.0},
+            new Object[]{"JCT-27-U", "JCT-34-U", 7.0},
             new Object[]{"JCT-34-U", "JCT-41-U", 7.0}, new Object[]{"JCT-41-U", "JCT-48-U", 7.0},
             new Object[]{"JCT-48-U", "JCT-62-U", 14.0},
             new Object[]{"JCT-4-L", "JCT-9-L", 13.0}, new Object[]{"JCT-9-L", "JCT-14-L", 13.0},
-            new Object[]{"JCT-14-L", "JCT-27-L", 19.0}, new Object[]{"JCT-27-L", "JCT-34-L", 7.0},
+            new Object[]{"JCT-14-L", "WH-GATE-L", 13.0}, new Object[]{"WH-GATE-L", "JCT-27-L", 6.0},
+            new Object[]{"JCT-27-L", "JCT-34-L", 7.0},
             new Object[]{"JCT-34-L", "JCT-41-L", 7.0}, new Object[]{"JCT-41-L", "JCT-48-L", 7.0},
             new Object[]{"JCT-48-L", "JCT-62-L", 14.0},
             // 명명된 노드 → 교차점
@@ -136,6 +146,9 @@ public class LocationRegistry {
             new Object[]{"WH-PICK", "JCT-9-U", 4.0}, new Object[]{"WH-PICK", "JCT-9-L", 5.0},
             new Object[]{"WH-SHIP", "JCT-14-L", 3.0},
             new Object[]{"WH-ELEV-1F", "JCT-14-U", 4.0}, new Object[]{"WH-ELEV-1F", "JCT-14-L", 5.0},
+            // P22: 생산동 AMR 충전 베이
+            new Object[]{"PROD-DOCK-1", "JCT-27-U", 6.0}, new Object[]{"PROD-DOCK-2", "JCT-27-U", 4.0},
+            new Object[]{"PROD-DOCK-3", "JCT-27-L", 3.0}, new Object[]{"PROD-DOCK-4", "JCT-27-L", 5.0},
             new Object[]{"PROD-A1", "JCT-27-U", 3.0}, new Object[]{"PROD-A2", "JCT-34-U", 3.0},
             new Object[]{"PROD-A3", "JCT-41-U", 3.0}, new Object[]{"PROD-A4", "JCT-48-U", 3.0},
             new Object[]{"PROD-B1", "JCT-27-L", 3.0}, new Object[]{"PROD-B2", "JCT-34-L", 3.0},
@@ -147,18 +160,33 @@ public class LocationRegistry {
      * 렉 하나의 물리 정보(P21). {@code nodes}/{@code floors}/{@code adjacency}와 <b>절대 섞지
      * 않는다</b> — 렉을 AMR의 레인 그래프에 노드로 넣으면 진입점(anchor) 탐색이 렉 좌표를
      * 가까운 연결로로 잘못 고를 위험이 있다(P20-3에서 실제로 겪은 종류의 버그, 설계 근거:
-     * {@code docs/p21-warehouse-rack-feeder-design.md} D2). 랙 피더는 이 맵만 보고 로컬
+     * {@code docs/p21-warehouse-rack-feeder-design.md} D2). AGV는 이 맵만 보고 로컬
      * 직선 이동을 한다 — {@code LaneGraph}/{@code TrafficController}를 타지 않는다.
      */
     public record RackInfo(String rackCode, short floorNo, double[] pos, String orientation) {}
 
     /**
-     * 피킹존(랙 피더가 취출한 물건을 AMR에게 넘기는 자리) 노드 코드 관례 — {@code WH-PICK}
+     * 피킹존(AGV가 취출한 물건을 AMR에게 넘기는 자리) 노드 코드 관례 — {@code WH-PICK}
      * (1층) 또는 {@code WH-{층}F-P{n}}(위층). 렉이 어느 피킹존과 가까운지는 WMS가 아니라
      * 이 관례로 fleet이 좌표로 계산한다(D4 — WMS는 렉→피킹존 구간이 있다는 사실 자체를
      * 몰라야 한다). {@code elevatorNode(floor)}(OrderService)와 같은 성격의 명명 관례다.
      */
     private static final Pattern PICK_NODE_PATTERN = Pattern.compile("^WH-(?:PICK|\\d+F-P\\d+)$");
+
+    /**
+     * 창고동 1층 안쪽 명명 노드(P22) — 도크·입고장·피킹존·출하장·엘리베이터 승강장.
+     * AMR은 이제 여기 못 들어간다({@code requiredPool}이 이 패턴이면 AGV 풀을 준다).
+     * <b>{@code WH-GATE-*}는 일부러 뺐다</b> — 게이트는 AMR·AGV 둘 다의 경계 정차 자리라
+     * 항상 AMR 풀(일반 노드 처리)로 본다. 2·3층 노드({@code WH-2F-P1} 등)도 뺐다 — 범위
+     * 밖이라 계속 AMR이다(P21 D10).
+     */
+    private static final Pattern WH_1F_INTERIOR_PATTERN =
+            Pattern.compile("^WH-(?:DOCK-[1-4]|RECV|PICK|SHIP|ELEV-1F)$");
+
+    /** 창고동 1층 안쪽 명명 노드인가(P22) — {@link #WH_1F_INTERIOR_PATTERN} 참고. */
+    public boolean isWarehouseFloor1Node(String code) {
+        return code != null && WH_1F_INTERIOR_PATTERN.matcher(code).matches();
+    }
 
     /**
      * factory에서 못 받았을 때 쓰는 렉 폴백 — factory V16 마이그레이션 시드와 같은 값
@@ -294,7 +322,7 @@ public class LocationRegistry {
             adjacency.putAll(loadedAdjacency);
             if (!loadedRacks.isEmpty()) {
                 // 응답에 racks 필드가 없거나(구버전 factory) 비어 있으면 폴백을 그대로 둔다 —
-                // 렉이 통째로 사라졌다고 보고 랙 피더를 전부 못 움직이게 만들 이유는 없다.
+                // 렉이 통째로 사라졌다고 보고 AGV를 전부 못 움직이게 만들 이유는 없다.
                 racks.clear();
                 racks.putAll(loadedRacks);
             }
@@ -418,7 +446,7 @@ public class LocationRegistry {
     }
 
     /**
-     * 랙 피더가 이 렉을 서비스하려 설 자리 — 렉 중심에서 방향(세로/가로)에 수직으로
+     * AGV가 이 렉을 서비스하려 설 자리 — 렉 중심에서 방향(세로/가로)에 수직으로
      * 한 걸음 뗀 점. 로컬 이동 전용 좌표라 {@code LaneGraph}가 쓰는 연결로·통로 개념과
      * 무관하다(D2) — 정확한 간격보다 "렉 앞에 선다"는 사실 자체가 중요하다.
      */

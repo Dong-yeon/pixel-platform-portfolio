@@ -57,7 +57,7 @@ public class Simulator {
     private final SimMqttClient mqtt;
     private final ObjectMapper objectMapper;
     /**
-     * 랙 피더가 렉 앞에서 멈춰 취출을 표현하는 시간(tick 수, P21). 없는 데이터를 애니메이션으로
+     * AGV가 렉 앞에서 멈춰 취출을 표현하는 시간(tick 수, P21). 없는 데이터를 애니메이션으로
      * 지어내지 않는다는 원칙에 따라 "몇 단에서 꺼내는지"는 흉내내지 않고 불투명한 정지로만
      * 표현한다 — 화물 엘리베이터의 {@code elevatorTravelSeconds}(fleet)와 같은 패턴이다
      * (설계 근거: docs/p21-warehouse-rack-feeder-design.md D7).
@@ -167,7 +167,7 @@ public class Simulator {
     }
 
     private void tickMoving(VirtualRobot robot) {
-        // 랙 피더가 렉 앞에서 취출 중(P21) — 이동은 이미 끝났고, 배터리만 계속 닳는다
+        // AGV가 렉 앞에서 취출 중(P21) — 이동은 이미 끝났고, 배터리만 계속 닳는다
         // (팔을 뻗어 꺼내는 동안도 로봇은 켜져 있다). 위치는 안 바뀌므로 다시 발행하지 않는다.
         if (robot.isRetrieving()) {
             robot.drain(properties.getBatteryDrainPerTick());
@@ -197,7 +197,7 @@ public class Simulator {
         }
         // 레그 목적지 도착.
         if (robot.hasOrder()) {
-            if (isRackFeeder(robot) && robot.isForLoadAtTarget() && rackMap.isRackCode(robot.getCurrentLocation())) {
+            if (isAgv(robot) && robot.isForLoadAtTarget() && rackMap.isRackCode(robot.getCurrentLocation())) {
                 // 렉 정면에 도착 — 아직 완료가 아니다. 몇 단에서 꺼내는지는 지어내지 않고
                 // (없는 데이터를 시각효과로 만들지 않는다), 불투명한 정지로만 취출을 표현한다.
                 robot.beginRetrieval(rackFetchTicks);
@@ -221,8 +221,8 @@ public class Simulator {
         publishTask(robot, "step-done", null);
     }
 
-    private boolean isRackFeeder(VirtualRobot robot) {
-        return "RACK_FEEDER".equals(robot.getRobotType());
+    private boolean isAgv(VirtualRobot robot) {
+        return "AGV".equals(robot.getRobotType());
     }
 
     private void tickIdle(VirtualRobot robot) {
@@ -230,7 +230,8 @@ public class Simulator {
             robot.startChargeRun(nodeMap.route(robot.position(), spot(dock(robot), robot.getCode())));
             publishStatus(robot); // now MOVING toward the dock
         } else if (properties.isRoam() && ThreadLocalRandom.current().nextDouble() < ROAM_PROBABILITY) {
-            String node = nodeMap.randomRoamNode(ThreadLocalRandom.current(), floorOf(robot.getCode()));
+            String node = nodeMap.randomRoamNode(
+                    ThreadLocalRandom.current(), floorOf(robot.getCode()), isAgv(robot));
             robot.startRoam(nodeMap.route(robot.position(), spot(node, robot.getCode())));
             publishStatus(robot); // now MOVING to a roam target
         }
@@ -296,10 +297,11 @@ public class Simulator {
      * 위층 로봇에게 물으면 <b>1층 베이</b>를 답한다 — 로봇이 층을 넘어 사라지는 그림이 된다.
      */
     private String dock(VirtualRobot robot) {
+        boolean agv = isAgv(robot);
         if (floorOf(robot.getCode()) == 1) {
-            return nodeMap.nearestDock(robot.getX(), robot.getY());
+            return nodeMap.nearestDock(robot.getX(), robot.getY(), agv);
         }
-        return homeByCode.getOrDefault(robot.getCode(), nodeMap.nearestDock(robot.getX(), robot.getY()));
+        return homeByCode.getOrDefault(robot.getCode(), nodeMap.nearestDock(robot.getX(), robot.getY(), agv));
     }
 
     /** 가로 통로 위인가 — 정차 자리로 쓰면 안 된다. */

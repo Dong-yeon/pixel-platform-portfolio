@@ -54,10 +54,10 @@ public class NearestBatteryAwareAssignmentPolicy implements AssignmentPolicy {
         double[] origin = resolveOrigin(order);
         return candidates.stream()
                 .filter(robot -> robot.floorNo() == order.getFloorNo())
-                // P21: 랙 피더 주문은 그 존 로봇만, AMR 주문은 AMR만 — 다른 로봇 종류는
+                // P21: AGV 주문은 그 존 로봇만, AMR 주문은 AMR만 — 다른 로봇 종류는
                 // 애초에 그 렉/레인망에 갈 수 없다(설계 근거: docs/p21-warehouse-rack-feeder-design.md D6).
                 .filter(robot -> robot.robotType() == order.getRobotType())
-                .filter(robot -> order.getRobotType() != RobotType.RACK_FEEDER
+                .filter(robot -> order.getRobotType() != RobotType.AGV
                         || order.getZoneCode().equals(robot.zoneCode()))
                 .filter(robot -> robot.batteryPercent() >= MIN_BATTERY_PERCENT)
                 .min(Comparator

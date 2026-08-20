@@ -308,11 +308,15 @@ button.mini { padding: 3px 10px; font-size: 12px; margin-left: auto; }
 .umap-rack-cell { stroke: #ffffff; stroke-width: 0.05; }
 .umap-rack-cell.empty { fill: #eef1f6; }
 .umap-rack-g { cursor: help; }
-/* 지금 랙 피더가 취출 중인 렉(P21) — 진행 중인 주문 근거가 있을 때만 그린다. */
+/* 지금 AGV가 취출 중인 렉(P21) — 진행 중인 주문 근거가 있을 때만 그린다. */
 .umap-rack-g.servicing .umap-rack-frame { stroke: #2d7ff9; stroke-width: 0.32; }
 
-/* 랙 피더(P21) — AMR(원)과 다른 사각 마커로 종류를 구분한다. */
-.umap-robot-feeder-mark { stroke: #fff; stroke-width: 0.18; }
+/* AGV(P21/P22, 옛 이름: 랙 피더) — AMR(원)과 다른 사각 마커로 종류를 구분한다. */
+.umap-robot-agv-mark { stroke: #fff; stroke-width: 0.18; }
+
+/* 게이트(P22) — AMR 레인망과 AGV 로컬 이동 구역의 유일한 경계. 문 모양 마커로 그린다. */
+.umap-gate-mark rect { fill: #6b4fbb; stroke: #4a3486; stroke-width: 0.15; }
+.umap-gate-label { fill: #4a3486; font-size: 0.85px; font-weight: 700; }
 
 /* ===== 품질(QMS) — 품질동 배지 · 정보 흐름 · MRB ===== */
 /* 품질동은 이제 평면도 안의 건물이다(예전엔 바깥에 떠 있는 박스였다). */

@@ -20,9 +20,10 @@ export function TaskPanel({
   robots: Robot[]
   onChanged: () => void
 }) {
-  // 도크는 충전 자리이지 운송 목적지가 아니므로 제외한다.
+  // 도크는 충전 자리, JUNCTION은 LaneGraph 내부 분기점, GATE는 AMR↔AGV 경계(P22)일 뿐
+  // 실제 운송 목적지가 아니므로 전부 제외한다.
   const nodeNames = (layout?.nodes ?? [])
-    .filter((n) => n.nodeType !== 'DOCK')
+    .filter((n) => n.nodeType !== 'DOCK' && n.nodeType !== 'JUNCTION' && n.nodeType !== 'GATE')
     .map((n) => n.nodeCode)
 
   const [taskCode, setTaskCode] = useState(nextTaskCode)

@@ -30,6 +30,9 @@ class LaneGraphTest {
         // WH-DOCK-1(4,3) -> PROD-A1(49,6). 창고동이 다시 넓어지며(V16) 연결로가 4·17·30으로
         // 벌어지고 생산동은 그만큼(+10) 밀렸다 — 코드는 그대로(JCT-9-*, JCT-14-*)라 실제 x만 다르다.
         // addVertical(4,3,9)=6 + addAisle(4→17→30→49)=13+13+19=45 + addVertical(49,9,6)=3 = 54.
+        // P22: 30↔49 구간은 이제 게이트(WH-GATE-U, x=43)를 거친다 — 13+6=19로 총 비용은 그대로고
+        // (y=9 축 위 일직선이라 웨이포인트가 압축돼 그대로 4/9→49/9다), 통과하는 엣지만 둘로
+        // 나뉜다(AU:30-43 + AU:43-49).
         RoutePlan plan = laneGraph.plan(new double[]{4, 3}, new double[]{49, 6});
 
         assertThat(plan.cost()).isEqualTo(54.0); // P20-5 — 배차 정책이 쓰는 그래프 비용
@@ -37,7 +40,7 @@ class LaneGraphTest {
         assertThat(plan.waypoints()).containsExactly(
                 new double[]{4, 9}, new double[]{49, 9}, new double[]{49, 6});
         assertThat(plan.segments()).containsExactlyInAnyOrder(
-                "V:4:top", "AU:4-17", "AU:17-30", "AU:30-49", "V:49:top");
+                "V:4:top", "AU:4-17", "AU:17-30", "AU:30-43", "AU:43-49", "V:49:top");
     }
 
     @Test
@@ -97,13 +100,15 @@ class LaneGraphTest {
 
     @Test
     void 엣지가_막히면_그_엣지를_안_쓰고_다른_길로_우회한다() {
-        // WH-DOCK-1 -> PROD-A1의 정상 경로(비용 54)는 상단 통로의 AU:30-49 구간을 지난다.
-        // 그 엣지를 막으면 하단 통로를 거쳐서라도(더 길어도) 도착해야 한다 — 아예 못 가면 안 된다.
-        when(obstacles.isBlocked(LaneGraph.canonicalEdgeId("JCT-14-U", "JCT-27-U"))).thenReturn(true);
+        // WH-DOCK-1 -> PROD-A1의 정상 경로(비용 54)는 상단 통로의 AU:30-49 구간을 지난다 —
+        // P22의 게이트 분할 이후로는 그 구간이 AU:30-43(WH 쪽) + AU:43-49(PROD 쪽) 두 엣지다.
+        // 게이트 안쪽(WH-GATE-U↔JCT-27-U)을 막으면 하단 통로를 거쳐서라도(더 길어도) 도착해야
+        // 한다 — 아예 못 가면 안 된다.
+        when(obstacles.isBlocked(LaneGraph.canonicalEdgeId("WH-GATE-U", "JCT-27-U"))).thenReturn(true);
 
         RoutePlan plan = laneGraph.plan(new double[]{4, 3}, new double[]{49, 6});
 
-        assertThat(plan.segments()).doesNotContain("AU:30-49");
+        assertThat(plan.segments()).doesNotContain("AU:43-49");
         assertThat(plan.waypoints()).contains(new double[]{49, 6}); // 그래도 목적지엔 도달한다
         assertThat(plan.cost()).isGreaterThan(54.0); // P20-5 배차 비교가 이 값을 쓴다
         assertThat(totalCost(plan.waypoints(), new double[]{4, 3})).isGreaterThan(54.0);
