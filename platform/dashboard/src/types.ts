@@ -239,7 +239,15 @@ function nearestLaneX(layout: Layout, x: number): number {
  * 두 지점 사이의 주행 경로(통로 경유)를 폴리라인으로 만든다.
  *
  * **서버 `LaneGraph`·robot-sim `NodeMap#route` 와 같은 규칙이어야** 그린 선과 실제 주행이
- * 일치한다: 목적지가 속한 쪽 통로를 탄다.
+ * 일치한다: from·to가 각자 속한 쪽 통로를 타고, 서로 다른 통로면 목적지 쪽 연결로에서
+ * 갈아탄다(서버의 `JCT-x-U`↔`JCT-x-L` 직결 엣지와 같은 모양 — 연결로 하나가 위아래 통로를
+ * 바로 잇는다).
+ *
+ * <p>예전엔 목적지가 속한 통로 하나로만 그렸다 — from이 반대쪽 통로 구역에 있으면 그
+ * 통로까지 가는 첫 세로선이 <b>가운데 다른 통로를 그대로 관통</b>했다(창고동 확장 뒤
+ * 화면에서 실제로 발견 — 세로선이 창고동 중앙을 뚫고 지나가는 것처럼 보였다). from은
+ * 자기 쪽 통로까지만 세로로 오르내리고, 통로를 갈아타야 하면 목적지 연결로 위에서
+ * 한 번 더 세로로 갈아탄다.
  *
  * <p>from·to가 연결로 x 위에 있지 않을 수 있다 — 로봇의 실좌표(이동 중)나 렉 접근점
  * (서버 `LocationRegistry#rackApproachPoint` — 렉 앞은 레인망 밖의 로컬 이동이라 연결로
@@ -257,13 +265,17 @@ export function routePoints(
     return [from, to]
   }
   const midY = (layout.upperAisleY + layout.lowerAisleY) / 2
-  const aisleY = to[1] < midY ? layout.upperAisleY : layout.lowerAisleY
+  const fromAisleY = from[1] < midY ? layout.upperAisleY : layout.lowerAisleY
+  const toAisleY = to[1] < midY ? layout.upperAisleY : layout.lowerAisleY
   const fromLaneX = nearestLaneX(layout, from[0])
   const toLaneX = nearestLaneX(layout, to[0])
 
   const points: [number, number][] = [from]
   if (Math.abs(fromLaneX - from[0]) > 0.6) points.push([fromLaneX, from[1]])
-  points.push([fromLaneX, aisleY], [toLaneX, aisleY])
+  points.push([fromLaneX, fromAisleY], [toLaneX, fromAisleY])
+  // 통로가 다르면 목적지 연결로에서 갈아탄다 — 안 그러면 from 쪽 통로에서 계속 머문 채
+  // to의 y로 바로 꺾여, 그 사이 다른 통로를 세로로 관통한다.
+  if (toAisleY !== fromAisleY) points.push([toLaneX, toAisleY])
   if (Math.abs(toLaneX - to[0]) > 0.6) points.push([toLaneX, to[1]])
   points.push(to)
   return points
