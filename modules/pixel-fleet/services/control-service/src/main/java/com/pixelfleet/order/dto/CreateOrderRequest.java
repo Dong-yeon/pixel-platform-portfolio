@@ -16,13 +16,18 @@ import java.util.List;
  * @param stepFixed  봉인 여부. null이면 true(봉인) — 스텝 추가를 기다리는 미봉인 주문은
  *                   지금 실사용 호출부가 없다.
  * @param materialId 물리 단위 식별자(P23 D6, 예: WMS 파렛트 코드). 선택.
+ * @param weightKg   이 운송이 옮기는 화물 총중량(kg, P25 D7). 선택 — 값이 있으면 로봇
+ *                   정격 적재량(600kg, EMMA 600K 사양)과 비교해 초과 시 거절한다. 지금
+ *                   실제 호출부(WMS)는 아직 이 값을 안 보낸다(범위 밖, design doc 8절) —
+ *                   자리만 미리 만들어 둔다.
  */
 public record CreateOrderRequest(
         String externalId,
         @NotEmpty List<@Valid StepRequest> steps,
         Integer priority,
         Boolean stepFixed,
-        String materialId
+        String materialId,
+        Double weightKg
 ) {
 
     public record StepRequest(@NotBlank String location, boolean forLoad, boolean forUnload) {

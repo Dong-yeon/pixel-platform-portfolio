@@ -375,7 +375,9 @@ public class OrderService {
      */
     private LaneGraph.RoutePlan planLeg(double[] fromPos, FleetOrder order, String toNode) {
         if (order.getRobotType() != RobotType.AGV) {
-            return laneGraph.planByNode(fromPos, toNode);
+            // P25 — 로딩 상태별 통로폭 강제. order.isLoaded()가 이미 forLoad/forUnload
+            // 스텝 완료로 갱신되는 값이라 새 상태를 만들 필요가 없다(design doc D6).
+            return laneGraph.planByNode(fromPos, toNode, order.isLoaded());
         }
         double[] to = resolveForAgv(toNode);
         double dx = to[0] - fromPos[0];

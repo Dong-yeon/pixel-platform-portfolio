@@ -57,7 +57,7 @@ public class GraphCostAwareAssignmentPolicy implements AssignmentPolicy {
                         || order.getZoneCode().equals(robot.zoneCode()))
                 .filter(robot -> robot.batteryPercent() >= MIN_BATTERY_PERCENT)
                 .min(Comparator
-                        .comparingDouble((RobotResponse robot) -> routeCost(robot, origin, rackOrigin))
+                        .comparingDouble((RobotResponse robot) -> routeCost(robot, origin, rackOrigin, order.isLoaded()))
                         .thenComparing(Comparator.comparingInt(RobotResponse::batteryPercent).reversed()));
     }
 
@@ -66,13 +66,17 @@ public class GraphCostAwareAssignmentPolicy implements AssignmentPolicy {
      * 경로 비용({@link LaneGraph#plan}), AGV는 그래프에 올라가지 않으므로(D2) 직선거리다
      * — {@code LaneGraph}로 렉을 route하면 로봇 위치가 진입점(anchor)으로 잘못 편입될 위험이
      * 있다(설계 근거: docs/p21-warehouse-rack-feeder-design.md D2).
+     *
+     * @param loaded P25 — 이 시점(TO_BE_ALLOCATED)의 주문은 항상 미배차라 {@code
+     *               order.isLoaded()}는 늘 false다(픽업 전이므로). 하드코딩하지 않고 그대로
+     *               넘기는 이유는 "왜 항상 false인지"가 호출부 자체에서 드러나게 하기 위해서다.
      */
-    private double routeCost(RobotResponse robot, double[] origin, boolean rackOrigin) {
+    private double routeCost(RobotResponse robot, double[] origin, boolean rackOrigin, boolean loaded) {
         if (rackOrigin) {
             double dx = robot.posX() - origin[0];
             double dy = robot.posY() - origin[1];
             return Math.hypot(dx, dy);
         }
-        return laneGraph.plan(new double[]{robot.posX(), robot.posY()}, origin).cost();
+        return laneGraph.plan(new double[]{robot.posX(), robot.posY()}, origin, loaded).cost();
     }
 }

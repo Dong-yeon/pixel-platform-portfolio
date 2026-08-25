@@ -54,8 +54,20 @@ public class LocationRegistry {
     /** 좌표 일치 판정 허용오차. 부동소수 비교와 "거의 그 자리" 판정에 같이 쓴다. */
     private static final double EPSILON = 0.05;
 
-    /** 두 노드 사이의 연결. {@code cost}는 기본 통행 비용(대략 거리) — factory {@code layout_edges}와 같다. */
-    public record Edge(String to, double cost) {}
+    /**
+     * 두 노드 사이의 연결. {@code cost}는 기본 통행 비용(대략 거리) — factory
+     * {@code layout_edges}와 같다. {@code widthMm}은 통로 폭(P25, {@code LaneGraph}가
+     * 로딩 상태별 최소폭과 비교해 라우팅을 강제하는 데 쓴다) — {@link #UNCONSTRAINED_WIDTH_MM}은
+     * "폭 제약 없음"(구버전 factory 응답, 폴백, 가상 노드 국소 접근 엣지가 이 값을 쓴다).
+     */
+    public record Edge(String to, double cost, double widthMm) {
+
+        public static final double UNCONSTRAINED_WIDTH_MM = Double.MAX_VALUE;
+
+        public Edge(String to, double cost) {
+            this(to, cost, UNCONSTRAINED_WIDTH_MM);
+        }
+    }
 
     /**
      * factory에서 못 받았을 때 쓰는 노드 폴백. V16 마이그레이션 시드와 같은 값이다 —
@@ -293,12 +305,15 @@ public class LocationRegistry {
                 String to = edge.path("toNode").asText(null);
                 double cost = edge.path("baseCost").asDouble(Double.NaN);
                 boolean bidirectional = edge.path("bidirectional").asBoolean(true);
+                // 필드가 없으면(구버전 factory) 무제한 취급 — racks 필드가 없을 때 폴백을
+                // 그대로 두는 것과 같은 하위호환 패턴(P21 D3, P25 design doc D3).
+                double widthMm = edge.path("widthMm").asDouble(Edge.UNCONSTRAINED_WIDTH_MM);
                 if (from == null || to == null || Double.isNaN(cost)) {
                     continue;
                 }
-                loadedAdjacency.computeIfAbsent(from, k -> new ArrayList<>()).add(new Edge(to, cost));
+                loadedAdjacency.computeIfAbsent(from, k -> new ArrayList<>()).add(new Edge(to, cost, widthMm));
                 if (bidirectional) {
-                    loadedAdjacency.computeIfAbsent(to, k -> new ArrayList<>()).add(new Edge(from, cost));
+                    loadedAdjacency.computeIfAbsent(to, k -> new ArrayList<>()).add(new Edge(from, cost, widthMm));
                 }
             }
 

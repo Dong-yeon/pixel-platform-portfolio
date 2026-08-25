@@ -6,6 +6,7 @@ import com.pixelfleet.order.service.OrderCodeGenerator;
 import com.pixelfleet.order.service.OrderService;
 import com.pixelfleet.order.service.OrderService.StepSpec;
 import com.pixelplatform.core.common.exception.BusinessException;
+import com.pixelplatform.core.common.exception.ErrorCode;
 import com.pixelplatform.core.common.response.ApiResponse;
 import jakarta.validation.Valid;
 import java.util.ArrayList;
@@ -41,12 +42,23 @@ public class OrderController {
         this.orderCodeGenerator = orderCodeGenerator;
     }
 
+    /** EMMA 600K 정격 적재량(kg, 사양서 §"AMR基础参数") — P25 D7. */
+    private static final double AMR_RATED_PAYLOAD_KG = 600;
+
     /**
      * M4형 주문 생성 — 스텝 배열을 그대로 받는다(P24 D1). {@code orderCode}는 fleet이
      * 자체 발급하고, 호출부가 보낸 {@code externalId}로만 완료/실패 통지를 받는다.
+     *
+     * <p>{@code weightKg}가 있으면 로봇 정격(600kg)과 비교해 거절한다(P25 D7) — 로봇이
+     * 전부 같은 모델이라 배차 단계 필터가 아니라 생성 시점 거부로 충분하다.
      */
     @PostMapping
     public ApiResponse<OrderResponse> create(@Valid @RequestBody CreateOrderRequest request) {
+        if (request.weightKg() != null && request.weightKg() > AMR_RATED_PAYLOAD_KG) {
+            throw new BusinessException(ErrorCode.INVALID_REQUEST,
+                    "화물 중량이 로봇 정격 적재량을 초과합니다: " + request.weightKg()
+                            + "kg (정격 " + AMR_RATED_PAYLOAD_KG + "kg)");
+        }
         List<StepSpec> steps = request.steps().stream()
                 .map(s -> new StepSpec(s.location(), s.forLoad(), s.forUnload()))
                 .toList();

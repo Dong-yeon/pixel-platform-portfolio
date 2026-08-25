@@ -54,6 +54,19 @@ public class LaneGraph {
 
     private static final double EPS = 0.05;
 
+    /**
+     * 로딩 상태별 최소 통로폭(mm, P25) — AMR 사양서 §4.3. {@link
+     * com.pixelfleet.traffic.TrafficController}가 구간을 배타적으로 잠그므로(로봇 하나만
+     * 점유) "단일 통로" 값만 쓴다 — 사양서의 "양방향 통로" 값(1900/2800)은 지금 이 구조에서
+     * 의미가 없다(설계 근거: docs/p25-robot-spec-routing-design.md 1절).
+     *
+     * <p>로봇별 필드가 아니라 정책 상수다 — {@link
+     * com.pixelfleet.task.dispatch.GraphCostAwareAssignmentPolicy#MIN_BATTERY_PERCENT}와
+     * 같은 이유(이 포트폴리오의 AMR은 전부 EMMA 600K 한 모델이다).
+     */
+    static final double EMPTY_MIN_WIDTH_MM = 950;
+    static final double LOADED_MIN_WIDTH_MM = 1400;
+
     private final LocationRegistry locations;
     private final ObstacleStore obstacles;
 
@@ -78,7 +91,15 @@ public class LaneGraph {
     public record RoutePlan(List<double[]> waypoints, List<String> segments, double cost) {}
 
     public RoutePlan planByNode(double[] from, String toNode) {
-        return plan(from, locations.resolve(toNode));
+        return planByNode(from, toNode, false);
+    }
+
+    /**
+     * @param loaded 로봇이 지금 화물을 싣고 있는가(P25) — 좁은 통로 판정에 쓴다. 대개
+     *               {@code order.isLoaded()}를 그대로 넘긴다.
+     */
+    public RoutePlan planByNode(double[] from, String toNode, boolean loaded) {
+        return plan(from, locations.resolve(toNode), loaded);
     }
 
     /** 노드의 좌표. "그 자리에 누가 서 있는가"를 실제 위치로 판단할 때 쓴다. */
@@ -87,12 +108,19 @@ public class LaneGraph {
     }
 
     /**
-     * {@code from}에서 {@code to}까지의 최단 경로를 그래프에서 계산한다.
+     * {@code from}에서 {@code to}까지의 최단 경로를 그래프에서 계산한다. 빈 화물(단일
+     * 통로 950mm 미만은 통과 불가) 기준이다 — 로딩 상태까지 반영하려면 {@link
+     * #plan(double[], double[], boolean)}을 쓴다.
      *
      * <p>노드 코드가 아니라 좌표를 받는 이유는 {@code from}이 로봇의 실시간 위치(그래프의
      * 노드가 아닐 수 있음)이기 때문이다. {@code to}는 실무상 항상 어떤 노드의 정확한 좌표다.
      */
     public RoutePlan plan(double[] from, double[] to) {
+        return plan(from, to, false);
+    }
+
+    /** @param loaded P25 — true면 적재 시 최소폭(1400mm), false면 공차 최소폭(950mm) 미만 엣지를 피한다. */
+    public RoutePlan plan(double[] from, double[] to, boolean loaded) {
         Anchor source = anchor(from);
         Anchor target = anchor(to);
 
@@ -101,7 +129,7 @@ public class LaneGraph {
             return new RoutePlan(List.of(to.clone()), List.of(), 0.0);
         }
 
-        DijkstraResult result = dijkstra(source, target);
+        DijkstraResult result = dijkstra(source, target, loaded);
         if (result.path().isEmpty()) {
             // 그래프가 끊겨 있으면(설정 오류) 직선 목적지라도 준다 — 로봇을 완전히 세우는 것보다 낫다.
             // 비용은 무한대로 둔다 — 배차 비교에서 이 후보/경로가 절대 이기지 않게.
@@ -193,7 +221,16 @@ public class LaneGraph {
     /** @param path 비어 있으면 도달 불가 — 그때 {@code cost}는 의미 없다({@code plan()}이 무한대로 대체). */
     private record DijkstraResult(List<PathStep> path, double cost) {}
 
-    private DijkstraResult dijkstra(Anchor source, Anchor target) {
+    /**
+     * 이 폭의 엣지를 지금 로딩 상태로 지나갈 수 있는가(P25 D4). 다익스트라 밖으로 뺀
+     * 순수 함수라 그래프 없이 단위 테스트할 수 있다.
+     */
+    static boolean passesWidth(double edgeWidthMm, boolean loaded) {
+        double requiredWidthMm = loaded ? LOADED_MIN_WIDTH_MM : EMPTY_MIN_WIDTH_MM;
+        return edgeWidthMm >= requiredWidthMm;
+    }
+
+    private DijkstraResult dijkstra(Anchor source, Anchor target, boolean loaded) {
         Map<String, double[]> extraPositions = new HashMap<>();
         Map<String, double[]> extraSegmentPositions = new HashMap<>();
         Map<String, List<Edge>> extraAdjacency = new HashMap<>();
@@ -224,6 +261,9 @@ public class LaneGraph {
                 }
                 if (obstacles.isBlocked(canonicalEdgeId(current, edge.to()))) {
                     continue; // 장애물 — 이 엣지는 존재하지 않는 것처럼 취급한다
+                }
+                if (!passesWidth(edge.widthMm(), loaded)) {
+                    continue; // P25 — 폭 미달. 장애물과 같은 자리에서 같은 방식으로 막는다
                 }
                 double candidate = currentDist + edge.cost();
                 if (candidate < dist.getOrDefault(edge.to(), Double.MAX_VALUE)) {

@@ -131,6 +131,38 @@ class LaneGraphTest {
                 .isEqualTo(LaneGraph.canonicalEdgeId("JCT-27-U", "JCT-14-U"));
     }
 
+    // ---- P25: 통로폭 강제 ----
+
+    @Test
+    void passesWidth_적재_시_1400mm_미만은_통과할_수_없다() {
+        // 사양서 §4.3 — 적재 시 단일 통로 ≥1400mm. 1200mm는 그 밑이다.
+        assertThat(LaneGraph.passesWidth(1200, true)).isFalse();
+        assertThat(LaneGraph.passesWidth(1200, false)).isTrue(); // 공차 기준(950mm)은 통과
+    }
+
+    @Test
+    void passesWidth_경계값은_통과다() {
+        // >= 비교이므로 정확히 임계값이면 통과(미만일 때만 막는다).
+        assertThat(LaneGraph.passesWidth(1400, true)).isTrue();
+        assertThat(LaneGraph.passesWidth(950, false)).isTrue();
+        assertThat(LaneGraph.passesWidth(1399.999, true)).isFalse();
+    }
+
+    @Test
+    void 폴백_엣지는_폭_무제한이라_적재_여부와_무관하게_경로가_그대로다() {
+        // LocationRegistry의 폴백 엣지(이 테스트가 쓰는 것 — 클래스 문서 참고)는 전부
+        // 2-인자 Edge(to, cost) 생성자를 쓰므로 폭이 무제한이다(UNCONSTRAINED_WIDTH_MM,
+        // D3) — 실제 factory 응답(refresh() 경유)에서만 2000mm 실값이 실린다. 여기서는
+        // "새 loaded 매개변수가 무제한 엣지에서는 실질적으로 아무것도 안 바꾼다"만 증명한다
+        // (설계 근거: docs/p25-robot-spec-routing-design.md 6절) — 실제 2000mm 시드에서도
+        // 950/1400보다 넉넉히 크므로 같은 결론이 성립한다(D1 근거, 별도 통합 테스트는 안 둔다).
+        RoutePlan unloaded = laneGraph.plan(new double[]{4, 3}, new double[]{49, 6}, false);
+        RoutePlan loaded = laneGraph.plan(new double[]{4, 3}, new double[]{49, 6}, true);
+
+        assertThat(loaded.cost()).isEqualTo(unloaded.cost()).isEqualTo(54.0);
+        assertThat(loaded.segments()).isEqualTo(unloaded.segments());
+    }
+
     /** 압축된 웨이포인트를 순서대로 이었을 때의 총 이동 거리(맨해튼 — 모든 다리가 축정렬이므로 유클리드와 같다). */
     private double totalCost(java.util.List<double[]> waypoints, double[] from) {
         double total = 0;

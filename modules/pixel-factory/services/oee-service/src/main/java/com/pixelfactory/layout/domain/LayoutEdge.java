@@ -45,10 +45,19 @@ public class LayoutEdge extends BaseEntity {
     @Column(nullable = false)
     private Boolean bidirectional;
 
-    public LayoutEdge(String fromNode, String toNode, double baseCost, boolean bidirectional) {
+    /**
+     * 통로 폭(mm) — P25. 순수한 기하학적 사실이다("로봇이 몇 mm를 요구하는가"가 아니라
+     * "이 통로가 몇 mm인가"). fleet의 {@code LaneGraph}가 로봇 규격(정적 상수)과 비교해
+     * 라우팅에 강제한다 — 그 판단은 fleet 몫이고 여기는 사실만 싣는다.
+     */
+    @Column(nullable = false)
+    private Integer widthMm;
+
+    public LayoutEdge(String fromNode, String toNode, double baseCost, boolean bidirectional, int widthMm) {
         this.fromNode = fromNode;
         this.toNode = toNode;
         this.baseCost = baseCost;
         this.bidirectional = bidirectional;
+        this.widthMm = widthMm;
     }
 }

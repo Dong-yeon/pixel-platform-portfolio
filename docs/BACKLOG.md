@@ -643,3 +643,49 @@ handoff 회귀 위험)이라 design doc 6절에 롤백 수단을 별도로 적�
 - `OrderResponse`/`TaskResponse` 둘 다 `materialId`를 노출하도록 P23~P24에 걸쳐 맞췄다.
 - `add/update/delete-steps`, fleet 레벨 `ref_uuid` 충돌 검사는 범위 밖으로 남겼다(design
   doc 5절) — 지금 유일한 실사용 호출부(WMS)가 필요로 하지 않는다.
+
+---
+
+### P25. 로봇 규격을 라우팅에 강제한다 — 통로폭 + 정격 적재량 ✅ 완료 (2026-08-25)
+
+> 세부 설계·결정 근거(D1~D7): [`docs/p25-robot-spec-routing-design.md`](./p25-robot-spec-routing-design.md)
+
+> P21/P22가 일관되게 "`LaneGraph`/`TrafficController`에는 손대지 않는다"를 반복해 온
+> 부분을 이번에 처음 건드렸다 — 사용자가 명시적으로 "데이터만 들고 대시보드 표시"가
+> 아니라 "라우팅에 실제 강제"를 선택했다. 대신 최소 침습으로 한다: 새 시그니처는 전부
+> 하위호환 오버로드로 추가하고, 막는 조건 하나만 기존 장애물 판정 옆에 나란히 둔다.
+
+목표
+
+- factory `layout_edges.width_mm`(통로 물리 폭) 신설, 전부 2000mm로 시드(실측 없음 —
+  두 임계값을 넉넉히 웃도는 안전한 근사, 좁은 구간을 인위로 만들지 않는다).
+- fleet `LaneGraph.plan()`에 `loaded` 오버로드를 추가하고, 다익스트라 완화 단계에서
+  로딩 상태별 최소폭(사양서 §4.3 — 공차 950mm/적재 1400mm) 미달 엣지를 장애물과 같은
+  방식으로 건너뛴다. `TrafficController`가 구간을 배타적으로 잠그므로 "단일 통로" 값만
+  쓴다(양방향 값은 이 구조에서 의미가 없다).
+- 로봇 규격은 로봇별 필드가 아니라 정책 상수로 둔다(이 포트폴리오의 AMR은 전부 EMMA
+  600K 한 모델 — `MIN_BATTERY_PERCENT`와 같은 패턴).
+- 정격 적재량(600kg) 초과 화물은 fleet `POST /api/orders`(P24) 생성 시점에 거부한다
+  (`weightKg` 선택 필드, D7) — 배차 단계 필터가 아니라 생성 시점 거부로 충분하다.
+
+핵심 결정(design doc 1절): `TrafficController`가 구간을 배타적으로 잠그므로 "양방향
+동시 통행"이 애초에 없다 — 임계값이 2가지(공차/적재)만 있으면 되고, 로딩 상태는 이미
+`FleetOrder.loaded`(P19)로 추적되고 있어 새 상태를 만들 필요가 없었다.
+
+완료 기준 — 전부 실기동으로 확인(2026-08-25, factory+fleet+robot-sim 풀스택)
+
+- [x] `GET /api/layout`에서 모든 엣지가 `widthMm: 2000` 노출
+- [x] 700kg 주문 생성 거부(`POST /api/orders`), 500kg는 정상 생성·라우팅
+- [x] 실제 배차·라우팅이 `loaded=false`/`loaded=true` 양쪽 다 실기동으로 실행됨을 확인
+      (로봇 8대 온라인, 여러 주문이 DONE까지 완주, 예외 0건)
+- [x] 신규 단위 테스트(폭 판정 함수 경계값, 폴백 그래프에서 `loaded` 무관 결과 동일)
+      + 기존 `LaneGraphTest`(6건)·`OrderServiceRegressionTest`(모킹 스텁 3인자로 갱신)·
+      `GraphCostAwareAssignmentPolicyTest` 전부 회귀 없음
+
+주의
+
+- **이번 배포에서 폭 강제 로직은 "한 번도 실제로 막지 않는다"** — 2000mm 시드가
+  950/1400mm를 항상 웃돌기 때문이다(의도된 결과, design doc 6절). 메커니즘 자체의
+  정확성은 단위 테스트(경계값 1200/1400/950mm)로 증명했다.
+- WMS가 파렛트 무게(`Item.unitWeightKg`, P23)를 fleet에 실어 보내는 배선은 범위 밖으로
+  남겼다 — fleet 쪽 검증 자리(`weightKg`)만 만들었다.

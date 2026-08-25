@@ -58,10 +58,11 @@ public record LayoutResponse(
      * 두 노드 사이의 연결 (P20) — <b>정적 토폴로지만</b> 담는다. 지금 막혀 있는가 같은
      * 동적 사실은 fleet의 라이브 상태다(설계 근거: {@code docs/p20-layout-routing-design.md} D4).
      */
-    public record Edge(String fromNode, String toNode, double baseCost, boolean bidirectional) {
+    public record Edge(String fromNode, String toNode, double baseCost, boolean bidirectional, int widthMm) {
 
         public static Edge from(LayoutEdge edge) {
-            return new Edge(edge.getFromNode(), edge.getToNode(), edge.getBaseCost(), edge.getBidirectional());
+            return new Edge(edge.getFromNode(), edge.getToNode(), edge.getBaseCost(), edge.getBidirectional(),
+                    edge.getWidthMm());
         }
     }
 
