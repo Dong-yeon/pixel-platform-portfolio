@@ -225,8 +225,14 @@ public class Simulator {
         return "AGV".equals(robot.getRobotType());
     }
 
+    /**
+     * P27 — 사양서 3단계(상 80% 이상은 충전 안 함, 중 30~80%·하 30% 미만은 유휴 시 충전)
+     * 중 중·하를 하나로 합친다: 이 시뮬레이터엔 진행 중인 작업을 배터리로 중단시키는
+     * 인터럽트가 없어, 두 등급 다 결국 "다음 유휴 시점에 충전 여부를 본다"로 접힌다
+     * (설계 근거: docs/p27-battery-tiers-elevator-queue-design.md D1).
+     */
     private void tickIdle(VirtualRobot robot) {
-        if (robot.getBattery() < properties.getLowBatteryThreshold()) {
+        if (robot.getBattery() < properties.getHighBatteryThreshold()) {
             robot.startChargeRun(nodeMap.route(robot.position(), spot(dock(robot), robot.getCode())));
             publishStatus(robot); // now MOVING toward the dock
         } else if (properties.isRoam() && ThreadLocalRandom.current().nextDouble() < ROAM_PROBABILITY) {

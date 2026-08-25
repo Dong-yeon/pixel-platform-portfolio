@@ -18,6 +18,7 @@ import com.pixelfleet.robot.dto.RobotResponse;
 import com.pixelfleet.robot.service.RobotService;
 import com.pixelfleet.task.dispatch.AssignmentPolicy;
 import com.pixelfleet.task.event.TaskLifecycleChanged;
+import com.pixelfleet.traffic.ElevatorController;
 import com.pixelfleet.traffic.LaneGraph;
 import com.pixelfleet.traffic.LayoutObstacleChanged;
 import com.pixelfleet.traffic.TrafficController;
@@ -68,10 +69,11 @@ public class OrderService {
     private final AssignmentPolicy assignmentPolicy;
     private final LaneGraph laneGraph;
     private final TrafficController trafficController;
+    private final ElevatorController elevatorController;
     private final LocationRegistry locations;
     private final ApplicationEventPublisher eventPublisher;
 
-    /** 화물 엘리베이터가 층을 옮기는 데 걸리는 시간. */
+    /** 화물 엘리베이터 한 번 왕복에 걸리는 시간. 실제 카 점유 여부는 {@link ElevatorController}(P27)가 큐잉한다. */
     private final int elevatorTravelSeconds;
 
     public OrderService(
@@ -82,6 +84,7 @@ public class OrderService {
             AssignmentPolicy assignmentPolicy,
             LaneGraph laneGraph,
             TrafficController trafficController,
+            ElevatorController elevatorController,
             LocationRegistry locations,
             ApplicationEventPublisher eventPublisher,
             @Value("${fleet.elevator.travel-seconds:12}") int elevatorTravelSeconds
@@ -93,6 +96,7 @@ public class OrderService {
         this.assignmentPolicy = assignmentPolicy;
         this.laneGraph = laneGraph;
         this.trafficController = trafficController;
+        this.elevatorController = elevatorController;
         this.locations = locations;
         this.eventPublisher = eventPublisher;
         this.elevatorTravelSeconds = elevatorTravelSeconds;
@@ -330,9 +334,16 @@ public class OrderService {
         String logMessage;
         if (crossesFloor) {
             startNode = elevatorNode(arrivalFloor);
-            availableAt = LocalDateTime.now().plusSeconds(elevatorTravelSeconds);
-            logMessage = "엘리베이터: " + finished.getOrderCode() + " 화물이 " + arrivalFloor + "층으로 이동 중 "
-                    + "(" + elevatorTravelSeconds + "초 후 " + startNode + "에서 인수)";
+            // P27 — 엘리베이터는 한 번에 한 운송만 태운다(ElevatorController가 실제 카 점유를
+            // 큐잉해 계산). 앞선 예약이 없으면 지금까지와 똑같이 elevatorTravelSeconds 뒤 인수.
+            LocalDateTime requestedAt = LocalDateTime.now();
+            availableAt = elevatorController.reserve(requestedAt, elevatorTravelSeconds);
+            boolean queued = availableAt.isAfter(requestedAt.plusSeconds(elevatorTravelSeconds));
+            logMessage = queued
+                    ? "엘리베이터: " + finished.getOrderCode() + " 다른 운송이 먼저 사용 중 — " + startNode
+                            + "에서 " + availableAt + "까지 대기 후 인수"
+                    : "엘리베이터: " + finished.getOrderCode() + " 화물이 " + arrivalFloor + "층으로 이동 중 "
+                            + "(" + elevatorTravelSeconds + "초 후 " + startNode + "에서 인수)";
         } else {
             // 앞 주문이 이미 물리적으로 가져다 놓은 자리 — 뒤 로봇은 즉시 이어받는다.
             startNode = finished.stepAt(finished.getSteps().size() - 1).getLocationNode();

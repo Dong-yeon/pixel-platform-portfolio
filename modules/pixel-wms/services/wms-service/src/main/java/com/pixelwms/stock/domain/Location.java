@@ -45,6 +45,15 @@ public class Location extends BaseEntity {
     @Column
     private Integer maxPallet;
 
+    /**
+     * 안전재고 수량 (P26 D1) — 이 로케이션의 이 로케이션 재고가 이 값 아래로 떨어지면
+     * 자동 보충 대상이다. {@code max_pallet}과 같은 자리(WMS 자체 값, null이면 모니터링
+     * 안 함) — 품목 총량이 아니라 <b>로케이션 단위</b>다(로봇이 실제로 옮길 수 있는 것만
+     * 다룬다, 설계 근거: docs/p26-safety-stock-replenishment-design.md 0절).
+     */
+    @Column
+    private Integer safetyStockQty;
+
     public Location(String locationCode, String name, String nodeCode) {
         this.locationCode = locationCode;
         this.name = name;

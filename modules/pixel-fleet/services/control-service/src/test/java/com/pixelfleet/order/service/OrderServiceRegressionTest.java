@@ -23,6 +23,7 @@ import com.pixelfleet.robot.domain.RobotType;
 import com.pixelfleet.robot.dto.RobotResponse;
 import com.pixelfleet.robot.service.RobotService;
 import com.pixelfleet.task.dispatch.AssignmentPolicy;
+import com.pixelfleet.traffic.ElevatorController;
 import com.pixelfleet.traffic.LaneGraph;
 import com.pixelfleet.traffic.TrafficController;
 import java.time.LocalDateTime;
@@ -68,6 +69,7 @@ class OrderServiceRegressionTest {
         AssignmentPolicy assignmentPolicy = mock(AssignmentPolicy.class);
         laneGraph = mock(LaneGraph.class);
         trafficController = new TrafficController(); // 실제 구현 — 교착은 진짜로 재현/방지돼야 한다.
+        ElevatorController elevatorController = new ElevatorController(); // 실제 구현(P27) — 상태 없는 순수 계산.
         LocationRegistry locations = mock(LocationRegistry.class);
         ApplicationEventPublisher eventPublisher = mock(ApplicationEventPublisher.class);
 
@@ -80,7 +82,7 @@ class OrderServiceRegressionTest {
 
         orderService = new OrderService(
                 orderRepository, robotService, fleetEventService, robotCommandPublisher,
-                assignmentPolicy, laneGraph, trafficController, locations, eventPublisher, 12);
+                assignmentPolicy, laneGraph, trafficController, elevatorController, locations, eventPublisher, 12);
     }
 
     private static RobotResponse robot(long id, String code) {
@@ -175,7 +177,7 @@ class OrderServiceRegressionTest {
 
         OrderService service = new OrderService(
                 repo, robots, mock(FleetEventService.class), mock(RobotCommandPublisher.class),
-                mock(AssignmentPolicy.class), graph, spyTraffic, mock(LocationRegistry.class),
+                mock(AssignmentPolicy.class), graph, spyTraffic, new ElevatorController(), mock(LocationRegistry.class),
                 mock(ApplicationEventPublisher.class), 12);
 
         FleetOrder order = new FleetOrder("O-ORDER", null, 1, true, (short) 1);

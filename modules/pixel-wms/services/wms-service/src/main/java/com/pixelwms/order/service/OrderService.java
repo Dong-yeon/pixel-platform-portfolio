@@ -53,6 +53,7 @@ public class OrderService {
     private final ItemService itemService;
     private final StockService stockService;
     private final FleetTaskClient fleetTaskClient;
+    private final ReplenishmentService replenishmentService;
 
     public OrderService(
             InboundOrderRepository inboundRepository,
@@ -60,7 +61,8 @@ public class OrderService {
             LocationRepository locationRepository,
             ItemService itemService,
             StockService stockService,
-            FleetTaskClient fleetTaskClient
+            FleetTaskClient fleetTaskClient,
+            ReplenishmentService replenishmentService
     ) {
         this.inboundRepository = inboundRepository;
         this.outboundRepository = outboundRepository;
@@ -68,6 +70,7 @@ public class OrderService {
         this.itemService = itemService;
         this.stockService = stockService;
         this.fleetTaskClient = fleetTaskClient;
+        this.replenishmentService = replenishmentService;
     }
 
     // ---- 입고 ----
@@ -169,6 +172,10 @@ public class OrderService {
         stockService.issuePallet(order.getPalletId(), order.getOrderNo());
         order.complete(LocalDateTime.now());
         log.info("운송 완료 → 재고 차감: {} (파렛트 소진, {}개)", order.getOrderNo(), order.getQuantity());
+
+        // P26 — 이 출고로 방금 줄어든 로케이션이 안전재고 아래로 떨어졌는지 확인한다.
+        // 출고 자체는 이미 성공했으므로, 여기서 보충 대상이 없어도 이 트랜잭션을 되감지 않는다.
+        replenishmentService.checkAndReplenish(order.getFromLocationId(), order.getItemId());
     }
 
     public List<OutboundOrderResponse> getOutboundOrders() {

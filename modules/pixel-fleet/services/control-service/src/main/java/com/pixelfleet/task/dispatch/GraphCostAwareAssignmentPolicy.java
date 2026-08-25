@@ -32,8 +32,8 @@ import org.springframework.stereotype.Component;
 public class GraphCostAwareAssignmentPolicy implements AssignmentPolicy {
 
     /** {@link NearestBatteryAwareAssignmentPolicy}와 같은 값 — 배차 정책만 바뀌지, 배터리 안전
-     * 기준(로봇 자체 충전 임계치와의 사각지대 방지)은 그대로 지켜야 한다. */
-    static final int MIN_BATTERY_PERCENT = 25;
+     * 기준(로봇 자체 충전 임계치와의 사각지대 방지)은 그대로 지켜야 한다(P27 — 사양서 "50% 이상"). */
+    static final int MIN_BATTERY_PERCENT = 50;
 
     private final LocationRegistry locations;
     private final LaneGraph laneGraph;

@@ -62,4 +62,14 @@ public class Pallet extends BaseEntity {
     public void markRetired() {
         this.status = PalletStatus.RETIRED;
     }
+
+    /** 보충 이동(P26) — 물리적으로 이 로케이션에 도착했다. locationId만 바뀐다, 재고 행은 그대로다. */
+    public void relocateTo(Long destinationLocationId) {
+        this.locationId = destinationLocationId;
+    }
+
+    /** 보충 완료 — IN_TRANSIT에서 되돌아온다(은퇴 아님, 새 자리에서 그대로 실려 있다). */
+    public void markLoaded() {
+        this.status = PalletStatus.LOADED;
+    }
 }

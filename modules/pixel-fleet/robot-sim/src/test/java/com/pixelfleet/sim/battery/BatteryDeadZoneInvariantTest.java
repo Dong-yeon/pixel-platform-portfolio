@@ -17,7 +17,7 @@ import org.junit.jupiter.api.Test;
  * 배터리 20~24% 사각지대 회귀 테스트 — <b>실제로 함대 전체가 멈췄던</b> 장애다.
  *
  * <p>배차 최소 배터리(control-service {@code NearestBatteryAwareAssignmentPolicy
- * .MIN_BATTERY_PERCENT})와 충전 시작 기준(robot-sim {@code sim.low-battery-threshold})이
+ * .MIN_BATTERY_PERCENT})와 충전 시작 기준(robot-sim {@code sim.high-battery-threshold})이
  * <b>서로 다른 두 서비스에</b> 흩어져 있다. 배터리는 MOVING일 때만 닳고 IDLE에서는 그대로라,
  * 이 두 값 사이에 갇힌 로봇은 배차받기엔 낮고 충전 가기엔 높고 스스로 빠져나올 방법이 없다 —
  * 로봇이 하나씩 이 구간에 빠지며 실제로 6대 전부가 멈췄다.
@@ -38,7 +38,7 @@ class BatteryDeadZoneInvariantTest {
             "src", "main", "java", "com", "pixelfleet", "task", "dispatch",
             "NearestBatteryAwareAssignmentPolicy.java");
 
-    /** {@code static final int MIN_BATTERY_PERCENT = 25;} */
+    /** {@code static final int MIN_BATTERY_PERCENT = 50;} */
     private static final Pattern MIN_BATTERY_FIELD = Pattern.compile(
             "MIN_BATTERY_PERCENT\\s*=\\s*(\\d+)");
 
@@ -69,8 +69,8 @@ class BatteryDeadZoneInvariantTest {
 
     @Test
     @DisplayName("불변식: SimProperties 기본 충전 복귀 기준 > control-service 배차 최소 배터리")
-    void defaultLowBatteryThresholdExceedsDispatchMinimum() {
-        int chargeReturnThreshold = new SimProperties().getLowBatteryThreshold();
+    void defaultHighBatteryThresholdExceedsDispatchMinimum() {
+        int chargeReturnThreshold = new SimProperties().getHighBatteryThreshold();
 
         assertThat(chargeReturnThreshold)
                 .as("충전 복귀 기준(%d)이 배차 최소 배터리(%d)보다 높아야 사각지대가 생기지 않는다. "
@@ -82,15 +82,15 @@ class BatteryDeadZoneInvariantTest {
 
     @Test
     @DisplayName("불변식: application.yml에 실제 배포되는 값도 같은 불변식을 지켜야 한다")
-    void configuredLowBatteryThresholdExceedsDispatchMinimum() throws IOException {
+    void configuredHighBatteryThresholdExceedsDispatchMinimum() throws IOException {
         Path applicationYml = Path.of("src", "main", "resources", "application.yml");
         if (!Files.exists(applicationYml)) {
             fail("robot-sim application.yml을 찾을 수 없다: " + applicationYml.toAbsolutePath());
         }
         String yml = Files.readString(applicationYml);
-        Matcher matcher = Pattern.compile("low-battery-threshold:\\s*(\\d+)").matcher(yml);
+        Matcher matcher = Pattern.compile("high-battery-threshold:\\s*(\\d+)").matcher(yml);
         if (!matcher.find()) {
-            fail("application.yml에서 low-battery-threshold를 파싱하지 못했다 — 키 이름이 바뀌었나?");
+            fail("application.yml에서 high-battery-threshold를 파싱하지 못했다 — 키 이름이 바뀌었나?");
         }
         int configuredThreshold = Integer.parseInt(matcher.group(1));
 

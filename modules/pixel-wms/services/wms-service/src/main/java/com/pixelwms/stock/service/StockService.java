@@ -170,6 +170,54 @@ public class StockService {
                 .map(s -> palletsById.get(s.getPalletId()));
     }
 
+    /**
+     * 보충용 도너 파렛트(P26 D5) — {@code excludeLocationId}(고갈된 로케이션) 밖에서
+     * 그 품목을 실은 가장 오래된(FIFO) 파렛트. {@link #findFifoPallet}과 같은 조합
+     * (palletRepository+stockRepository)을 쓰되 범위가 로케이션 하나가 아니라 전체다.
+     */
+    public Optional<Pallet> findDonorPallet(Long excludeLocationId, Long itemId) {
+        List<Pallet> loaded = palletRepository.findByStatus(PalletStatus.LOADED);
+        List<Long> candidateIds = loaded.stream()
+                .filter(p -> !p.getLocationId().equals(excludeLocationId))
+                .map(Pallet::getId)
+                .toList();
+        if (candidateIds.isEmpty()) {
+            return Optional.empty();
+        }
+        Map<Long, Pallet> palletsById = loaded.stream().collect(Collectors.toMap(Pallet::getId, p -> p));
+        return stockRepository.findByPalletIdInAndItemId(candidateIds, itemId).stream()
+                .min(Comparator.comparing(Stock::getInboundDt))
+                .map(s -> palletsById.get(s.getPalletId()));
+    }
+
+    /** 로케이션의 특정 품목 총수량 — 그 위의 모든 LOADED 파렛트 합(P26, 안전재고 판정 기준). */
+    public int totalQuantityAt(Long locationId, Long itemId) {
+        List<Long> palletIds = palletRepository.findByLocationIdAndStatus(locationId, PalletStatus.LOADED)
+                .stream().map(Pallet::getId).toList();
+        if (palletIds.isEmpty()) {
+            return 0;
+        }
+        return stockRepository.findByPalletIdInAndItemId(palletIds, itemId).stream()
+                .mapToInt(Stock::getQuantity)
+                .sum();
+    }
+
+    /**
+     * 보충 완료(P26 D6) — 파렛트를 은퇴시키지 않고 위치만 옮긴다. {@code stocks} 행은
+     * 손대지 않는다(위치는 파렛트에서만 파생된다, P23 D2) — 도착지 슬롯은 여전히 지킨다
+     * (D7 재사용).
+     */
+    @Transactional
+    public void relocatePallet(Long palletId, Long destinationLocationId) {
+        Pallet pallet = requirePallet(palletId);
+        Location destination = locationRepository.findById(destinationLocationId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND,
+                        "로케이션을 찾을 수 없습니다: id=" + destinationLocationId));
+        assertSlotAvailable(destination);
+        pallet.relocateTo(destinationLocationId);
+        pallet.markLoaded();
+    }
+
     public Pallet requireLoadedPallet(String pltCode) {
         Pallet pallet = palletRepository.findByPltCode(pltCode)
                 .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND,

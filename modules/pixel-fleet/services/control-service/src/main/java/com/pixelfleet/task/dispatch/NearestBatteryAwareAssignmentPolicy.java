@@ -27,21 +27,26 @@ import org.springframework.stereotype.Component;
  *   <li>Break ties by higher battery, so wear is spread toward the healthier robot.</li>
  * </ol>
  *
- * <p><b>지켜야 할 불변식: 로봇의 충전 복귀 기준 &gt; {@link #MIN_BATTERY_PERCENT}.</b>
- * 충전 결정은 로봇이 스스로 하는데(robot-sim {@code sim.low-battery-threshold}), 그 값이
+ * <p><b>지켜야 할 불변식: 로봇의 자가충전 트리거 &gt; {@link #MIN_BATTERY_PERCENT}.</b>
+ * 충전 결정은 로봇이 스스로 하는데(robot-sim {@code sim.high-battery-threshold}), 그 값이
  * 이 값보다 낮으면 사이에 사각지대가 생긴다 — 배차받기엔 낮고, 충전 가기엔 높고,
  * 유휴 상태에선 배터리가 닳지도 않아 로봇이 스스로 빠져나올 수 없다. 한 대씩 이 구간에
  * 빠지다 결국 함대 전체가 멈춘다(실제로 6대 전부 20~23%에서 멈춰 있었다).
  *
  * <p>두 값이 서로 다른 서비스에 있는 게 근본 원인이다. 충전도 서버가 배차하는 작업으로
  * 만들면 애초에 어긋날 수가 없어진다(백로그).
+ *
+ * <p><b>P27 — 사양서 3단계(상 80%·중 30~80%·하 30% 미만)에 맞춰 숫자를 올렸다</b>
+ * (AMR 사양요구서 §"AMR 충전 전략" — "배터리 잔량이 50% 이상이어야 새로운 작업을
+ * 할당받을 수 있습니다"). 자가충전 트리거도 80%로 함께 올려(design doc P27 D1) 위
+ * 불변식은 그대로 유지된다(80 &gt; 50).
  */
 @Component
 @ConditionalOnProperty(name = "dispatch.policy", havingValue = "nearest", matchIfMissing = true)
 public class NearestBatteryAwareAssignmentPolicy implements AssignmentPolicy {
 
-    /** A robot needs at least this much charge to be handed a new task. */
-    static final int MIN_BATTERY_PERCENT = 25;
+    /** A robot needs at least this much charge to be handed a new task (P27 — 사양서 "50% 이상"). */
+    static final int MIN_BATTERY_PERCENT = 50;
 
     private final LocationRegistry locations;
 
