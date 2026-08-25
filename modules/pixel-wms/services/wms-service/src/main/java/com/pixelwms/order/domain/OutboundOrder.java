@@ -39,6 +39,10 @@ public class OutboundOrder extends BaseEntity {
     @Column(nullable = false)
     private Long fromLocationId;
 
+    /** 이 지시가 옮기는 파렛트(P23) — 출고는 파렛트 하나를 통째로 대상으로 한다(D5). */
+    @Column(nullable = false)
+    private Long palletId;
+
     /** 도착지 — factory 평면도 노드 코드(예: SHIPPING). */
     @Column(nullable = false, length = 30)
     private String toNodeCode;
@@ -56,10 +60,12 @@ public class OutboundOrder extends BaseEntity {
 
     private LocalDateTime completedAt;
 
-    public OutboundOrder(String orderNo, Long itemId, Long fromLocationId, String toNodeCode, Integer quantity) {
+    public OutboundOrder(String orderNo, Long itemId, Long fromLocationId, Long palletId,
+                         String toNodeCode, Integer quantity) {
         this.orderNo = orderNo;
         this.itemId = itemId;
         this.fromLocationId = fromLocationId;
+        this.palletId = palletId;
         this.toNodeCode = toNodeCode;
         this.quantity = quantity;
         this.status = OrderStatus.CREATED;

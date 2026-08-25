@@ -171,6 +171,15 @@ public class OrderService {
     @Transactional
     public FleetOrder create(String orderCode, String externalId, List<StepSpec> stepSpecs,
                              int priority, boolean stepFixed) {
+        return create(orderCode, externalId, stepSpecs, priority, stepFixed, null);
+    }
+
+    /**
+     * @param materialId 상류가 실어 보내는 물리 단위 식별자(P23 D6, 예: WMS 파렛트 코드).
+     *                   null이면 안 붙인다 — 이 값을 안 보내는 호출부까지 강제하지 않는다.
+     */
+    public FleetOrder create(String orderCode, String externalId, List<StepSpec> stepSpecs,
+                             int priority, boolean stepFixed, String materialId) {
         if (stepSpecs == null || stepSpecs.isEmpty()) {
             throw new BusinessException(ErrorCode.INVALID_REQUEST, "스텝이 최소 하나는 필요합니다.");
         }
@@ -190,7 +199,7 @@ public class OrderService {
         boolean poolChanges = pools.stream().distinct().count() > 1;
 
         if (poolChanges && isSimpleHaul(stepSpecs)) {
-            return createSplitAtHandoff(orderCode, externalId, stepSpecs, priority, pools);
+            return createSplitAtHandoff(orderCode, externalId, stepSpecs, priority, pools, materialId);
         }
         if (poolChanges) {
             throw new BusinessException(ErrorCode.INVALID_REQUEST,
@@ -200,6 +209,7 @@ public class OrderService {
         RobotPool pool = pools.get(0);
         FleetOrder order = new FleetOrder(orderCode, externalId, priority, stepFixed,
                 pool.floorNo(), pool.robotType(), pool.zoneCode());
+        order.assignMaterial(materialId);
         stepSpecs.forEach(s -> order.addStep(s.location(), s.forLoad(), s.forUnload()));
         orderRepository.save(order);
         recordCreated(order, null);
@@ -220,7 +230,8 @@ public class OrderService {
      * 평범한 단일 풀 주문으로 만든다.
      */
     private FleetOrder createSplitAtHandoff(String orderCode, String externalId,
-                                            List<StepSpec> specs, int priority, List<RobotPool> pools) {
+                                            List<StepSpec> specs, int priority, List<RobotPool> pools,
+                                            String materialId) {
         RobotPool origin = pools.get(0);
         RobotPool destination = pools.get(1);
         String originNode = specs.get(0).location();
@@ -229,6 +240,7 @@ public class OrderService {
 
         FleetOrder order = new FleetOrder(orderCode, externalId, priority, true,
                 origin.floorNo(), origin.robotType(), origin.zoneCode());
+        order.assignMaterial(materialId);
         order.addStep(originNode, true, false);
 
         if (finalDestination.equals(handoffNode)) {
@@ -329,10 +341,12 @@ public class OrderService {
         }
 
         RobotPool arrivalPool = requiredPool(startNode);
-        // externalId를 물려받는다 — 상류는 체인이 쪼개진 사정을 모르고, 자기가 낸
-        // 번호 하나로 최종 결과를 기다린다.
+        // externalId·materialId를 물려받는다 — 상류는 체인이 쪼개진 사정을 모르고, 자기가
+        // 낸 번호 하나로 최종 결과를 기다린다. 같은 물리 파렛트가 이어지는 것이므로
+        // materialId도 그대로다(P23 D6).
         FleetOrder leg = new FleetOrder(code, finished.getExternalId(), finished.getPriority(), true,
                 arrivalPool.floorNo(), arrivalPool.robotType(), arrivalPool.zoneCode());
+        leg.assignMaterial(finished.getMaterialId());
         leg.addStep(startNode, true, false);
         leg.addStep(finalDestination, false, true);
         leg.continues(finished.getOrderCode(), availableAt);

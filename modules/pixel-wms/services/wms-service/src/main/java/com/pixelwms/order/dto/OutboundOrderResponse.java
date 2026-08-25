@@ -8,6 +8,8 @@ public record OutboundOrderResponse(
         String orderNo,
         String itemCode,
         String fromLocationCode,
+        /** 이 지시가 통째로 옮기는 파렛트(P23, D5). */
+        String palletCode,
         String toNodeCode,
         Integer quantity,
         OrderStatus status,

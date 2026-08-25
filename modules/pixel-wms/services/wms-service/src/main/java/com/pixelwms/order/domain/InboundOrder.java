@@ -37,17 +37,21 @@ public class InboundOrder extends BaseEntity {
     @Column(nullable = false)
     private Integer quantity;
 
+    /** 입고로 새로 만들어진 파렛트(P23). 이 마이그레이션 이전 이력은 null. */
+    private Long palletId;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
     private OrderStatus status;
 
     private LocalDateTime completedAt;
 
-    public InboundOrder(String orderNo, Long itemId, Long locationId, Integer quantity) {
+    public InboundOrder(String orderNo, Long itemId, Long locationId, Integer quantity, Long palletId) {
         this.orderNo = orderNo;
         this.itemId = itemId;
         this.locationId = locationId;
         this.quantity = quantity;
+        this.palletId = palletId;
         this.status = OrderStatus.CREATED;
     }
 

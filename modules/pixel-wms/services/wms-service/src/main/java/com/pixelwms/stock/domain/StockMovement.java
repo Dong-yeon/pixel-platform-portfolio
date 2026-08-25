@@ -31,6 +31,13 @@ public class StockMovement extends BaseEntity {
     @Column(nullable = false)
     private Long locationId;
 
+    /**
+     * 이 이동이 어느 파렛트의 것인지(P23). null이면 P23 이전에 남은 이력이거나 파렛트
+     * 개념이 없던 시절의 데이터다 — 강제로 채우지 않는다.
+     */
+    @Column
+    private Long palletId;
+
     /** 증가는 양수, 차감은 음수. */
     @Column(nullable = false)
     private Integer quantityDelta;
@@ -46,10 +53,11 @@ public class StockMovement extends BaseEntity {
     @Column(nullable = false)
     private LocalDateTime occurredAt;
 
-    public StockMovement(Long itemId, Long locationId, Integer quantityDelta,
+    public StockMovement(Long itemId, Long locationId, Long palletId, Integer quantityDelta,
                          MovementType movementType, String referenceNo, LocalDateTime occurredAt) {
         this.itemId = itemId;
         this.locationId = locationId;
+        this.palletId = palletId;
         this.quantityDelta = quantityDelta;
         this.movementType = movementType;
         this.referenceNo = referenceNo;

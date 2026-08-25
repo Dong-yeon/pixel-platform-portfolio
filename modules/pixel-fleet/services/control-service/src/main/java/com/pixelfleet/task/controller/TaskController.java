@@ -56,7 +56,8 @@ public class TaskController {
                 request.taskCode(),   // WMS의 전표 번호 — external_id로만 남는다(통지 열쇠)
                 List.of(StepSpec.load(request.originNode()), StepSpec.unload(request.destinationNode())),
                 request.priorityValue(),
-                true));
+                true,
+                request.materialId()));  // P23 D6 — 옵션. WMS라면 파렛트 코드가 온다.
         return ApiResponse.ok(created);
     }
 

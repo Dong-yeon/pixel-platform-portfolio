@@ -37,6 +37,14 @@ public class Location extends BaseEntity {
     @Column(nullable = false, length = 30)
     private String nodeCode;
 
+    /**
+     * 파렛트 슬롯 용량 (P23 D7). factory {@code layout_racks.capacityQty}(EA, "만재 수량")와는
+     * 다른 축이다 — 몇 개가 아니라 몇 장(파렛트)까지 앉는가. null이면 상한을 두지 않는다
+     * (레거시·통과 지점 로케이션).
+     */
+    @Column
+    private Integer maxPallet;
+
     public Location(String locationCode, String name, String nodeCode) {
         this.locationCode = locationCode;
         this.name = name;

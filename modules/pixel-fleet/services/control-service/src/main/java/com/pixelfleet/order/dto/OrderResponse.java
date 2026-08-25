@@ -27,7 +27,9 @@ public record OrderResponse(
         LocalDateTime assignedAt,
         LocalDateTime startedAt,
         LocalDateTime finishedAt,
-        List<OrderStepResponse> steps
+        List<OrderStepResponse> steps,
+        /** 물리 단위 식별자(P23 D6, P24 D2) — WMS라면 파렛트 코드. 없으면 null. */
+        String materialId
 ) {
 
     public static OrderResponse from(FleetOrder order) {
@@ -49,7 +51,8 @@ public record OrderResponse(
                 order.getAssignedAt(),
                 order.getStartedAt(),
                 order.getFinishedAt(),
-                order.getSteps().stream().map(OrderStepResponse::from).toList()
+                order.getSteps().stream().map(OrderStepResponse::from).toList(),
+                order.getMaterialId()
         );
     }
 }

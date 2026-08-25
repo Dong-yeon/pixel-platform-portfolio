@@ -56,6 +56,15 @@ public class FleetOrder extends BaseEntity {
     @Column(nullable = false)
     private int priority;
 
+    /**
+     * 상류가 실어 보내는 물리 단위 식별자(P23, D6) — M4의 {@code containerId}/Cloudia의
+     * {@code material_id}에 대응한다. WMS라면 파렛트 코드가 온다. 지금은 저장·조회만
+     * 한다(적재/도킹 검증에 쓰는 건 범위 밖). null이면 그런 값을 안 보낸 호출부다 —
+     * {@code TaskController} 호환 어댑터를 통하지 않는 옛 호출까지 강제하지 않는다.
+     */
+    @Column(length = 50)
+    private String materialId;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
     private OrderStatus status;
@@ -139,6 +148,11 @@ public class FleetOrder extends BaseEntity {
         this(orderCode, externalId, priority, stepFixed, floorNo);
         this.robotType = robotType;
         this.zoneCode = zoneCode;
+    }
+
+    /** D6 — 물리 단위 식별자를 붙인다. handoff 뒷 레그도 같은 값을 물려받는다(createHandoffOrder). */
+    public void assignMaterial(String materialId) {
+        this.materialId = materialId;
     }
 
     public OrderStep addStep(String locationNode, boolean forLoad, boolean forUnload) {

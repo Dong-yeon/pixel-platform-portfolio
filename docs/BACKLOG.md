@@ -558,3 +558,88 @@ handoff 회귀 위험)이라 design doc 6절에 롤백 수단을 별도로 적�
 - **`LaneGraph`/`TrafficController`에는 이번에도 손대지 않는다**(P21 D2를 그대로 계승) — 게이트도
   평범한 그래프 노드일 뿐, AGV는 여전히 로컬 직선 이동이라 그래프에 올라가지 않는다.
 - 착수 전 design doc 0절의 범위(1층만, 2·3층은 무변경) 재확인 필요.
+
+---
+
+### P23. 파렛트 단위 재고 — WMS를 로봇 규격에 맞춘다 ✅ 완료 (2026-08-25)
+
+> 세부 설계·결정 근거(D1~D9)·열린 질문: [`docs/p23-pallet-unit-design.md`](./p23-pallet-unit-design.md)
+
+> 외부 자료(`amr 사양요구서.docx` — IPLUS MOBOT EMMA 600K 기술협의서, Cloudia/M4 Fleet
+> API 문서, 동방플라스틱 WMS 실무 스키마) 분석에서 나온 항목. EMMA 600K는 품목이 아니라
+> **1100×1100 팔레트를 잭업해서** 옮기는데, 지금 `stocks(location_id, item_id, quantity)`는
+> 로케이션 안의 품목 수량만 뭉텅이로 갖고 있어 "몇 장의 파렛트로 나뉘어 있는지"가 없다.
+> P21/P22가 "로봇이 어디까지 갈 수 있는가"(AMR/AGV 경계)는 이미 정교하게 잡아 뒀지만,
+> "로봇이 무엇을 들 수 있는가"는 전혀 다루지 않았다 — 그 축을 채우는 첫 착수 지점이다.
+
+목표
+
+- 로케이션이 재고를 직접 갖던 것을 **로케이션 → 파렛트 → 재고**의 3단으로 바꾼다 —
+  `pallets`(QR 코드·위치·상태) 신설, `stocks`를 (로케이션,품목)에서 (파렛트,품목)으로 재정의.
+- 출고를 **파렛트 단위 전량 이동**으로 바꾼다(EMMA 600K는 부분 피킹을 못 한다 — 리프팅식
+  로봇이라 파렛트를 통째로만 옮긴다).
+- 사양서 실측치(파렛트 총중량 500kg 미만, 로케이션의 파렛트 슬롯 용량)를 입고 검증에 반영한다.
+- **factory/fleet DB·API는 원칙적으로 무변경**(전제, design doc D8) — fleet 계약에
+  파렛트 코드를 실을지(D6)는 열린 질문으로 남겨 별도 승인 대상.
+
+핵심 결정(design doc D2): `stocks.location_id`를 제거하고 파렛트에서만 위치를 갖는다 —
+되돌리기 어려운 변경이라 nullable 컬럼 추가 → 백필 검증 → not null 전환 → 구컬럼 제거의
+2단계 마이그레이션으로 진행했다(design doc 6절 리스크·롤백 참고). 9절 열린 질문 4가지는
+전부 권장안대로 확정: 1:1 제약 잠금(D2), fleet 계약 확장(D6) 동시 실행, 중량 검증(D4)
+포함, 기존 출고 API 병행 어댑터(P19 패턴 재사용).
+
+완료 기준 — 전부 실기동으로 확인(2026-08-25, factory+fleet+wms 풀스택 로컬 구동)
+
+- [x] 입고지시가 파렛트를 만들고 QR 코드(`PLT-########`)로 조회된다 — 중량 초과(500kg↑)·
+      슬롯 초과 입고는 거절됨을 실기동 확인
+- [x] 출고지시가 파렛트를 통째로 대상으로 하고, 부분 잔량이 남지 않는다 — 수량 불일치 시
+      거절, FIFO 자동 선택·명시적 `palletCode` 지정 둘 다 확인
+- [x] 500kg 초과 입고, 슬롯 초과 입고가 거절된다
+- [x] 운송 완료 MQTT 통지 → 파렛트 RETIRED + 재고 삭제, 중복 통지 멱등성 확인
+- [x] fleet `fleet_orders.material_id`에 파렛트 코드가 실려 조회됨을 확인(D6)
+- [x] `V7` 마이그레이션을 실제 Postgres에 적용해 `ddl-auto: validate` 통과, 27개 로케이션
+      백필 결과(파렛트 23장, qty=0 로케이션 5곳 제외) 직접 확인
+- [x] 대시보드 렉 적재율 표시 무변경(D8 전제) — 집계 쿼리 구조상 로케이션 합산이라 영향 없음
+
+주의
+
+- 외부 근거 자료(`D:\happyeon\05.DongBang\Book`)는 실제 고객사 산출물이라 물리 규격
+  수치와 스키마 구조만 참고했다 — 품번·거래처·주문 등 실데이터는 가져오지 않았다.
+- e2e 검증 중 로컬 `pixelfleet` DB가 예전 세션의 마이그레이션 드리프트(V5 체크섬 불일치)로
+  기동에 실패해 볼륨을 리셋했다 — P23 변경과 무관한 로컬 환경 문제였다.
+
+---
+
+### P24. WMS→fleet을 M4형 다단 스텝 `orders/create`로 전환 ✅ 완료 (2026-08-25)
+
+> 세부 설계·결정 근거(D1~D4): [`docs/p24-m4-order-creation-design.md`](./p24-m4-order-creation-design.md)
+
+> 원래 P24로 잡았던 "`OrderStep.action`+멱등키"는 P19가 이미 끝내 놨다는 게 P23 설계 중
+> 드러났다(`forLoad`/`forUnload`·`externalId`·`stepFixed` 전부 기존). 대신 P19 스스로
+> "의도적으로 미룬 것"에 적어 둔 **M4형 `orders/create`(스텝 배열 입력)** 이 실제로
+> 비어 있었다 — `OrderController`(`/api/orders`)에 조작자 동사만 있고 생성 엔드포인트가
+> 없어서, WMS도 여전히 구식 2필드 `TaskController`(`/api/tasks`) 호환 어댑터를 거쳤다.
+
+목표
+
+- fleet에 `POST /api/orders`(스텝 배열, M4형) 신설 — 기존 `OrderService.create(...)`
+  (P19가 이미 완성)을 그대로 호출하는 얇은 진입점.
+- WMS `FleetTaskClient`가 이 신규 엔드포인트로 갈아탄다 — 픽업/하역 2스텝을 직접 조립해
+  보낸다. 우선순위 문자열→정수 변환을 fleet 관례(0~3)로 통일.
+- **`TaskController`(`/api/tasks`)는 지우지 않는다** — 대시보드 `TaskPanel.tsx`가 아직
+  이 경로로 수동 작업을 만든다(확인 완료). 소비자가 전부 옮겨간 뒤에야 삭제 대상.
+
+완료 기준 — 전부 실기동으로 확인(2026-08-25)
+
+- [x] WMS 출고지시 → fleet `POST /api/orders` 호출 → `GET /api/orders`에서 스텝 2개
+      (forLoad/forUnload)·`externalId`·`materialId`(파렛트 코드) 확인
+- [x] MQTT 완료 통지 → 재고 차감까지 새 경로로도 P23과 동일하게 동작
+- [x] 기존 `POST /api/tasks`(대시보드 경로) 무변경 동작 확인 — `materialId: null`로 응답,
+      회귀 없음
+- [x] 양쪽 모듈 컴파일·fleet 전체 테스트(`./gradlew test`) 회귀 없음
+
+주의
+
+- `OrderResponse`/`TaskResponse` 둘 다 `materialId`를 노출하도록 P23~P24에 걸쳐 맞췄다.
+- `add/update/delete-steps`, fleet 레벨 `ref_uuid` 충돌 검사는 범위 밖으로 남겼다(design
+  doc 5절) — 지금 유일한 실사용 호출부(WMS)가 필요로 하지 않는다.

@@ -1,9 +1,13 @@
 package com.pixelfleet.order.controller;
 
+import com.pixelfleet.order.dto.CreateOrderRequest;
 import com.pixelfleet.order.dto.OrderResponse;
+import com.pixelfleet.order.service.OrderCodeGenerator;
 import com.pixelfleet.order.service.OrderService;
+import com.pixelfleet.order.service.OrderService.StepSpec;
 import com.pixelplatform.core.common.exception.BusinessException;
 import com.pixelplatform.core.common.response.ApiResponse;
+import jakarta.validation.Valid;
 import java.util.ArrayList;
 import java.util.List;
 import org.slf4j.Logger;
@@ -16,11 +20,12 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * M4 모양 주문 API — 조작자 동사(cancel/suspend/complete/retry-failed) 전용 진입점.
+ * M4 모양 주문 API — 생성 + 조작자 동사(cancel/suspend/complete/retry-failed) 진입점.
  *
- * <p>생성은 여기 없다. {@code TaskController}(호환 어댑터)가 계속 전담한다 — 이 계획은
- * M4형 {@code orders/create}(스텝 배열 입력)를 범위에 넣지 않았다. 이 컨트롤러는
- * {@code orderCode}로 기존 주문을 조작하는 동사만 다룬다.
+ * <p><b>P24 — 생성 엔드포인트를 추가했다.</b> P19는 이 자리를 비워 두고 스텝 2개짜리
+ * {@code TaskController}(호환 어댑터)에만 생성을 맡겼었다. 그 어댑터는 <b>지우지 않는다</b> —
+ * 대시보드의 수동 작업 생성 UI가 여전히 그 경로를 쓴다(설계 근거: docs/p24-*.md D4). 여기
+ * 새로 연 {@code POST}는 WMS처럼 스텝을 직접 조립해 보내는 소비자를 위한 것이다.
  */
 @RestController
 @RequestMapping("/api/orders")
@@ -29,9 +34,30 @@ public class OrderController {
     private static final Logger log = LoggerFactory.getLogger(OrderController.class);
 
     private final OrderService orderService;
+    private final OrderCodeGenerator orderCodeGenerator;
 
-    public OrderController(OrderService orderService) {
+    public OrderController(OrderService orderService, OrderCodeGenerator orderCodeGenerator) {
         this.orderService = orderService;
+        this.orderCodeGenerator = orderCodeGenerator;
+    }
+
+    /**
+     * M4형 주문 생성 — 스텝 배열을 그대로 받는다(P24 D1). {@code orderCode}는 fleet이
+     * 자체 발급하고, 호출부가 보낸 {@code externalId}로만 완료/실패 통지를 받는다.
+     */
+    @PostMapping
+    public ApiResponse<OrderResponse> create(@Valid @RequestBody CreateOrderRequest request) {
+        List<StepSpec> steps = request.steps().stream()
+                .map(s -> new StepSpec(s.location(), s.forLoad(), s.forUnload()))
+                .toList();
+        var order = orderService.create(
+                orderCodeGenerator.next(),
+                request.externalId(),
+                steps,
+                request.priority() != null ? request.priority() : 1,
+                request.stepFixed() == null || request.stepFixed(),
+                request.materialId());
+        return ApiResponse.ok(OrderResponse.from(order));
     }
 
     @GetMapping

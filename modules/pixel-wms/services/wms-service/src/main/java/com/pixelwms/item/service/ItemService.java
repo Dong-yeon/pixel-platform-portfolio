@@ -50,6 +50,7 @@ public class ItemService {
                 item.getItemCode(),
                 item.getName(),
                 item.getUnit(),
+                item.getUnitWeightKg(),
                 cycleTimes.stream()
                         .map(c -> new ItemResponse.StandardCycleTime(c.getProcessCode(), c.getStandardCycleTimeMs()))
                         .toList()

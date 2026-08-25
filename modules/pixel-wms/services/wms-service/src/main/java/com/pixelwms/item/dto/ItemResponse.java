@@ -1,5 +1,6 @@
 package com.pixelwms.item.dto;
 
+import java.math.BigDecimal;
 import java.util.List;
 
 /**
@@ -12,6 +13,8 @@ public record ItemResponse(
         String itemCode,
         String name,
         String unit,
+        /** 낱개 단위중량(kg, P23 D4) — 없으면 파렛트 총중량 검증을 안 하는 품목이다. */
+        BigDecimal unitWeightKg,
         List<StandardCycleTime> standardCycleTimes
 ) {
 

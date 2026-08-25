@@ -7,7 +7,8 @@ import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface StockRepository extends JpaRepository<Stock, Long> {
 
-    Optional<Stock> findByLocationIdAndItemId(Long locationId, Long itemId);
+    Optional<Stock> findByPalletId(Long palletId);
 
-    List<Stock> findByLocationId(Long locationId);
+    /** FIFO 후보 조회 1단계 — 로케이션의 LOADED 파렛트 id 목록과 조합해서 쓴다(StockService). */
+    List<Stock> findByPalletIdInAndItemId(List<Long> palletIds, Long itemId);
 }

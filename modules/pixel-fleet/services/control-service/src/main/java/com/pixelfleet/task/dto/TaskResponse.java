@@ -34,7 +34,9 @@ public record TaskResponse(
         LocalDateTime finishedAt,
         String failureReason,
         /** 조작자가 다음 레그를 막았다 — suspend/unsuspend 버튼 라벨을 정한다. */
-        boolean suspended
+        boolean suspended,
+        /** 물리 단위 식별자(P23 D6) — WMS라면 파렛트 코드. 없으면 null. */
+        String materialId
 ) {
 
     public static TaskResponse from(FleetOrder order) {
@@ -60,7 +62,8 @@ public record TaskResponse(
                 order.getStartedAt(),
                 order.getFinishedAt(),
                 order.getFailureReason(),
-                order.isSuspended()
+                order.isSuspended(),
+                order.getMaterialId()
         );
     }
 
