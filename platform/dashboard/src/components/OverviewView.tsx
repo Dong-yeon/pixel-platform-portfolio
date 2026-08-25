@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react'
-import { api } from '../api'
+import { api, type ReplenishmentOrder } from '../api'
 import type {
   Equipment, EquipmentOee, Layout, ModuleKey, MrbOpenSummary, Robot, Task,
   TerminalPresence, TimelineEvent, WorkOrder,
 } from '../types'
+import { useRackPallets } from '../useRackPallets'
 import { useRackStock } from '../useRackStock'
 import { EventTimeline } from './EventTimeline'
 import { MapControls } from './MapControls'
@@ -65,6 +66,8 @@ export function OverviewView({
   const [view, setView] = useState<MapView>(ALL_VIEW)
   // 렉 적재율 — 용량은 평면도, 수량은 WMS. 코드로 맞춘다.
   const rackStock = useRackStock()
+  // 렉 안의 파렛트 목록(P23) — 적재율 %만으론 안 보이는 "몇 장·뭘 실었는지"를 툴팁에 보탠다.
+  const rackPallets = useRackPallets()
 
   // 품질관리실 배지 — 열려 있는 MRB. QMS가 없으면 조용히 비워 둔다(컴포저블).
   const [mrbOpen, setMrbOpen] = useState<MrbOpenSummary | null>(null)
@@ -72,6 +75,15 @@ export function OverviewView({
     const loadMrb = () => api.qms.mrbOpen().then(setMrbOpen).catch(() => setMrbOpen(null))
     loadMrb()
     const timer = window.setInterval(loadMrb, 15_000)
+    return () => window.clearInterval(timer)
+  }, [])
+
+  // 안전재고 자동 보충 지시(P26) — 서버가 스스로 판단해서 만드는 것, 조회만 한다.
+  const [replenishments, setReplenishments] = useState<ReplenishmentOrder[]>([])
+  useEffect(() => {
+    const loadReplenishments = () => api.wms.replenishmentOrders().then(setReplenishments).catch(() => setReplenishments([]))
+    loadReplenishments()
+    const timer = window.setInterval(loadReplenishments, 15_000)
     return () => window.clearInterval(timer)
   }, [])
 
@@ -125,6 +137,7 @@ export function OverviewView({
     .slice(0, 60)
 
   const activeRoutes = tasks.filter((t) => t.status === 'ASSIGNED' || t.status === 'IN_PROGRESS').length
+  const activeReplenishments = replenishments.filter((r) => r.status === 'CREATED' || r.status === 'IN_TRANSIT')
 
   return (
     <div className="overview">
@@ -145,6 +158,7 @@ export function OverviewView({
           presence={presence}
           mrbOpen={mrbOpen}
           rackStock={rackStock}
+          rackPallets={rackPallets}
           view={view}
           layers={layers}
         />
@@ -227,10 +241,44 @@ export function OverviewView({
         </div>
       </section>
 
+      <section className="card wms-panel">
+        <div className="module-head">
+          <h2>PixelWMS — 안전재고 보충</h2>
+          <span className="muted small">
+            진행 중 {activeReplenishments.length}
+            {replenishments.length > 0 && ` · 최근 ${Math.min(replenishments.length, 5)}건 표시`}
+          </span>
+        </div>
+        {replenishments.length === 0 ? (
+          <p className="muted small">보충 지시 없음 — 안전재고 미달 로케이션이 없거나 아직 감지되지 않았다.</p>
+        ) : (
+          <div className="replenish-list">
+            {replenishments.slice(0, 5).map((r) => (
+              <div key={r.id} className="replenish-row">
+                <span className={`badge ${REPLENISH_BADGE[r.status]}`}>{REPLENISH_LABEL[r.status]}</span>
+                <span>
+                  {r.itemCode} · {r.fromLocationCode} → {r.toLocationCode}
+                  <span className="muted small"> ({r.palletCode})</span>
+                </span>
+                <span className="muted small">{r.quantity}개</span>
+                <span className="muted small">{r.taskCode ?? '—'}</span>
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
+
       <section className="card timeline-panel">
         <h2>통합 이벤트 타임라인 <span className="muted small">[F] 공장 · [A] 물류</span></h2>
         <EventTimeline events={merged} />
       </section>
     </div>
   )
+}
+
+const REPLENISH_LABEL: Record<ReplenishmentOrder['status'], string> = {
+  CREATED: '대기', IN_TRANSIT: '이동 중', COMPLETED: '완료', CANCELLED: '취소',
+}
+const REPLENISH_BADGE: Record<ReplenishmentOrder['status'], string> = {
+  CREATED: 'status-CHARGING', IN_TRANSIT: 'status-MOVING', COMPLETED: 'task-COMPLETED', CANCELLED: 'task-CANCELLED',
 }

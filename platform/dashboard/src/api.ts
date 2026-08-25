@@ -20,12 +20,41 @@ const FLEET = '/api/fleet'
 const QMS = '/api/qms'
 const WMS = '/api/wms'
 
-/** WMS 재고 한 줄 — 로케이션(=렉) × 품목. */
+/** WMS 재고 한 줄 — 파렛트(=렉 위의 한 장) × 품목(P23). */
 export interface Stock {
   id: number
   locationCode: string
+  /** 이 재고가 실린 파렛트의 QR 코드(P23). 로봇이 실제로 옮기는 물리 단위다. */
+  palletCode: string
   itemCode: string
   quantity: number
+}
+
+/** 파렛트 한 장 — 로케이션 안에 몇 장이 있는지 확인용(P23). RETIRED(소진)도 포함될 수 있다. */
+export interface Pallet {
+  pltCode: string
+  locationCode: string
+  status: 'LOADED' | 'IN_TRANSIT' | 'RETIRED'
+  weightKg: number | null
+  itemCode: string | null
+  quantity: number | null
+  lotNo: string | null
+}
+
+export type ReplenishmentStatus = 'CREATED' | 'IN_TRANSIT' | 'COMPLETED' | 'CANCELLED'
+
+/** 안전재고 미달 자동 보충 지시(P26) — 파렛트를 로케이션 간에 옮긴다(출고와 달리 은퇴시키지 않는다). */
+export interface ReplenishmentOrder {
+  id: number
+  orderNo: string
+  itemCode: string
+  fromLocationCode: string
+  toLocationCode: string
+  palletCode: string
+  quantity: number
+  status: ReplenishmentStatus
+  taskCode: string | null
+  completedAt: string | null
 }
 
 // 게이트웨이 중앙 인증(P6) — 토큰 하나로 모든 모듈에 접근한다.
@@ -151,6 +180,10 @@ export const api = {
   /** 창고(WMS) — 재고. 로케이션 코드가 곧 렉 코드라 지도의 적재율이 여기서 나온다. */
   wms: {
     stocks: () => request<Stock[]>(WMS, '/stocks'),
+    /** 파렛트 목록(P23) — 렉 하나에 몇 장이 있는지, 각각 몇 개씩인지. */
+    pallets: () => request<Pallet[]>(WMS, '/pallets'),
+    /** 안전재고 자동 보충 지시(P26) — 생성은 서버가 스스로 판단해서 한다, 조회만 연다. */
+    replenishmentOrders: () => request<ReplenishmentOrder[]>(WMS, '/replenishment-orders'),
   },
 
   /** 품질(QMS) — 검사·부적합·MRB 심의·발송함. */

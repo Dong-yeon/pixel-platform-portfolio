@@ -1,3 +1,4 @@
+import type { Pallet } from '../api'
 import {
   nodeIndex, routePoints,
   type Equipment, type EquipmentStatus, type Layout, type LayoutBuilding, type LayoutRack,
@@ -125,6 +126,7 @@ export function UnifiedMap({
   presence = [],
   mrbOpen = null,
   rackStock = {},
+  rackPallets = {},
   view = ALL_VIEW,
   layers = ALL_LAYERS,
 }: {
@@ -139,6 +141,8 @@ export function UnifiedMap({
   mrbOpen?: MrbOpenSummary | null
   /** 렉 코드 → WMS 재고 수량. 용량(평면도)과 나눠 적재율을 낸다. */
   rackStock?: Record<string, number>
+  /** 렉 코드 → 그 위의 파렛트 목록(P23). 적재율 %만으론 안 보이는 "몇 장·뭘 실었는지"를 툴팁에 보탠다. */
+  rackPallets?: Record<string, Pallet[]>
   view?: MapView
   layers?: MapLayers
 }) {
@@ -228,6 +232,7 @@ export function UnifiedMap({
             key={rack.rackCode}
             rack={rack}
             quantity={rackStock[rack.rackCode] ?? 0}
+            pallets={rackPallets[rack.rackCode] ?? []}
             active={activeRackCodes.has(rack.rackCode)}
           />
         ))}
@@ -554,10 +559,12 @@ function BuildingNameplate({ x, y, scale, text }: { x: number; y: number; scale:
  * "바닥부터 쌓는다"는 창고 직관을 따른다.
  */
 function RackShape({
-  rack, quantity, active = false,
+  rack, quantity, pallets = [], active = false,
 }: {
   rack: LayoutRack
   quantity: number
+  /** 이 렉 위의 파렛트 목록(P23) — 툴팁에 "몇 장·뭘 실었는지"를 보탠다. */
+  pallets?: Pallet[]
   /** 지금 AGV가 이 렉에서 취출 중인가(P21) — 실제 진행 중인 주문 근거만(지도 시각 규칙). */
   active?: boolean
 }) {
@@ -608,7 +615,15 @@ function RackShape({
       </text>
       <title>
         {`${rack.rackCode} · ${quantity}/${rack.capacityQty} EA (${Math.round(ratio * 100)}%) · `
-          + `${cols}열 ${levels}단 (${filledCells}/${totalCells}칸)${active ? ' · AGV 취출 중' : ''}`}
+          + `${cols}열 ${levels}단 (${filledCells}/${totalCells}칸)${active ? ' · AGV 취출 중' : ''}`
+          // P23 — 로봇이 실제로 옮기는 단위는 EA가 아니라 파렛트 한 장이다. 적재율 %만으론
+          // "몇 장이 있는지·각각 뭘 실었는지"가 안 보여서 파렛트별로 한 줄씩 덧붙인다.
+          + (pallets.length > 0
+            ? '\n' + pallets
+                .map((p) => `  ${p.pltCode}: ${p.itemCode ?? '?'} ${p.quantity ?? '?'}개`
+                  + (p.status === 'IN_TRANSIT' ? ' (운송 중)' : ''))
+                .join('\n')
+            : '')}
       </title>
     </g>
   )

@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import type { Equipment, Layout, Robot, Task, TimelineEvent } from '../../types'
+import { useRackPallets } from '../../useRackPallets'
 import { useRackStock } from '../../useRackStock'
 import { EventTimeline } from '../EventTimeline'
 import { MapControls } from '../MapControls'
@@ -48,6 +49,7 @@ export function FleetView({
   const [view, setView] = useState<MapView>(ALL_VIEW)
   // 창고 렉의 적재율 — 배차 담당도 "어디가 찼는지"는 봐야 한다.
   const rackStock = useRackStock()
+  const rackPallets = useRackPallets()
 
   return (
     <div className="grid">
@@ -59,6 +61,7 @@ export function FleetView({
           robots={robots}
           tasks={tasks}
           rackStock={rackStock}
+          rackPallets={rackPallets}
           view={view}
           layers={FLEET_LAYERS}
         />

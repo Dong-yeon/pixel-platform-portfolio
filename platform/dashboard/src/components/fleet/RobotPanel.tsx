@@ -2,6 +2,24 @@ import { useState } from 'react'
 import { api } from '../../api'
 import type { Robot } from '../../types'
 
+/**
+ * 배터리 3단계 색(P27, 사양서 §"AMR 충전 전략") — 상 80%↑(초록, 유휴여도 안 충전),
+ * 중 30~80%(호박색, 유휴 시 충전 · 배차는 50%↑만), 하 30%↓(빨강, 급히 충전).
+ * 배차 최소(50%)·자가충전 트리거(80%) 두 실제 임계값과 같은 경계를 색으로 그대로 보여준다
+ * (design doc: docs/p27-battery-tiers-elevator-queue-design.md D1).
+ */
+function batteryTierColor(percent: number): string {
+  if (percent >= 80) return '#27ae60'
+  if (percent >= 30) return '#e0a300'
+  return '#e0392b'
+}
+
+function batteryTierLabel(percent: number): string {
+  if (percent >= 80) return '상(80%↑) — 유휴 시에도 충전 안 함'
+  if (percent >= 30) return '중(30~80%) — 유휴 시 충전, 50%↑만 신규 작업 배차'
+  return '하(30%↓) — 급히 충전, 신규 작업 배차 안 됨'
+}
+
 export function RobotPanel({ robots }: { robots: Robot[] }) {
   const [busyId, setBusyId] = useState<number | null>(null)
 
@@ -35,10 +53,13 @@ export function RobotPanel({ robots }: { robots: Robot[] }) {
             {r.offDuty && <span className="badge muted">휴무</span>}
             {r.disabled && <span className="badge muted">잠김</span>}
           </div>
-          <div className="battery">
+          <div
+            className="battery"
+            title={batteryTierLabel(r.batteryPercent)}
+          >
             <div
               className="battery-fill"
-              style={{ width: `${r.batteryPercent}%`, background: r.batteryPercent < 20 ? '#e0392b' : '#27ae60' }}
+              style={{ width: `${r.batteryPercent}%`, background: batteryTierColor(r.batteryPercent) }}
             />
             <span className="battery-text">{r.batteryPercent}%</span>
           </div>

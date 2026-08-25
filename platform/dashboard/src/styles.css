@@ -169,8 +169,17 @@ input, select {
 }
 .map-panel { grid-column: 1 / -1; }
 .kpi-panel { grid-column: span 1; }
+.wms-panel { grid-column: 1 / -1; }
 .timeline-panel { grid-column: 1 / -1; }
 .timeline-panel .timeline { max-height: 158px; }
+/* 안전재고 자동 보충 지시 목록(P26) — EventTimeline의 .event 행과 같은 격자 감각. */
+.replenish-list { display: flex; flex-direction: column; gap: 6px; margin-top: 10px; }
+.replenish-row {
+  display: grid; grid-template-columns: 90px 1fr 100px 70px; gap: 8px;
+  align-items: center; padding: 6px 0; border-bottom: 1px solid var(--line);
+  font-size: 13px;
+}
+.replenish-row:last-child { border-bottom: none; }
 /* 지도가 화면을 다 잡아먹지 않게 뷰포트 기준으로 높이를 제한한다. */
 .umap { max-height: 62vh; }
 .kpi-panel .stat-value { font-size: 22px; }
