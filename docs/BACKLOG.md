@@ -516,7 +516,7 @@ handoff 회귀 위험)이라 design doc 6절에 롤백 수단을 별도로 적�
 
 ---
 
-### P22. AMR/AGV 경계 확정 — 창고동 1층 AMR 진입 차단 🚧 구현 + 로컬 검증 완료, 배포 검증 대기
+### P22. AMR/AGV 경계 확정 — 창고동 1층 AMR 진입 차단 ✅ 완료 (2026-08-25, 배포 검증까지)
 
 > 세부 설계·결정 근거(D1~D6)·실행 단계: [`docs/p22-amr-agv-boundary-design.md`](./p22-amr-agv-boundary-design.md)
 
@@ -540,7 +540,7 @@ handoff 회귀 위험)이라 design doc 6절에 롤백 수단을 별도로 적�
 못 감)을 그대로 물려받는다 — 1층만 엘리베이터 접근을 예외로 허용하는 층 기반 분기가 이번
 작업에서 가장 조심해야 할 지점이다(design doc 6절 리스크 참고).
 
-완료 기준 — 로컬 구현 완료, 배포 후 실기동 확인 필요(근거: design doc 5·7절)
+완료 기준 — 로컬 구현·검증에 이어 Railway 배포 검증까지 전부 완료(근거: design doc 5·7절)
 
 - [x] factory V17/fleet V11 마이그레이션 작성(게이트·PROD-DOCK 추가, RACK_FEEDER→AGV 변환)
 - [x] `OrderService`(`requiredPool`/`handoffNodeFor`/`createHandoffOrder`) 확장
@@ -548,7 +548,18 @@ handoff 회귀 위험)이라 design doc 6절에 롤백 수단을 별도로 적�
 - [x] 대시보드(게이트 마커, AGV 이름 변경, 노드 필터) 반영
 - [x] 로컬 Gradle/TS 빌드 검증 — control-service/robot-sim 테스트 전부 통과(검증 중 게이트
       분할을 반영 못 한 `LaneGraphTest` 2건 발견·수정), `tsc --noEmit`/`vite build` 통과
-- [ ] Railway 배포 후 실기동 확인(AMR 창고동 진입 차단, AGV 1층 경계 준수, 2·3층 회귀 없음)
+- [x] **Railway 배포 후 실기동 확인**(2026-08-25) — V17/V11 Flyway 적용 로그 확인,
+      `POST /api/orders`로 AMR 게이트 정차·1층 AGV 엘리베이터 예외 허용·2·3층 AGV 층
+      경계 거부 3가지 전부 직접 검증, 대시보드 라이브 이벤트 타임라인에서 실제 게이트
+      핸드오프 트래픽 확인. 세부: design doc 5절 P22-5
+
+부수 발견 및 수정(배포 검증 중)
+
+- `pixel-fleet`에 `LAYOUT_URL` 환경변수가 아예 없어서(배포 가이드에도 누락) factory의
+  실제 레이아웃을 받아본 적이 없고 계속 하드코딩 폴백(V16 시절 좌표)으로만 동작 중이었다
+  — 코드상 폴백 상수가 V17 이후 값과 동기화돼 있어 겉보기 동작은 맞았지만, factory와의
+  실시간 동기화 자체가 조용히 끊겨 있었다. `LAYOUT_URL` 추가로 즉시 해결, 재시작 로그로
+  실제 레이아웃 54노드/54엣지 로드 확인.
 
 주의
 
@@ -557,7 +568,6 @@ handoff 회귀 위험)이라 design doc 6절에 롤백 수단을 별도로 적�
   `NodeMapLayoutConsistencyTest`로 좌표·비용 일치를 반드시 확인해야 한다.
 - **`LaneGraph`/`TrafficController`에는 이번에도 손대지 않는다**(P21 D2를 그대로 계승) — 게이트도
   평범한 그래프 노드일 뿐, AGV는 여전히 로컬 직선 이동이라 그래프에 올라가지 않는다.
-- 착수 전 design doc 0절의 범위(1층만, 2·3층은 무변경) 재확인 필요.
 
 ---
 

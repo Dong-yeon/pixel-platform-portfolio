@@ -1,6 +1,6 @@
 # P22 설계 문서 — AMR/AGV 경계 확정 (창고동 1층 AMR 진입 차단 + 랙 피더의 AGV 확장)
 
-> 상태: **구현 + 로컬 검증(Gradle 테스트, `tsc`/`vite build`) 완료, 배포 검증 대기.**
+> 상태: **구현 + 로컬 검증 + 배포 검증 전부 완료(2026-08-25, Railway 실기동).**
 > `docs/p21-warehouse-rack-feeder-design.md`와 같은 형식. 실행 단계(5절)에 진행 상황을 남긴다.
 >
 > 선행 문서: P20(그래프 라우팅, `LaneGraph`/`TrafficController`) · P21(창고동 렉 취출 로봇 —
@@ -208,12 +208,30 @@ PROD 건물 첫 커넥터 옆에 `PROD-DOCK-1..4`를 새로 만들어(기존 `WH
 - [x] `styles.css` — `.umap-robot-agv-mark` 이름 일치, 게이트 마커 스타일 추가
 - [x] `tsc --noEmit`/`vite build` 로컬 검증 — 둘 다 에러 없이 통과
 
-### P22-5. 배포 검증
-- [ ] Railway 배포 후 V17/V11 Flyway 적용 로그 확인
-- [ ] 대시보드에서 AGV가 창고동 1층 밖으로 못 나가는지, AMR이 창고동 1층 안쪽에 배차되지
-      않는지 실측
-- [ ] 1층 AGV의 엘리베이터 접근(D3 예외) 케이스, 2·3층 AGV의 층 경계 거부(D3 유지) 케이스
-      각각 실기동 확인
+### P22-5. 배포 검증 ✅ (2026-08-25, Railway `pixel-platform-portfolio` 프로젝트 실기동)
+- [x] Railway 배포 후 V17/V11 Flyway 적용 로그 확인 — `pixel-factory`가 "Successfully
+      validated 18 migrations"(V17 포함, 이번엔 V18까지 적용), `pixel-fleet`이
+      "Successfully validated 12 migrations"(V11 포함) / "up to date"로 확인. 부수적으로
+      `pixel-wms`도 V7·V8까지, 전부 `SUCCESS`+`RUNNING`
+- [x] 대시보드에서 AGV가 창고동 1층 밖으로 못 나가는지, AMR이 창고동 1층 안쪽에 배차되지
+      않는지 실측 — 실제 라이브 이벤트 타임라인에서 확인: `T-510795 이동 완료,
+      WH-GATE-U에서 다음 로봇 인수 대기`, `Order T-229761 created (QC-OUT -> WH-GATE-U)
+      [AGV가 null에서 WH-RECV까지]` — AMR이 게이트에서 멈추고 AGV가 그 뒤를 잇는 실제
+      운영 트래픽을 그대로 확인
+- [x] 1층 AGV의 엘리베이터 접근(D3 예외) 케이스, 2·3층 AGV의 층 경계 거부(D3 유지) 케이스
+      각각 실기동 확인 — `POST /api/fleet/orders`로 직접 검증:
+      - `WH-RECV`(1F AGV) → `WH-2F-P1`: 정상 생성, `WH-ELEV-1F`에서 인계(예외 허용)
+      - `WH-2F-R04`(2F 렉, AGV) → `PROD-A1`(1F AMR): **거부** — "좁은 존의 AGV(2·3층)가
+        층까지 동시에 넘는 주문은 아직 지원하지 않습니다" 메시지 그대로 확인
+      - `PROD-A1`(AMR) → `WH-RECV`(AGV): AMR 레그가 `WH-GATE-U`에서 정확히 멈춤
+
+**부수 발견 및 수정**: `pixel-fleet`에 `LAYOUT_URL` 환경변수가 아예 없어서
+(`docs/deploy-railway.md`에도 누락) factory의 실제 레이아웃을 한 번도 못 받고 계속
+하드코딩 폴백(V16 시절 좌표)으로만 동작하고 있었다 — P22의 게이트 데이터를 포함해
+V17 이후 변경은 fleet 코드의 폴백 상수에는 반영돼 있어 동작 자체는 맞았지만, factory와의
+실시간 동기화는 조용히 끊겨 있었다. `LAYOUT_URL=http://pixel-factory.railway.internal:9001/api/layout`
+추가로 즉시 해결 — 재시작 로그에 `Loaded 54 layout nodes / 54 edge-sources from
+http://pixel-factory.railway.internal:9001/api/layout`로 확인.
 
 ---
 
@@ -236,16 +254,16 @@ PROD 건물 첫 커넥터 옆에 `PROD-DOCK-1..4`를 새로 만들어(기존 `WH
 
 ## 7. 완료 기준
 
-- [ ] AMR은 창고동 1층 내부(렉·입고장·출하장·도크·엘리베이터 승강장) 어디에도 배차되지
-      않는다 — 항상 게이트에서 AGV에게 인계한다
-- [ ] AGV는 창고동 1층 밖(게이트 너머)으로 나가지 않는다
-- [ ] 1층 AGV는 엘리베이터를 이용한 층간 handoff를 할 수 있다(D3 예외)
-- [ ] 2·3층 AGV는 여전히 층을 넘지 못한다(P21 D5/D10 그대로, 회귀 없음)
-- [ ] 기존 P21 흐름(렉 → 피킹존 → AMR)이 이름만 바뀐 채(AGV) 그대로 동작한다
-- [ ] 대시보드에서 게이트가 시각적으로 구분되고, AGV/AMR 마커가 올바로 렌더링된다
+- [x] AMR은 창고동 1층 내부(렉·입고장·출하장·도크·엘리베이터 승강장) 어디에도 배차되지
+      않는다 — 항상 게이트에서 AGV에게 인계한다(Railway 실기동 확인, 5절 P22-5)
+- [x] AGV는 창고동 1층 밖(게이트 너머)으로 나가지 않는다
+- [x] 1층 AGV는 엘리베이터를 이용한 층간 handoff를 할 수 있다(D3 예외)
+- [x] 2·3층 AGV는 여전히 층을 넘지 못한다(P21 D5/D10 그대로, 회귀 없음)
+- [x] 기존 P21 흐름(렉 → 피킹존 → AMR)이 이름만 바뀐 채(AGV) 그대로 동작한다
+- [x] 대시보드에서 게이트가 시각적으로 구분되고, AGV/AMR 마커가 올바로 렌더링된다
 
-위 항목은 전부 로컬 구현·검증(Gradle 테스트, `tsc --noEmit`, `vite build`) 완료 상태이고,
-실기동 확인은 아직 남아 있다(5절 P22-5 참고).
+전부 로컬 구현·검증(Gradle 테스트, `tsc --noEmit`, `vite build`)에 이어 Railway 실기동
+검증까지 완료했다(5절 P22-5).
 
 ---
 

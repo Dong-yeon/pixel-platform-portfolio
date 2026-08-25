@@ -122,10 +122,19 @@ SPRING_DATASOURCE_PASSWORD=<1단계에서 정한 비밀번호>
 REDIS_URL=${{Redis.REDIS_URL}}
 MQTT_BROKER_URL=tcp://mosquitto.railway.internal:1883
 MQTT_CLIENT_ID=control-service
+LAYOUT_URL=http://pixel-factory.railway.internal:9001/api/layout
 PLATFORM_JWT_SECRET=<32바이트 이상 랜덤 문자열>   ← 게이트웨이·모든 모듈이 같은 값
 DASHBOARD_ORIGIN=https://<게이트웨이 도메인>      ← P16 CORS. gateway·factory·fleet 세 곳 동일
 DISPATCH_ENABLED=true
 ```
+
+> **`LAYOUT_URL`을 빠뜨리면 조용히 실패한다(P22 배포 검증 중 실제로 겪었다).** 기본값이
+> `http://localhost:9001/api/layout`이라 안 넣으면 fleet 컨테이너 안에서 자기 자신을
+> 찾다가 매번 연결 실패하고, `LocationRegistry`가 그때마다 하드코딩 폴백(노드·엣지)으로
+> 조용히 넘어간다 — 에러도 안 나고 로봇도 정상적으로 움직여서 겉보기엔 아무 문제가 없다.
+> 다만 factory의 실제 평면도(레이아웃 변경·신규 렉 등)는 영영 반영되지 않는다. 로그에
+> `Loaded N layout nodes / N edge-sources from ...`가 찍히는지로 확인한다 — 대신
+> `평면도를 가져오지 못했다(ConnectException)` 경고가 반복되면 이 변수가 없거나 틀린 것이다.
 
 ### 2-3b. pixel-wms (프라이빗)
 
@@ -310,6 +319,15 @@ curl -H "Authorization: Bearer $TOKEN" $DOMAIN/api/qms/nonconformances
    같은 Spring Security 기본 헤더가 결정적 단서였다 — 게이트웨이는 리액티브 스택이라
    이 헤더를 안 붙이므로, **엉뚱한(서블릿 기반) 모듈까지 요청이 도달했다**는 뜻이었다.
    wms에는 `/ws/**` permitAll 규칙이 없어 `anyRequest().authenticated()`에 걸려 401.
+
+**실측(2026-08-25):** P22(AMR/AGV 경계) 배포 검증 — P23~P27(파렛트 재고·M4형 주문·통로폭
+강제·안전재고 보충·배터리/엘리베이터)까지 이미 자동 배포(GitHub push 연동)돼 있었고,
+factory 18개·fleet 12개·wms 8개 마이그레이션 전부 정상 적용을 로그로 확인했다.
+`POST /api/fleet/orders`(P24 M4형 생성 엔드포인트)로 AMR/AGV 경계 3가지 케이스를 직접
+쏴서 확인: ① `PROD-A1`→`WH-RECV` 주문의 AMR 레그가 정확히 `WH-GATE-U`에서 멈춤,
+② `WH-RECV`(1F)→`WH-2F-P1`는 엘리베이터 예외로 정상 생성, ③ `WH-2F-R04`(2F 렉)→
+`PROD-A1`은 "좁은 존의 AGV(2·3층)가 층까지 동시에 넘는 주문은 아직 지원하지 않습니다"로
+정확히 거부. 이 과정에서 `LAYOUT_URL` 누락(위 참고)을 발견해 즉시 수정했다.
 
 ## 반드시 알아둘 점
 
