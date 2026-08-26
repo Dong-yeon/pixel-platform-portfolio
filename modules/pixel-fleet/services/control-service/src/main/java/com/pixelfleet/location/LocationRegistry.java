@@ -70,7 +70,7 @@ public class LocationRegistry {
     }
 
     /**
-     * factory에서 못 받았을 때 쓰는 노드 폴백. V16 마이그레이션 시드와 같은 값이다 —
+     * factory에서 못 받았을 때 쓰는 노드 폴백. V20 마이그레이션 시드와 같은 값이다 —
      * 명명된 노드(1층만, 위층은 배차 대상이 아니라 제외) + 교차점(JUNCTION) 16개.
      *
      * <p><b>코드가 실제 x와 안 맞는 항목이 있다.</b> JCT-9-*는 x=17, JCT-14-*는 x=30다 —
@@ -79,9 +79,9 @@ public class LocationRegistry {
      * 커진다).
      */
     private static final Map<String, double[]> FALLBACK_NODES = Map.ofEntries(
-            // 창고동 1층
-            Map.entry("WH-DOCK-1", new double[]{4, 3}),
-            Map.entry("WH-DOCK-2", new double[]{4, 5}),
+            // 창고동 1층 — 도크 4개가 좌하단 한 코너로 모였다(P29, V20).
+            Map.entry("WH-DOCK-1", new double[]{4, 19}),
+            Map.entry("WH-DOCK-2", new double[]{4, 20.5}),
             Map.entry("WH-DOCK-3", new double[]{4, 21}),
             Map.entry("WH-DOCK-4", new double[]{4, 23}),
             Map.entry("WH-RECV", new double[]{17, 6}),
@@ -151,8 +151,9 @@ public class LocationRegistry {
             new Object[]{"JCT-27-L", "JCT-34-L", 7.0},
             new Object[]{"JCT-34-L", "JCT-41-L", 7.0}, new Object[]{"JCT-41-L", "JCT-48-L", 7.0},
             new Object[]{"JCT-48-L", "JCT-62-L", 14.0},
-            // 명명된 노드 → 교차점
-            new Object[]{"WH-DOCK-1", "JCT-4-U", 6.0}, new Object[]{"WH-DOCK-2", "JCT-4-U", 4.0},
+            // 명명된 노드 → 교차점. 도크 4개가 전부 JCT-4-L로 붙는다(P29, V20 — 좌하단 코너로
+            // 모이며 넷 다 하단 통로 아래에 있다).
+            new Object[]{"WH-DOCK-1", "JCT-4-L", 1.0}, new Object[]{"WH-DOCK-2", "JCT-4-L", 2.5},
             new Object[]{"WH-DOCK-3", "JCT-4-L", 3.0}, new Object[]{"WH-DOCK-4", "JCT-4-L", 5.0},
             new Object[]{"WH-RECV", "JCT-9-U", 3.0},
             new Object[]{"WH-PICK", "JCT-9-U", 4.0}, new Object[]{"WH-PICK", "JCT-9-L", 5.0},

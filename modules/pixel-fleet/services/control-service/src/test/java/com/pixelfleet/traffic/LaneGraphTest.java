@@ -65,13 +65,14 @@ class LaneGraphTest {
 
     @Test
     void 같은_연결로의_다른_명명노드로는_교차점을_거치지_않고_직행한다() {
-        // WH-DOCK-1(4,3)과 WH-DOCK-2(4,5) 사이 — 둘 다 같은 연결로 위, 교차점(y=9)보다 훨씬 가깝다.
-        // 명명 노드가 교차점에만 연결돼 있어도(P20-1 데이터), 진입점 탐색이 같은 연결로의
-        // 가장 가까운 이웃(교차점이 아니라 다른 명명 노드일 수도 있음)을 우선 찾아야 한다.
-        RoutePlan plan = laneGraph.plan(new double[]{4, 4}, locations.resolve("WH-DOCK-2"));
+        // WH-DOCK-1(4,19)과 WH-DOCK-2(4,20.5) 사이(P29 — 도크 4개가 좌하단 코너로
+        // 모였다) — 둘 다 같은 연결로 위, 교차점(y=18)보다 훨씬 가깝다. 명명 노드가
+        // 교차점에만 연결돼 있어도(P20-1 데이터), 진입점 탐색이 같은 연결로의 가장
+        // 가까운 이웃(교차점이 아니라 다른 명명 노드일 수도 있음)을 우선 찾아야 한다.
+        RoutePlan plan = laneGraph.plan(new double[]{4, 20}, locations.resolve("WH-DOCK-2"));
 
-        assertThat(plan.waypoints()).containsExactly(new double[]{4, 5});
-        assertThat(totalCost(plan.waypoints(), new double[]{4, 4})).isEqualTo(1.0);
+        assertThat(plan.waypoints()).containsExactly(new double[]{4, 20.5});
+        assertThat(totalCost(plan.waypoints(), new double[]{4, 20})).isEqualTo(0.5);
     }
 
     @Test

@@ -300,6 +300,9 @@ button.mini { padding: 3px 10px; font-size: 12px; margin-left: auto; }
 .b-WH .umap-building-fill { fill: #f2f6f9; }
 .b-WH .umap-wall { stroke: #46586b; }
 .b-WH .umap-building-label { fill: #33465a; }
+/* P29 — 벽 안쪽 점선 둘레선. 충전존과 같은 대시 패턴을 재사용해 "통로/동선" 계열임을
+   색으로도 알 수 있게 한다(실측 참고 이미지의 순환 통로 인상, 라우팅과는 무관한 시각 요소). */
+.umap-building-loop { fill: none; stroke: #46586b; stroke-width: 0.12; stroke-dasharray: 0.7 0.5; opacity: 0.4; }
 
 /* 충전존 — 베이를 감싸는 구역. 비워 둔 자리라는 게 읽히도록 옅은 빗금 느낌으로. */
 .umap-charge-zone rect { fill: #eef4ff; stroke: #2d7ff9; stroke-width: 0.14; stroke-dasharray: 0.7 0.5; opacity: 0.75; }

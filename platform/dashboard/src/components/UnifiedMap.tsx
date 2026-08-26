@@ -519,6 +519,13 @@ function BuildingShape({
       {segments.map(([a, b], i) => (
         <line key={`r-${i}`} x1={right} y1={a} x2={right} y2={b} className="umap-wall" />
       ))}
+      {/* 창고동 전용 — 벽 안쪽에 점선 둘레선(P29). 실제 건물 좌표에서 일정 간격 들어간
+          사각형일 뿐 새 좌표를 지어내지 않는다 — 참고 이미지의 순환 통로 인상만 낸다.
+          라우팅에는 관여하지 않는 순수 시각 요소다(설계 근거: docs/p29-*.md 0-2·D3). */}
+      {building.buildingCode === 'WH' && (
+        <rect x={x + 0.9} y={y + 0.9} width={w - 1.8} height={h - 1.8} rx={0.6}
+              className="umap-building-loop" />
+      )}
       {/* 이름표는 윗벽에 걸친 명패로 둔다 — 건물 안에 넣으면 렉·설비에 가린다. */}
       <BuildingNameplate
         x={x + w / 2}

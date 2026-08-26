@@ -39,9 +39,9 @@ import org.springframework.stereotype.Component;
  * 받아 오지 않고 자기 복사본을 갖는다 — 시뮬레이터는 물리 세계를 흉내내는 쪽이라 실제 설비처럼
  * 서버가 알려주는 대로 위치를 바꾸지 않아야 하고, 서버가 죽어도 계속 돌아야 한다.
  *
- * <p>대신 {@code NodeMapLayoutConsistencyTest}가 서버 마스터(V17 마이그레이션 — 평면도를
- * 다시 그리는 마이그레이션마다 이 경로도 함께 옮긴다, V9→V12→V15→V16→V17)와 대조해 <b>어긋나면
- * 빌드를 깨뜨린다.</b> 런타임 의존을 만들지 않으면서 조용한 불일치를 막는 방법이다.
+ * <p>대신 {@code NodeMapLayoutConsistencyTest}가 서버 마스터(V20 마이그레이션 — 평면도를
+ * 다시 그리는 마이그레이션마다 이 경로도 함께 옮긴다, V9→V12→V15→V16→V17→V20)와 대조해
+ * <b>어긋나면 빌드를 깨뜨린다.</b> 런타임 의존을 만들지 않으면서 조용한 불일치를 막는 방법이다.
  * 좌표를 바꿀 일이 있으면 마스터를 고치고 여기를 맞춘다(순서가 반대면 테스트가 잡아 준다).
  */
 @Component
@@ -53,9 +53,9 @@ public class NodeMap {
     public static final double MAX_Y = 26.0;
 
     private static final Map<String, double[]> NODES = Map.ofEntries(
-            // 창고동 1층 — 도크는 이제 AGV 전용(P22)
-            Map.entry("WH-DOCK-1", new double[]{4, 3}),
-            Map.entry("WH-DOCK-2", new double[]{4, 5}),
+            // 창고동 1층 — 도크 4개가 좌하단 한 코너로 모였다(P29, 참고 이미지의 CP 클러스터).
+            Map.entry("WH-DOCK-1", new double[]{4, 19}),
+            Map.entry("WH-DOCK-2", new double[]{4, 20.5}),
             Map.entry("WH-DOCK-3", new double[]{4, 21}),
             Map.entry("WH-DOCK-4", new double[]{4, 23}),
             Map.entry("WH-RECV", new double[]{17, 6}),
@@ -63,12 +63,12 @@ public class NodeMap {
             Map.entry("WH-SHIP", new double[]{30, 21}),
             Map.entry("WH-ELEV-1F", new double[]{30, 13}),
             // 창고동 2·3층 — **1층과 좌표가 겹친다**(샤프트·베이가 수직으로 같은 자리다).
-            // P22 범위 밖 — 계속 AMR이 담당한다(P21 D10 그대로).
-            Map.entry("WH-DOCK-2F", new double[]{4, 3}),
+            // P22 범위 밖 — 계속 AMR이 담당한다(P21 D10 그대로). 도크는 1층과 같은 코너로(P29).
+            Map.entry("WH-DOCK-2F", new double[]{4, 21}),
             Map.entry("WH-2F-P1", new double[]{17, 6}),
             Map.entry("WH-2F-P2", new double[]{17, 13}),
             Map.entry("WH-ELEV-2F", new double[]{30, 13}),
-            Map.entry("WH-DOCK-3F", new double[]{4, 3}),
+            Map.entry("WH-DOCK-3F", new double[]{4, 21}),
             Map.entry("WH-3F-P1", new double[]{17, 6}),
             Map.entry("WH-3F-P2", new double[]{17, 13}),
             Map.entry("WH-ELEV-3F", new double[]{30, 13}),
