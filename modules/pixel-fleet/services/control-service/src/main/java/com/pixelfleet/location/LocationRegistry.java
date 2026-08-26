@@ -201,26 +201,41 @@ public class LocationRegistry {
     }
 
     /**
-     * factory에서 못 받았을 때 쓰는 렉 폴백 — factory V16 마이그레이션 시드와 같은 값
-     * (27기: 1층 9 · 2층 9 · 3층 9). 렉 피더가 factory 없이도 계속 취출 동작을 하려면
-     * 좌표가 있어야 한다({@code FALLBACK_NODES}와 같은 이유).
+     * factory에서 못 받았을 때 쓰는 렉 폴백 — factory V19 마이그레이션 시드와 같은 값
+     * (54기: 1층 18 · 2층 18 · 3층 18, P28로 27→54 증설). 렉 피더가 factory 없이도 계속
+     * 취출 동작을 하려면 좌표가 있어야 한다({@code FALLBACK_NODES}와 같은 이유).
      */
     private static final List<Object[]> FALLBACK_RACKS = List.of(
-            new Object[]{"WH-1F-R01", (short) 1, 10.5, 4.0, "V"}, new Object[]{"WH-1F-R02", (short) 1, 23.5, 4.0, "V"},
-            new Object[]{"WH-1F-R03", (short) 1, 36.5, 4.0, "V"}, new Object[]{"WH-1F-R04", (short) 1, 10.5, 13.5, "V"},
-            new Object[]{"WH-1F-R05", (short) 1, 23.5, 13.5, "V"}, new Object[]{"WH-1F-R06", (short) 1, 36.5, 13.5, "V"},
-            new Object[]{"WH-1F-R07", (short) 1, 10.5, 22.0, "V"}, new Object[]{"WH-1F-R08", (short) 1, 23.5, 22.0, "V"},
-            new Object[]{"WH-1F-R09", (short) 1, 36.5, 22.0, "V"},
-            new Object[]{"WH-2F-R01", (short) 2, 10.5, 4.0, "V"}, new Object[]{"WH-2F-R02", (short) 2, 23.5, 4.0, "V"},
-            new Object[]{"WH-2F-R03", (short) 2, 36.5, 4.0, "V"}, new Object[]{"WH-2F-R04", (short) 2, 10.5, 13.5, "V"},
-            new Object[]{"WH-2F-R05", (short) 2, 23.5, 13.5, "V"}, new Object[]{"WH-2F-R06", (short) 2, 36.5, 13.5, "V"},
-            new Object[]{"WH-2F-R07", (short) 2, 10.5, 22.0, "V"}, new Object[]{"WH-2F-R08", (short) 2, 23.5, 22.0, "V"},
-            new Object[]{"WH-2F-R09", (short) 2, 36.5, 22.0, "V"},
-            new Object[]{"WH-3F-R01", (short) 3, 10.5, 4.0, "V"}, new Object[]{"WH-3F-R02", (short) 3, 23.5, 4.0, "V"},
-            new Object[]{"WH-3F-R03", (short) 3, 36.5, 4.0, "V"}, new Object[]{"WH-3F-R04", (short) 3, 10.5, 13.5, "V"},
-            new Object[]{"WH-3F-R05", (short) 3, 23.5, 13.5, "V"}, new Object[]{"WH-3F-R06", (short) 3, 36.5, 13.5, "V"},
-            new Object[]{"WH-3F-R07", (short) 3, 10.5, 22.0, "V"}, new Object[]{"WH-3F-R08", (short) 3, 23.5, 22.0, "V"},
-            new Object[]{"WH-3F-R09", (short) 3, 36.5, 22.0, "V"}
+            new Object[]{"WH-1F-R01", (short) 1, 8.0, 4.0, "V"}, new Object[]{"WH-1F-R02", (short) 1, 21.0, 4.0, "V"},
+            new Object[]{"WH-1F-R03", (short) 1, 33.5, 4.0, "V"}, new Object[]{"WH-1F-R04", (short) 1, 8.0, 13.5, "V"},
+            new Object[]{"WH-1F-R05", (short) 1, 21.0, 13.5, "V"}, new Object[]{"WH-1F-R06", (short) 1, 33.5, 13.5, "V"},
+            new Object[]{"WH-1F-R07", (short) 1, 8.0, 22.0, "V"}, new Object[]{"WH-1F-R08", (short) 1, 21.0, 22.0, "V"},
+            new Object[]{"WH-1F-R09", (short) 1, 33.5, 22.0, "V"},
+            new Object[]{"WH-1F-R10", (short) 1, 13.0, 4.0, "V"}, new Object[]{"WH-1F-R11", (short) 1, 26.0, 4.0, "V"},
+            new Object[]{"WH-1F-R12", (short) 1, 38.5, 4.0, "V"}, new Object[]{"WH-1F-R13", (short) 1, 13.0, 13.5, "V"},
+            new Object[]{"WH-1F-R14", (short) 1, 26.0, 13.5, "V"}, new Object[]{"WH-1F-R15", (short) 1, 38.5, 13.5, "V"},
+            new Object[]{"WH-1F-R16", (short) 1, 13.0, 22.0, "V"}, new Object[]{"WH-1F-R17", (short) 1, 26.0, 22.0, "V"},
+            new Object[]{"WH-1F-R18", (short) 1, 38.5, 22.0, "V"},
+            new Object[]{"WH-2F-R01", (short) 2, 8.0, 4.0, "V"}, new Object[]{"WH-2F-R02", (short) 2, 21.0, 4.0, "V"},
+            new Object[]{"WH-2F-R03", (short) 2, 33.5, 4.0, "V"}, new Object[]{"WH-2F-R04", (short) 2, 8.0, 13.5, "V"},
+            new Object[]{"WH-2F-R05", (short) 2, 21.0, 13.5, "V"}, new Object[]{"WH-2F-R06", (short) 2, 33.5, 13.5, "V"},
+            new Object[]{"WH-2F-R07", (short) 2, 8.0, 22.0, "V"}, new Object[]{"WH-2F-R08", (short) 2, 21.0, 22.0, "V"},
+            new Object[]{"WH-2F-R09", (short) 2, 33.5, 22.0, "V"},
+            new Object[]{"WH-2F-R10", (short) 2, 13.0, 4.0, "V"}, new Object[]{"WH-2F-R11", (short) 2, 26.0, 4.0, "V"},
+            new Object[]{"WH-2F-R12", (short) 2, 38.5, 4.0, "V"}, new Object[]{"WH-2F-R13", (short) 2, 13.0, 13.5, "V"},
+            new Object[]{"WH-2F-R14", (short) 2, 26.0, 13.5, "V"}, new Object[]{"WH-2F-R15", (short) 2, 38.5, 13.5, "V"},
+            new Object[]{"WH-2F-R16", (short) 2, 13.0, 22.0, "V"}, new Object[]{"WH-2F-R17", (short) 2, 26.0, 22.0, "V"},
+            new Object[]{"WH-2F-R18", (short) 2, 38.5, 22.0, "V"},
+            new Object[]{"WH-3F-R01", (short) 3, 8.0, 4.0, "V"}, new Object[]{"WH-3F-R02", (short) 3, 21.0, 4.0, "V"},
+            new Object[]{"WH-3F-R03", (short) 3, 33.5, 4.0, "V"}, new Object[]{"WH-3F-R04", (short) 3, 8.0, 13.5, "V"},
+            new Object[]{"WH-3F-R05", (short) 3, 21.0, 13.5, "V"}, new Object[]{"WH-3F-R06", (short) 3, 33.5, 13.5, "V"},
+            new Object[]{"WH-3F-R07", (short) 3, 8.0, 22.0, "V"}, new Object[]{"WH-3F-R08", (short) 3, 21.0, 22.0, "V"},
+            new Object[]{"WH-3F-R09", (short) 3, 33.5, 22.0, "V"},
+            new Object[]{"WH-3F-R10", (short) 3, 13.0, 4.0, "V"}, new Object[]{"WH-3F-R11", (short) 3, 26.0, 4.0, "V"},
+            new Object[]{"WH-3F-R12", (short) 3, 38.5, 4.0, "V"}, new Object[]{"WH-3F-R13", (short) 3, 13.0, 13.5, "V"},
+            new Object[]{"WH-3F-R14", (short) 3, 26.0, 13.5, "V"}, new Object[]{"WH-3F-R15", (short) 3, 38.5, 13.5, "V"},
+            new Object[]{"WH-3F-R16", (short) 3, 13.0, 22.0, "V"}, new Object[]{"WH-3F-R17", (short) 3, 26.0, 22.0, "V"},
+            new Object[]{"WH-3F-R18", (short) 3, 38.5, 22.0, "V"}
     );
 
     private final Map<String, double[]> nodes = new ConcurrentHashMap<>(FALLBACK_NODES);

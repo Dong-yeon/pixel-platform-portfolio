@@ -4,7 +4,7 @@ import java.util.Set;
 import org.springframework.stereotype.Component;
 
 /**
- * 창고동 렉 코드 사본(P21) — factory {@code layout_racks}(V12)와 같은 27기.
+ * 창고동 렉 코드 사본(P21) — factory {@code layout_racks}(V12+V19)와 같은 54기.
  *
  * <p><b>왜 좌표가 아니라 코드만 갖는가.</b> AGV(옛 이름: 랙 피더)가 렉으로 가는 경로(웨이포인트)는
  * {@code NodeMap}처럼 여기서 계산하지 않는다 — 관제 서버가 이미 접근점을 계산해 GOTO에
@@ -14,7 +14,8 @@ import org.springframework.stereotype.Component;
  *
  * <p>그래도 코드 집합 자체는 서버 마스터와 어긋나면 안 된다(새 렉이 생겼는데 여기 없으면
  * 그 렉으로 가는 AGV 주문이 조용히 "일반 노드처럼" 취급돼 취출 대기 없이 즉시
- * 완료된다) — {@code RackMapLayoutConsistencyTest}가 factory V12 마이그레이션과 대조한다.
+ * 완료된다) — {@code RackMapLayoutConsistencyTest}가 factory V12+V19 마이그레이션과
+ * 대조한다. 27기 → 54기 증설은 P28(설계 근거: docs/p28-warehouse-rack-density-design.md D3).
  */
 @Component
 public class RackMap {
@@ -22,10 +23,16 @@ public class RackMap {
     private static final Set<String> RACK_CODES = Set.of(
             "WH-1F-R01", "WH-1F-R02", "WH-1F-R03", "WH-1F-R04", "WH-1F-R05",
             "WH-1F-R06", "WH-1F-R07", "WH-1F-R08", "WH-1F-R09",
+            "WH-1F-R10", "WH-1F-R11", "WH-1F-R12", "WH-1F-R13", "WH-1F-R14",
+            "WH-1F-R15", "WH-1F-R16", "WH-1F-R17", "WH-1F-R18",
             "WH-2F-R01", "WH-2F-R02", "WH-2F-R03", "WH-2F-R04", "WH-2F-R05",
             "WH-2F-R06", "WH-2F-R07", "WH-2F-R08", "WH-2F-R09",
+            "WH-2F-R10", "WH-2F-R11", "WH-2F-R12", "WH-2F-R13", "WH-2F-R14",
+            "WH-2F-R15", "WH-2F-R16", "WH-2F-R17", "WH-2F-R18",
             "WH-3F-R01", "WH-3F-R02", "WH-3F-R03", "WH-3F-R04", "WH-3F-R05",
-            "WH-3F-R06", "WH-3F-R07", "WH-3F-R08", "WH-3F-R09"
+            "WH-3F-R06", "WH-3F-R07", "WH-3F-R08", "WH-3F-R09",
+            "WH-3F-R10", "WH-3F-R11", "WH-3F-R12", "WH-3F-R13", "WH-3F-R14",
+            "WH-3F-R15", "WH-3F-R16", "WH-3F-R17", "WH-3F-R18"
     );
 
     public boolean isRackCode(String node) {

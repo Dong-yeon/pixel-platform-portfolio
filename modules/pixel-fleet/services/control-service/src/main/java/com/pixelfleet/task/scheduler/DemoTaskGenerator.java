@@ -86,10 +86,21 @@ public class DemoTaskGenerator {
             // 피더)가 실제로 렉까지 가서 꺼내 오는 구간이 이제 생겼다(OrderService.create()가
             // 렉 코드를 보고 자동으로 AGV 레그 + AMR 레그로 쪼갠다 — 이 목록은 여전히 "어디서
             // 어디로"만 말한다). 같은 층 목적지만 — 렉↔층 동시 경계는 아직 지원하지 않는다.
+            //
+            // P28 — 창고동 렉이 27→54기로 늘면서(밀도 증가) 렉 취출 흐름도 4개→10개로
+            // 늘린다. 전체 흐름 수(24→30) 대비 렉 취출 비율이 ~17%에서 ~33%로 올라가
+            // "AGV가 렉을 빼는 장면"이 눈에 띄게 더 자주 보인다(설계 근거:
+            // docs/p28-warehouse-rack-density-design.md D4).
             new Flow("WH-1F-R05", "PROD-A2"),
             new Flow("WH-1F-R08", "WH-SHIP"),
+            new Flow("WH-1F-R13", "PROD-A3"),
+            new Flow("WH-1F-R16", "WH-SHIP"),
             new Flow("WH-2F-R04", "WH-2F-P2"),
-            new Flow("WH-3F-R02", "WH-3F-P1"));
+            new Flow("WH-2F-R11", "WH-2F-P1"),
+            new Flow("WH-2F-R14", "WH-2F-P2"),
+            new Flow("WH-3F-R02", "WH-3F-P1"),
+            new Flow("WH-3F-R12", "WH-3F-P2"),
+            new Flow("WH-3F-R15", "WH-3F-P1"));
 
     /**
      * 대기 작업이 이 수를 넘으면 새로 만들지 않는다.
