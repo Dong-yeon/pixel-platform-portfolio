@@ -68,6 +68,10 @@ public class DemoTaskGenerator {
             new Flow("QC-OUT", "PROD-B1"),
             // 출하: 창고에 들어온 완제품을 출하장으로
             new Flow("WH-PICK", "WH-SHIP"),
+            // P30: 4번째 베이의 보조 출하장 — 이 흐름이 실제로 새 연결로(JCT-19) 구간을
+            // 지나간다. 렉은 LaneGraph를 안 타므로(P21 D2) 이 흐름 없이는 그 구간이
+            // 죽은 엣지로 남는다(설계 근거: docs/p30-warehouse-fourth-bay-design.md D3).
+            new Flow("WH-PICK", "WH-SHIP-2"),
             // 위층 보관: 1층에 다 못 두는 물량은 2·3층에 올린다.
             // 층이 다르므로 TaskService가 엘리베이터에서 두 구간으로 끊는다 —
             // 앞 구간은 1층 로봇이 승강장까지, 뒷 구간은 그 층 로봇이 이어받는다.
@@ -91,6 +95,10 @@ public class DemoTaskGenerator {
             // 늘린다. 전체 흐름 수(24→30) 대비 렉 취출 비율이 ~17%에서 ~33%로 올라가
             // "AGV가 렉을 빼는 장면"이 눈에 띄게 더 자주 보인다(설계 근거:
             // docs/p28-warehouse-rack-density-design.md D4).
+            //
+            // P30 — 4번째 베이(렉 18기 추가, 54→72)에서도 3개를 추가한다(10→13,
+            // 아래 WH-PICK→WH-SHIP-2와 합쳐 전체 흐름 30→34, 설계 근거:
+            // docs/p30-warehouse-fourth-bay-design.md D4).
             new Flow("WH-1F-R05", "PROD-A2"),
             new Flow("WH-1F-R08", "WH-SHIP"),
             new Flow("WH-1F-R13", "PROD-A3"),
@@ -100,7 +108,11 @@ public class DemoTaskGenerator {
             new Flow("WH-2F-R14", "WH-2F-P2"),
             new Flow("WH-3F-R02", "WH-3F-P1"),
             new Flow("WH-3F-R12", "WH-3F-P2"),
-            new Flow("WH-3F-R15", "WH-3F-P1"));
+            new Flow("WH-3F-R15", "WH-3F-P1"),
+            // P30 — 4번째 베이(R19~R24) 렉도 취출 대상에 넣는다(층별 1개씩).
+            new Flow("WH-1F-R21", "PROD-A4"),
+            new Flow("WH-2F-R23", "WH-2F-P2"),
+            new Flow("WH-3F-R19", "WH-3F-P1"));
 
     /**
      * 대기 작업이 이 수를 넘으면 새로 만들지 않는다.

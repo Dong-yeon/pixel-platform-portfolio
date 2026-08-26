@@ -48,7 +48,7 @@ public class LocationRegistry {
 
     private static final Logger log = LoggerFactory.getLogger(LocationRegistry.class);
 
-    private static final double MAX_X = 160.0;
+    private static final double MAX_X = 173.0;
     private static final double MAX_Y = 26.0;
 
     /** 좌표 일치 판정 허용오차. 부동소수 비교와 "거의 그 자리" 판정에 같이 쓴다. */
@@ -88,44 +88,50 @@ public class LocationRegistry {
             Map.entry("WH-PICK", new double[]{17, 13}),
             Map.entry("WH-SHIP", new double[]{30, 21}),
             Map.entry("WH-ELEV-1F", new double[]{30, 13}),
-            // P22: AMR ↔ AGV 게이트 — 창고동 벽 밖, 생산동 벽 앞의 중립 지대(x=43)
-            Map.entry("WH-GATE-U", new double[]{43, 9}),
-            Map.entry("WH-GATE-L", new double[]{43, 18}),
-            // P22: 생산동 쪽 AMR 충전 베이 — 창고동 도크가 AGV 전용이 되며 새로 생겼다.
-            Map.entry("PROD-DOCK-1", new double[]{49, 3}),
-            Map.entry("PROD-DOCK-2", new double[]{49, 5}),
-            Map.entry("PROD-DOCK-3", new double[]{49, 21}),
-            Map.entry("PROD-DOCK-4", new double[]{49, 23}),
-            // 생산동 (V16에서 창고동이 다시 넓어진 만큼 +10 — 균일 이동이라 내부 상대거리는 그대로)
-            Map.entry("PROD-A1", new double[]{49, 6}),
-            Map.entry("PROD-A2", new double[]{56, 6}),
-            Map.entry("PROD-A3", new double[]{63, 6}),
-            Map.entry("PROD-A4", new double[]{70, 6}),
-            Map.entry("PROD-B1", new double[]{49, 21}),
-            Map.entry("PROD-B2", new double[]{56, 21}),
-            Map.entry("PROD-B3", new double[]{63, 21}),
-            Map.entry("PROD-B4", new double[]{70, 21}),
-            // 품질동 — 가공이 끝난 물건은 무조건 여기를 거친다 (+10)
-            Map.entry("QC-IN", new double[]{84, 21}),
-            Map.entry("QC-OUT", new double[]{84, 6}),
+            // P30: 4번째 베이의 보조 출하장 — 순환 경로에 실제 주문을 태우는 진짜 목적지.
+            Map.entry("WH-SHIP-2", new double[]{41, 21}),
+            // P22: AMR ↔ AGV 게이트 — 창고동 벽 밖, 생산동 벽 앞의 중립 지대. P30으로
+            // 창고동 4번째 베이가 생긴 만큼(+13) 균일 이동(x=43→56).
+            Map.entry("WH-GATE-U", new double[]{56, 9}),
+            Map.entry("WH-GATE-L", new double[]{56, 18}),
+            // P22: 생산동 쪽 AMR 충전 베이 — P30으로 균일 +13.
+            Map.entry("PROD-DOCK-1", new double[]{62, 3}),
+            Map.entry("PROD-DOCK-2", new double[]{62, 5}),
+            Map.entry("PROD-DOCK-3", new double[]{62, 21}),
+            Map.entry("PROD-DOCK-4", new double[]{62, 23}),
+            // 생산동 (P30 — 창고동 4번째 베이 신설로 +13, 균일 이동이라 내부 상대거리는 그대로)
+            Map.entry("PROD-A1", new double[]{62, 6}),
+            Map.entry("PROD-A2", new double[]{69, 6}),
+            Map.entry("PROD-A3", new double[]{76, 6}),
+            Map.entry("PROD-A4", new double[]{83, 6}),
+            Map.entry("PROD-B1", new double[]{62, 21}),
+            Map.entry("PROD-B2", new double[]{69, 21}),
+            Map.entry("PROD-B3", new double[]{76, 21}),
+            Map.entry("PROD-B4", new double[]{83, 21}),
+            // 품질동 — 가공이 끝난 물건은 무조건 여기를 거친다 (+13)
+            Map.entry("QC-IN", new double[]{97, 21}),
+            Map.entry("QC-OUT", new double[]{97, 6}),
             // 통로·연결로 교차점 (P20) — 로봇이 정차하는 자리가 아니라 경로 그래프의 분기점.
-            // V16__warehouse_biggest_building.sql과 같은 값.
+            // V21__warehouse_fourth_bay.sql과 같은 값.
             Map.entry("JCT-4-U", new double[]{4, 9}),
             Map.entry("JCT-4-L", new double[]{4, 18}),
             Map.entry("JCT-9-U", new double[]{17, 9}),
             Map.entry("JCT-9-L", new double[]{17, 18}),
             Map.entry("JCT-14-U", new double[]{30, 9}),
             Map.entry("JCT-14-L", new double[]{30, 18}),
-            Map.entry("JCT-27-U", new double[]{49, 9}),
-            Map.entry("JCT-27-L", new double[]{49, 18}),
-            Map.entry("JCT-34-U", new double[]{56, 9}),
-            Map.entry("JCT-34-L", new double[]{56, 18}),
-            Map.entry("JCT-41-U", new double[]{63, 9}),
-            Map.entry("JCT-41-L", new double[]{63, 18}),
-            Map.entry("JCT-48-U", new double[]{70, 9}),
-            Map.entry("JCT-48-L", new double[]{70, 18}),
-            Map.entry("JCT-62-U", new double[]{84, 9}),
-            Map.entry("JCT-62-L", new double[]{84, 18})
+            // P30: 4번째 베이 연결로(옛 벽 자리, x=41).
+            Map.entry("JCT-19-U", new double[]{41, 9}),
+            Map.entry("JCT-19-L", new double[]{41, 18}),
+            Map.entry("JCT-27-U", new double[]{62, 9}),
+            Map.entry("JCT-27-L", new double[]{62, 18}),
+            Map.entry("JCT-34-U", new double[]{69, 9}),
+            Map.entry("JCT-34-L", new double[]{69, 18}),
+            Map.entry("JCT-41-U", new double[]{76, 9}),
+            Map.entry("JCT-41-L", new double[]{76, 18}),
+            Map.entry("JCT-48-U", new double[]{83, 9}),
+            Map.entry("JCT-48-L", new double[]{83, 18}),
+            Map.entry("JCT-62-U", new double[]{97, 9}),
+            Map.entry("JCT-62-L", new double[]{97, 18})
     );
 
     /**
@@ -138,20 +144,23 @@ public class LocationRegistry {
             new Object[]{"JCT-14-U", "JCT-14-L", 9.0}, new Object[]{"JCT-27-U", "JCT-27-L", 9.0},
             new Object[]{"JCT-34-U", "JCT-34-L", 9.0}, new Object[]{"JCT-41-U", "JCT-41-L", 9.0},
             new Object[]{"JCT-48-U", "JCT-48-L", 9.0}, new Object[]{"JCT-62-U", "JCT-62-L", 9.0},
-            // 통로(가로) — 인접 연결로 교차점끼리. 창고동 내부 두 구간(4~17, 17~30)이 9→13으로
-            // 늘었다(V16). 창고동↔생산동 경계(옛 JCT-14↔JCT-27, 30~49, 비용19)는 P22에서
-            // WH-GATE를 경유하는 두 구간(13+6)으로 바뀌었다 — 총비용은 그대로다.
+            // 통로(가로) — 인접 연결로 교차점끼리. 창고동 내부 두 구간(4~17, 17~30)은 13
+            // 그대로. P30으로 4번째 베이가 끼어들며 옛 JCT-14↔게이트 직결(13)이 JCT-14↔
+            // JCT-19(11)+JCT-19↔게이트(15)로 늘었다 — 물리적으로 베이 하나가 더 생겼으니
+            // 총비용도 실제로 늘어난다(P22의 "총비용 그대로" 패턴과 다르다).
             new Object[]{"JCT-4-U", "JCT-9-U", 13.0}, new Object[]{"JCT-9-U", "JCT-14-U", 13.0},
-            new Object[]{"JCT-14-U", "WH-GATE-U", 13.0}, new Object[]{"WH-GATE-U", "JCT-27-U", 6.0},
+            new Object[]{"JCT-14-U", "JCT-19-U", 11.0}, new Object[]{"JCT-19-U", "WH-GATE-U", 15.0},
+            new Object[]{"WH-GATE-U", "JCT-27-U", 6.0},
             new Object[]{"JCT-27-U", "JCT-34-U", 7.0},
             new Object[]{"JCT-34-U", "JCT-41-U", 7.0}, new Object[]{"JCT-41-U", "JCT-48-U", 7.0},
             new Object[]{"JCT-48-U", "JCT-62-U", 14.0},
             new Object[]{"JCT-4-L", "JCT-9-L", 13.0}, new Object[]{"JCT-9-L", "JCT-14-L", 13.0},
-            new Object[]{"JCT-14-L", "WH-GATE-L", 13.0}, new Object[]{"WH-GATE-L", "JCT-27-L", 6.0},
+            new Object[]{"JCT-14-L", "JCT-19-L", 11.0}, new Object[]{"JCT-19-L", "WH-GATE-L", 15.0},
+            new Object[]{"WH-GATE-L", "JCT-27-L", 6.0},
             new Object[]{"JCT-27-L", "JCT-34-L", 7.0},
             new Object[]{"JCT-34-L", "JCT-41-L", 7.0}, new Object[]{"JCT-41-L", "JCT-48-L", 7.0},
             new Object[]{"JCT-48-L", "JCT-62-L", 14.0},
-            // 명명된 노드 → 교차점. 도크 4개가 전부 JCT-4-L로 붙는다(P29, V20 — 좌하단 코너로
+            // 명명된 노드 → 교차점. 도크 4개가 전부 JCT-4-L로 붙는다(P29 — 좌하단 코너로
             // 모이며 넷 다 하단 통로 아래에 있다).
             new Object[]{"WH-DOCK-1", "JCT-4-L", 1.0}, new Object[]{"WH-DOCK-2", "JCT-4-L", 2.5},
             new Object[]{"WH-DOCK-3", "JCT-4-L", 3.0}, new Object[]{"WH-DOCK-4", "JCT-4-L", 5.0},
@@ -159,6 +168,8 @@ public class LocationRegistry {
             new Object[]{"WH-PICK", "JCT-9-U", 4.0}, new Object[]{"WH-PICK", "JCT-9-L", 5.0},
             new Object[]{"WH-SHIP", "JCT-14-L", 3.0},
             new Object[]{"WH-ELEV-1F", "JCT-14-U", 4.0}, new Object[]{"WH-ELEV-1F", "JCT-14-L", 5.0},
+            // P30: 4번째 베이의 보조 출하장 — 순환 경로에 실제 주문을 태우는 진짜 목적지.
+            new Object[]{"WH-SHIP-2", "JCT-19-L", 3.0},
             // P22: 생산동 AMR 충전 베이
             new Object[]{"PROD-DOCK-1", "JCT-27-U", 6.0}, new Object[]{"PROD-DOCK-2", "JCT-27-U", 4.0},
             new Object[]{"PROD-DOCK-3", "JCT-27-L", 3.0}, new Object[]{"PROD-DOCK-4", "JCT-27-L", 5.0},
@@ -187,14 +198,14 @@ public class LocationRegistry {
     private static final Pattern PICK_NODE_PATTERN = Pattern.compile("^WH-(?:PICK|\\d+F-P\\d+)$");
 
     /**
-     * 창고동 1층 안쪽 명명 노드(P22) — 도크·입고장·피킹존·출하장·엘리베이터 승강장.
-     * AMR은 이제 여기 못 들어간다({@code requiredPool}이 이 패턴이면 AGV 풀을 준다).
-     * <b>{@code WH-GATE-*}는 일부러 뺐다</b> — 게이트는 AMR·AGV 둘 다의 경계 정차 자리라
-     * 항상 AMR 풀(일반 노드 처리)로 본다. 2·3층 노드({@code WH-2F-P1} 등)도 뺐다 — 범위
-     * 밖이라 계속 AMR이다(P21 D10).
+     * 창고동 1층 안쪽 명명 노드(P22) — 도크·입고장·피킹존·출하장(P30: 보조 출하장 포함)·
+     * 엘리베이터 승강장. AMR은 이제 여기 못 들어간다({@code requiredPool}이 이 패턴이면
+     * AGV 풀을 준다). <b>{@code WH-GATE-*}는 일부러 뺐다</b> — 게이트는 AMR·AGV 둘 다의
+     * 경계 정차 자리라 항상 AMR 풀(일반 노드 처리)로 본다. 2·3층 노드({@code WH-2F-P1} 등)도
+     * 뺐다 — 범위 밖이라 계속 AMR이다(P21 D10).
      */
     private static final Pattern WH_1F_INTERIOR_PATTERN =
-            Pattern.compile("^WH-(?:DOCK-[1-4]|RECV|PICK|SHIP|ELEV-1F)$");
+            Pattern.compile("^WH-(?:DOCK-[1-4]|RECV|PICK|SHIP(?:-2)?|ELEV-1F)$");
 
     /** 창고동 1층 안쪽 명명 노드인가(P22) — {@link #WH_1F_INTERIOR_PATTERN} 참고. */
     public boolean isWarehouseFloor1Node(String code) {
@@ -202,9 +213,10 @@ public class LocationRegistry {
     }
 
     /**
-     * factory에서 못 받았을 때 쓰는 렉 폴백 — factory V19 마이그레이션 시드와 같은 값
-     * (54기: 1층 18 · 2층 18 · 3층 18, P28로 27→54 증설). 렉 피더가 factory 없이도 계속
-     * 취출 동작을 하려면 좌표가 있어야 한다({@code FALLBACK_NODES}와 같은 이유).
+     * factory에서 못 받았을 때 쓰는 렉 폴백 — factory V21 마이그레이션 시드와 같은 값
+     * (72기: 1층 24 · 2층 24 · 3층 24, P28로 27→54, P30으로 54→72 증설). 렉 피더가
+     * factory 없이도 계속 취출 동작을 하려면 좌표가 있어야 한다({@code FALLBACK_NODES}와
+     * 같은 이유).
      */
     private static final List<Object[]> FALLBACK_RACKS = List.of(
             new Object[]{"WH-1F-R01", (short) 1, 8.0, 4.0, "V"}, new Object[]{"WH-1F-R02", (short) 1, 21.0, 4.0, "V"},
@@ -236,7 +248,17 @@ public class LocationRegistry {
             new Object[]{"WH-3F-R12", (short) 3, 38.5, 4.0, "V"}, new Object[]{"WH-3F-R13", (short) 3, 13.0, 13.5, "V"},
             new Object[]{"WH-3F-R14", (short) 3, 26.0, 13.5, "V"}, new Object[]{"WH-3F-R15", (short) 3, 38.5, 13.5, "V"},
             new Object[]{"WH-3F-R16", (short) 3, 13.0, 22.0, "V"}, new Object[]{"WH-3F-R17", (short) 3, 26.0, 22.0, "V"},
-            new Object[]{"WH-3F-R18", (short) 3, 38.5, 22.0, "V"}
+            new Object[]{"WH-3F-R18", (short) 3, 38.5, 22.0, "V"},
+            // P30: 4번째 베이(x=45/50) — 18기 증설.
+            new Object[]{"WH-1F-R19", (short) 1, 45.0, 4.0, "V"}, new Object[]{"WH-1F-R20", (short) 1, 50.0, 4.0, "V"},
+            new Object[]{"WH-1F-R21", (short) 1, 45.0, 13.5, "V"}, new Object[]{"WH-1F-R22", (short) 1, 50.0, 13.5, "V"},
+            new Object[]{"WH-1F-R23", (short) 1, 45.0, 22.0, "V"}, new Object[]{"WH-1F-R24", (short) 1, 50.0, 22.0, "V"},
+            new Object[]{"WH-2F-R19", (short) 2, 45.0, 4.0, "V"}, new Object[]{"WH-2F-R20", (short) 2, 50.0, 4.0, "V"},
+            new Object[]{"WH-2F-R21", (short) 2, 45.0, 13.5, "V"}, new Object[]{"WH-2F-R22", (short) 2, 50.0, 13.5, "V"},
+            new Object[]{"WH-2F-R23", (short) 2, 45.0, 22.0, "V"}, new Object[]{"WH-2F-R24", (short) 2, 50.0, 22.0, "V"},
+            new Object[]{"WH-3F-R19", (short) 3, 45.0, 4.0, "V"}, new Object[]{"WH-3F-R20", (short) 3, 50.0, 4.0, "V"},
+            new Object[]{"WH-3F-R21", (short) 3, 45.0, 13.5, "V"}, new Object[]{"WH-3F-R22", (short) 3, 50.0, 13.5, "V"},
+            new Object[]{"WH-3F-R23", (short) 3, 45.0, 22.0, "V"}, new Object[]{"WH-3F-R24", (short) 3, 50.0, 22.0, "V"}
     );
 
     private final Map<String, double[]> nodes = new ConcurrentHashMap<>(FALLBACK_NODES);

@@ -14,8 +14,9 @@ import org.springframework.stereotype.Component;
  *
  * <p>그래도 코드 집합 자체는 서버 마스터와 어긋나면 안 된다(새 렉이 생겼는데 여기 없으면
  * 그 렉으로 가는 AGV 주문이 조용히 "일반 노드처럼" 취급돼 취출 대기 없이 즉시
- * 완료된다) — {@code RackMapLayoutConsistencyTest}가 factory V12+V19 마이그레이션과
- * 대조한다. 27기 → 54기 증설은 P28(설계 근거: docs/p28-warehouse-rack-density-design.md D3).
+ * 완료된다) — {@code RackMapLayoutConsistencyTest}가 factory V12+V19+V21 마이그레이션과
+ * 대조한다. 27기 → 54기 증설은 P28, 54기 → 72기(4번째 베이) 증설은 P30(설계 근거:
+ * docs/p28-warehouse-rack-density-design.md D3, docs/p30-warehouse-fourth-bay-design.md D4).
  */
 @Component
 public class RackMap {
@@ -32,7 +33,11 @@ public class RackMap {
             "WH-3F-R01", "WH-3F-R02", "WH-3F-R03", "WH-3F-R04", "WH-3F-R05",
             "WH-3F-R06", "WH-3F-R07", "WH-3F-R08", "WH-3F-R09",
             "WH-3F-R10", "WH-3F-R11", "WH-3F-R12", "WH-3F-R13", "WH-3F-R14",
-            "WH-3F-R15", "WH-3F-R16", "WH-3F-R17", "WH-3F-R18"
+            "WH-3F-R15", "WH-3F-R16", "WH-3F-R17", "WH-3F-R18",
+            // P30: 4번째 베이 신설로 18기 추가 (54 → 72).
+            "WH-1F-R19", "WH-1F-R20", "WH-1F-R21", "WH-1F-R22", "WH-1F-R23", "WH-1F-R24",
+            "WH-2F-R19", "WH-2F-R20", "WH-2F-R21", "WH-2F-R22", "WH-2F-R23", "WH-2F-R24",
+            "WH-3F-R19", "WH-3F-R20", "WH-3F-R21", "WH-3F-R22", "WH-3F-R23", "WH-3F-R24"
     );
 
     public boolean isRackCode(String node) {

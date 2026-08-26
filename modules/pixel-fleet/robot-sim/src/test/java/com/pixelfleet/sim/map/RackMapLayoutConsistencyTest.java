@@ -25,9 +25,10 @@ import org.junit.jupiter.api.Test;
  * 하나라도 어긋나면 그 렉으로 가는 AGV 주문이 조용히 "일반 노드"로 취급돼 취출 대기
  * 없이 즉시 완료된다 — 그래서 코드 집합의 일치는 반드시 지켜야 한다.
  *
- * <p><b>P28 — 마스터가 두 마이그레이션에 걸쳐 있다.</b> V12가 원본 27기, V19가 추가 27기
- * (기존 27기는 V19에서 자리만 옮기고 INSERT는 안 한다 — 그래서 코드 집합은 V19의
- * INSERT문만 보면 된다, UPDATE문은 이 정규식에 안 걸린다).
+ * <p><b>마스터가 여러 마이그레이션에 걸쳐 있다.</b> V12가 원본 27기, V19(P28)가 추가
+ * 27기, V21(P30)이 4번째 베이 18기(기존 렉은 V19/V21에서 자리만 옮기고 INSERT는 안
+ * 한다 — 그래서 코드 집합은 각 파일의 INSERT문만 보면 된다, UPDATE문은 이 정규식에
+ * 안 걸린다).
  */
 class RackMapLayoutConsistencyTest {
 
@@ -35,7 +36,9 @@ class RackMapLayoutConsistencyTest {
             Path.of("..", "..", "pixel-factory", "services", "oee-service",
                     "src", "main", "resources", "db", "migration", "V12__elevator_and_charging_zone.sql"),
             Path.of("..", "..", "pixel-factory", "services", "oee-service",
-                    "src", "main", "resources", "db", "migration", "V19__more_warehouse_racks.sql"));
+                    "src", "main", "resources", "db", "migration", "V19__more_warehouse_racks.sql"),
+            Path.of("..", "..", "pixel-factory", "services", "oee-service",
+                    "src", "main", "resources", "db", "migration", "V21__warehouse_fourth_bay.sql"));
 
     /** ('WH-1F-R01', 'WH', 1,  7.0,  4.0, 'V', 4, 5, 200, now(), now()) */
     private static final Pattern RACK_ROW = Pattern.compile(
