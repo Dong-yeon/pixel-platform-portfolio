@@ -3,6 +3,14 @@
 Pixel Platform을 Railway에 올리는 절차. **배포 실행에는 동연님의 Railway 계정 인증이
 필요**하므로, 이 문서는 그대로 따라 하면 되도록 설정값을 전부 적어 두었다.
 
+> **현재 배포 주소: `https://happyeon-pixel-platform.up.railway.app`**(2026-08-25부터).
+> Railway가 자동 생성한 무작위 접미사 도메인(`gateway-production-4f47...`, 아래 §2-5·
+> 실측 로그에 남아 있는 옛 주소)을 `railway domain update <old> --domain
+> happyeon-pixel-platform --service gateway`로 바꿨다. **주소를 바꾸면 `DASHBOARD_ORIGIN`도
+> gateway·factory·fleet 세 곳 전부 같이 바꿔야 한다** — 안 그러면 CORS가 옛 주소만 허용해
+> 로그인이 403이 된다(§2-5의 기존 경고와 같은 함정, 실제로 세 곳 다 갱신하고 재배포까지
+> 확인했다).
+
 ## 서비스 구성 (9개 + 플러그인 2개)
 
 ```
