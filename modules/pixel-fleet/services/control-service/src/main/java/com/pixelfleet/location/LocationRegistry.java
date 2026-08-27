@@ -49,7 +49,8 @@ public class LocationRegistry {
     private static final Logger log = LoggerFactory.getLogger(LocationRegistry.class);
 
     private static final double MAX_X = 173.0;
-    private static final double MAX_Y = 26.0;
+    /** P32로 26→74 — 창고동 1층이 밴드 12개(빗 구조)로 세로로 훨씬 길어졌다. */
+    private static final double MAX_Y = 74.0;
 
     /** 좌표 일치 판정 허용오차. 부동소수 비교와 "거의 그 자리" 판정에 같이 쓴다. */
     private static final double EPSILON = 0.05;
@@ -70,28 +71,59 @@ public class LocationRegistry {
     }
 
     /**
-     * factory에서 못 받았을 때 쓰는 노드 폴백. V20 마이그레이션 시드와 같은 값이다 —
-     * 명명된 노드(1층만, 위층은 배차 대상이 아니라 제외) + 교차점(JUNCTION) 16개.
+     * factory에서 못 받았을 때 쓰는 노드 폴백. V22 마이그레이션 시드와 같은 값이다 —
+     * 명명된 노드(1층만, 위층은 배차 대상이 아니라 제외) + 교차점(JUNCTION).
      *
-     * <p><b>코드가 실제 x와 안 맞는 항목이 있다.</b> JCT-9-*는 x=17, JCT-14-*는 x=30다 —
-     * V15·V16에서 창고동을 두 번 넓히며 연결로 간격만 벌리고 이름은 그대로 뒀다(마이그레이션
-     * 헤더 참고, FK 때문에 이름을 바꾸려면 layout_edges를 통째로 다시 넣어야 해서 위험만
-     * 커진다).
+     * <p>P32로 창고동 내부는 "좌우 스파인 + 밴드 12개 진입 노드"로 바뀌었다(D1) —
+     * {@code WH-B01-L}~{@code WH-B12-R}. 옛 JCT-4/9/14/19는 이 스파인에 자리를 내주고
+     * 없어졌다. PROD/QC 쪽 교차점은 무변경.
      */
     private static final Map<String, double[]> FALLBACK_NODES = Map.ofEntries(
-            // 창고동 1층 — 도크 4개가 좌하단 한 코너로 모였다(P29, V20).
-            Map.entry("WH-DOCK-1", new double[]{4, 19}),
-            Map.entry("WH-DOCK-2", new double[]{4, 20.5}),
-            Map.entry("WH-DOCK-3", new double[]{4, 21}),
-            Map.entry("WH-DOCK-4", new double[]{4, 23}),
-            Map.entry("WH-RECV", new double[]{17, 6}),
-            Map.entry("WH-PICK", new double[]{17, 13}),
-            Map.entry("WH-SHIP", new double[]{30, 21}),
+            // ---- 창고동 1층 — 좌우 스파인(수직) + 밴드 12개 진입 노드(P32) ----
+            Map.entry("WH-B01-L", new double[]{2, 4.00}),
+            Map.entry("WH-B01-R", new double[]{52, 4.00}),
+            Map.entry("WH-B02-L", new double[]{2, 9.70}),
+            Map.entry("WH-B02-R", new double[]{52, 9.70}),
+            Map.entry("WH-B03-L", new double[]{2, 15.40}),
+            Map.entry("WH-B03-R", new double[]{52, 15.40}),
+            Map.entry("WH-B04-L", new double[]{2, 21.10}),
+            Map.entry("WH-B04-R", new double[]{52, 21.10}),
+            Map.entry("WH-B05-L", new double[]{2, 26.80}),
+            Map.entry("WH-B05-R", new double[]{52, 26.80}),
+            Map.entry("WH-B06-L", new double[]{2, 32.50}),
+            Map.entry("WH-B06-R", new double[]{52, 32.50}),
+            Map.entry("WH-B07-L", new double[]{2, 38.20}),
+            Map.entry("WH-B07-R", new double[]{52, 38.20}),
+            Map.entry("WH-B08-L", new double[]{2, 43.90}),
+            Map.entry("WH-B08-R", new double[]{52, 43.90}),
+            Map.entry("WH-B09-L", new double[]{2, 49.60}),
+            Map.entry("WH-B09-R", new double[]{52, 49.60}),
+            Map.entry("WH-B10-L", new double[]{2, 55.30}),
+            Map.entry("WH-B10-R", new double[]{52, 55.30}),
+            Map.entry("WH-B11-L", new double[]{2, 61.00}),
+            Map.entry("WH-B11-R", new double[]{52, 61.00}),
+            Map.entry("WH-B12-L", new double[]{2, 66.70}),
+            Map.entry("WH-B12-R", new double[]{52, 66.70}),
+            // 우측 스파인이 게이트(y=9/18)와 만나는 접속점 — D1 게이트 좌표 무변경 요구사항.
+            Map.entry("WH-SPINE-R-GATE-U", new double[]{52, 9}),
+            Map.entry("WH-SPINE-R-GATE-L", new double[]{52, 18}),
+            // 기능 노드 — 입고·피킹·출하는 가까운 밴드 진입 노드 옆에.
+            Map.entry("WH-RECV", new double[]{2, 3.00}),
+            Map.entry("WH-PICK", new double[]{2, 33.50}),
+            Map.entry("WH-SHIP", new double[]{52, 65.70}),
+            // 엘리베이터 1층 — 좌표(30,13) 무변경(2·3층 샤프트와 같은 자리, D5).
             Map.entry("WH-ELEV-1F", new double[]{30, 13}),
-            // P30: 4번째 베이의 보조 출하장 — 순환 경로에 실제 주문을 태우는 진짜 목적지.
-            Map.entry("WH-SHIP-2", new double[]{41, 21}),
-            // P22: AMR ↔ AGV 게이트 — 창고동 벽 밖, 생산동 벽 앞의 중립 지대. P30으로
-            // 창고동 4번째 베이가 생긴 만큼(+13) 균일 이동(x=43→56).
+            // 충전 도크 8개 — 좌하단 코너(밴드12 아래) 클러스터(P29 패턴 재사용, D4로 4→8).
+            Map.entry("WH-DOCK-1", new double[]{2.0, 68.5}),
+            Map.entry("WH-DOCK-2", new double[]{3.5, 68.5}),
+            Map.entry("WH-DOCK-3", new double[]{5.0, 68.5}),
+            Map.entry("WH-DOCK-4", new double[]{6.5, 68.5}),
+            Map.entry("WH-DOCK-5", new double[]{2.0, 70.0}),
+            Map.entry("WH-DOCK-6", new double[]{3.5, 70.0}),
+            Map.entry("WH-DOCK-7", new double[]{5.0, 70.0}),
+            Map.entry("WH-DOCK-8", new double[]{6.5, 70.0}),
+            // P22: AMR ↔ AGV 게이트 — 창고동 벽 밖, 생산동 벽 앞의 중립 지대. P32에서도 무변경
+            // (우측 스파인이 y=9/18에서 그대로 접점을 만든다, D1).
             Map.entry("WH-GATE-U", new double[]{56, 9}),
             Map.entry("WH-GATE-L", new double[]{56, 18}),
             // P22: 생산동 쪽 AMR 충전 베이 — P30으로 균일 +13.
@@ -112,16 +144,8 @@ public class LocationRegistry {
             Map.entry("QC-IN", new double[]{97, 21}),
             Map.entry("QC-OUT", new double[]{97, 6}),
             // 통로·연결로 교차점 (P20) — 로봇이 정차하는 자리가 아니라 경로 그래프의 분기점.
-            // V21__warehouse_fourth_bay.sql과 같은 값.
-            Map.entry("JCT-4-U", new double[]{4, 9}),
-            Map.entry("JCT-4-L", new double[]{4, 18}),
-            Map.entry("JCT-9-U", new double[]{17, 9}),
-            Map.entry("JCT-9-L", new double[]{17, 18}),
-            Map.entry("JCT-14-U", new double[]{30, 9}),
-            Map.entry("JCT-14-L", new double[]{30, 18}),
-            // P30: 4번째 베이 연결로(옛 벽 자리, x=41).
-            Map.entry("JCT-19-U", new double[]{41, 9}),
-            Map.entry("JCT-19-L", new double[]{41, 18}),
+            // 창고동 내부 4개(JCT-4/9/14/19)는 P32로 스파인에 자리를 내주고 사라졌다.
+            // PROD/QC 쪽은 V22__warehouse_band_relayout.sql과 같은 값(무변경).
             Map.entry("JCT-27-U", new double[]{62, 9}),
             Map.entry("JCT-27-L", new double[]{62, 18}),
             Map.entry("JCT-34-U", new double[]{69, 9}),
@@ -139,37 +163,57 @@ public class LocationRegistry {
      * {@code {from, to, cost}} 3항. 양방향 취급은 로딩 시 자동으로 반대 방향도 추가한다.
      */
     private static final List<Object[]> FALLBACK_EDGES = List.of(
-            // 교차점 내부 수직(상단↔하단, 통로 사이)
-            new Object[]{"JCT-4-U", "JCT-4-L", 9.0}, new Object[]{"JCT-9-U", "JCT-9-L", 9.0},
-            new Object[]{"JCT-14-U", "JCT-14-L", 9.0}, new Object[]{"JCT-27-U", "JCT-27-L", 9.0},
+            // ---- 좌측 스파인 — 밴드 12개 진입 노드를 y순으로 잇는 수직 체인(P32, D1) ----
+            new Object[]{"WH-B01-L", "WH-B02-L", 5.7}, new Object[]{"WH-B02-L", "WH-B03-L", 5.7},
+            new Object[]{"WH-B03-L", "WH-B04-L", 5.7}, new Object[]{"WH-B04-L", "WH-B05-L", 5.7},
+            new Object[]{"WH-B05-L", "WH-B06-L", 5.7}, new Object[]{"WH-B06-L", "WH-B07-L", 5.7},
+            new Object[]{"WH-B07-L", "WH-B08-L", 5.7}, new Object[]{"WH-B08-L", "WH-B09-L", 5.7},
+            new Object[]{"WH-B09-L", "WH-B10-L", 5.7}, new Object[]{"WH-B10-L", "WH-B11-L", 5.7},
+            new Object[]{"WH-B11-L", "WH-B12-L", 5.7},
+            // ---- 우측 스파인 — 게이트 접속점 2개를 y순서대로 끼워 넣는다 ----
+            new Object[]{"WH-B01-R", "WH-SPINE-R-GATE-U", 5.0},
+            new Object[]{"WH-SPINE-R-GATE-U", "WH-B02-R", 0.7},
+            new Object[]{"WH-B02-R", "WH-B03-R", 5.7},
+            new Object[]{"WH-B03-R", "WH-SPINE-R-GATE-L", 2.6},
+            new Object[]{"WH-SPINE-R-GATE-L", "WH-B04-R", 3.1},
+            new Object[]{"WH-B04-R", "WH-B05-R", 5.7}, new Object[]{"WH-B05-R", "WH-B06-R", 5.7},
+            new Object[]{"WH-B06-R", "WH-B07-R", 5.7}, new Object[]{"WH-B07-R", "WH-B08-R", 5.7},
+            new Object[]{"WH-B08-R", "WH-B09-R", 5.7}, new Object[]{"WH-B09-R", "WH-B10-R", 5.7},
+            new Object[]{"WH-B10-R", "WH-B11-R", 5.7}, new Object[]{"WH-B11-R", "WH-B12-R", 5.7},
+            // 게이트 접속 — D1 계약 유지(WH-GATE-U/L 좌표 무변경).
+            new Object[]{"WH-SPINE-R-GATE-U", "WH-GATE-U", 4.0},
+            new Object[]{"WH-SPINE-R-GATE-L", "WH-GATE-L", 4.0},
+            // ---- 밴드 아이슬(가로) — D3에서 TrafficController가 배타 잠금을 거는 세그먼트 ----
+            new Object[]{"WH-B01-L", "WH-B01-R", 50.0}, new Object[]{"WH-B02-L", "WH-B02-R", 50.0},
+            new Object[]{"WH-B03-L", "WH-B03-R", 50.0}, new Object[]{"WH-B04-L", "WH-B04-R", 50.0},
+            new Object[]{"WH-B05-L", "WH-B05-R", 50.0}, new Object[]{"WH-B06-L", "WH-B06-R", 50.0},
+            new Object[]{"WH-B07-L", "WH-B07-R", 50.0}, new Object[]{"WH-B08-L", "WH-B08-R", 50.0},
+            new Object[]{"WH-B09-L", "WH-B09-R", 50.0}, new Object[]{"WH-B10-L", "WH-B10-R", 50.0},
+            new Object[]{"WH-B11-L", "WH-B11-R", 50.0}, new Object[]{"WH-B12-L", "WH-B12-R", 50.0},
+            // 교차점 내부 수직(상단↔하단, 통로 사이) — PROD/QC 쪽만(창고동은 스파인으로 대체).
+            new Object[]{"JCT-27-U", "JCT-27-L", 9.0},
             new Object[]{"JCT-34-U", "JCT-34-L", 9.0}, new Object[]{"JCT-41-U", "JCT-41-L", 9.0},
             new Object[]{"JCT-48-U", "JCT-48-L", 9.0}, new Object[]{"JCT-62-U", "JCT-62-L", 9.0},
-            // 통로(가로) — 인접 연결로 교차점끼리. 창고동 내부 두 구간(4~17, 17~30)은 13
-            // 그대로. P30으로 4번째 베이가 끼어들며 옛 JCT-14↔게이트 직결(13)이 JCT-14↔
-            // JCT-19(11)+JCT-19↔게이트(15)로 늘었다 — 물리적으로 베이 하나가 더 생겼으니
-            // 총비용도 실제로 늘어난다(P22의 "총비용 그대로" 패턴과 다르다).
-            new Object[]{"JCT-4-U", "JCT-9-U", 13.0}, new Object[]{"JCT-9-U", "JCT-14-U", 13.0},
-            new Object[]{"JCT-14-U", "JCT-19-U", 11.0}, new Object[]{"JCT-19-U", "WH-GATE-U", 15.0},
+            // 통로(가로) — PROD 내부(무변경). 창고동↔게이트는 스파인 접속 엣지로 대체됐다(위).
             new Object[]{"WH-GATE-U", "JCT-27-U", 6.0},
             new Object[]{"JCT-27-U", "JCT-34-U", 7.0},
             new Object[]{"JCT-34-U", "JCT-41-U", 7.0}, new Object[]{"JCT-41-U", "JCT-48-U", 7.0},
             new Object[]{"JCT-48-U", "JCT-62-U", 14.0},
-            new Object[]{"JCT-4-L", "JCT-9-L", 13.0}, new Object[]{"JCT-9-L", "JCT-14-L", 13.0},
-            new Object[]{"JCT-14-L", "JCT-19-L", 11.0}, new Object[]{"JCT-19-L", "WH-GATE-L", 15.0},
             new Object[]{"WH-GATE-L", "JCT-27-L", 6.0},
             new Object[]{"JCT-27-L", "JCT-34-L", 7.0},
             new Object[]{"JCT-34-L", "JCT-41-L", 7.0}, new Object[]{"JCT-41-L", "JCT-48-L", 7.0},
             new Object[]{"JCT-48-L", "JCT-62-L", 14.0},
-            // 명명된 노드 → 교차점. 도크 4개가 전부 JCT-4-L로 붙는다(P29 — 좌하단 코너로
-            // 모이며 넷 다 하단 통로 아래에 있다).
-            new Object[]{"WH-DOCK-1", "JCT-4-L", 1.0}, new Object[]{"WH-DOCK-2", "JCT-4-L", 2.5},
-            new Object[]{"WH-DOCK-3", "JCT-4-L", 3.0}, new Object[]{"WH-DOCK-4", "JCT-4-L", 5.0},
-            new Object[]{"WH-RECV", "JCT-9-U", 3.0},
-            new Object[]{"WH-PICK", "JCT-9-U", 4.0}, new Object[]{"WH-PICK", "JCT-9-L", 5.0},
-            new Object[]{"WH-SHIP", "JCT-14-L", 3.0},
-            new Object[]{"WH-ELEV-1F", "JCT-14-U", 4.0}, new Object[]{"WH-ELEV-1F", "JCT-14-L", 5.0},
-            // P30: 4번째 베이의 보조 출하장 — 순환 경로에 실제 주문을 태우는 진짜 목적지.
-            new Object[]{"WH-SHIP-2", "JCT-19-L", 3.0},
+            // 기능 노드 → 가장 가까운 스파인 진입 노드(P32). 엘리베이터는 (30,13)에 고정된
+            // 채라(D5) 스파인에서 멀어 비용이 크다.
+            new Object[]{"WH-RECV", "WH-B01-L", 1.0},
+            new Object[]{"WH-PICK", "WH-B06-L", 1.0},
+            new Object[]{"WH-SHIP", "WH-B12-R", 1.0},
+            new Object[]{"WH-ELEV-1F", "WH-B02-R", 25.3}, new Object[]{"WH-ELEV-1F", "WH-B03-R", 24.4},
+            // 충전 도크 8개 → 밴드12 좌측 진입(P32, D4).
+            new Object[]{"WH-DOCK-1", "WH-B12-L", 1.8}, new Object[]{"WH-DOCK-2", "WH-B12-L", 1.8},
+            new Object[]{"WH-DOCK-3", "WH-B12-L", 1.8}, new Object[]{"WH-DOCK-4", "WH-B12-L", 1.8},
+            new Object[]{"WH-DOCK-5", "WH-B12-L", 3.3}, new Object[]{"WH-DOCK-6", "WH-B12-L", 3.3},
+            new Object[]{"WH-DOCK-7", "WH-B12-L", 3.3}, new Object[]{"WH-DOCK-8", "WH-B12-L", 3.3},
             // P22: 생산동 AMR 충전 베이
             new Object[]{"PROD-DOCK-1", "JCT-27-U", 6.0}, new Object[]{"PROD-DOCK-2", "JCT-27-U", 4.0},
             new Object[]{"PROD-DOCK-3", "JCT-27-L", 3.0}, new Object[]{"PROD-DOCK-4", "JCT-27-L", 5.0},
@@ -198,14 +242,16 @@ public class LocationRegistry {
     private static final Pattern PICK_NODE_PATTERN = Pattern.compile("^WH-(?:PICK|\\d+F-P\\d+)$");
 
     /**
-     * 창고동 1층 안쪽 명명 노드(P22) — 도크·입고장·피킹존·출하장(P30: 보조 출하장 포함)·
-     * 엘리베이터 승강장. AMR은 이제 여기 못 들어간다({@code requiredPool}이 이 패턴이면
-     * AGV 풀을 준다). <b>{@code WH-GATE-*}는 일부러 뺐다</b> — 게이트는 AMR·AGV 둘 다의
-     * 경계 정차 자리라 항상 AMR 풀(일반 노드 처리)로 본다. 2·3층 노드({@code WH-2F-P1} 등)도
-     * 뺐다 — 범위 밖이라 계속 AMR이다(P21 D10).
+     * 창고동 1층 안쪽 명명 노드(P22) — 도크(P32로 4→8)·입고장·피킹존·출하장·엘리베이터
+     * 승강장. AMR은 이제 여기 못 들어간다({@code requiredPool}이 이 패턴이면 AGV 풀을
+     * 준다). <b>{@code WH-GATE-*}·{@code WH-B*}(밴드 진입 노드)는 일부러 뺐다</b> — 게이트는
+     * AMR·AGV 둘 다의 경계 정차 자리라 항상 AMR 풀(일반 노드 처리)로 보고, 밴드 진입 노드는
+     * 실제 주문의 출발지/목적지로 쓰인 적이 없는 순수 라우팅 경유점이라 예전 JCT-*와 같은
+     * 취급이다. 2·3층 노드({@code WH-2F-P1} 등)도 뺐다 — 범위 밖이라 계속 AMR이다(P21 D10).
+     * P30의 {@code WH-SHIP-2}는 P32로 은퇴했다(밴드 12개 전부가 이미 실제 목적지 노드).
      */
     private static final Pattern WH_1F_INTERIOR_PATTERN =
-            Pattern.compile("^WH-(?:DOCK-[1-4]|RECV|PICK|SHIP(?:-2)?|ELEV-1F)$");
+            Pattern.compile("^WH-(?:DOCK-[1-8]|RECV|PICK|SHIP|ELEV-1F)$");
 
     /** 창고동 1층 안쪽 명명 노드인가(P22) — {@link #WH_1F_INTERIOR_PATTERN} 참고. */
     public boolean isWarehouseFloor1Node(String code) {
@@ -213,22 +259,13 @@ public class LocationRegistry {
     }
 
     /**
-     * factory에서 못 받았을 때 쓰는 렉 폴백 — factory V21 마이그레이션 시드와 같은 값
-     * (72기: 1층 24 · 2층 24 · 3층 24, P28로 27→54, P30으로 54→72 증설). 렉 피더가
-     * factory 없이도 계속 취출 동작을 하려면 좌표가 있어야 한다({@code FALLBACK_NODES}와
-     * 같은 이유).
+     * factory에서 못 받았을 때 쓰는 렉 폴백 — factory V22 마이그레이션 시드와 같은 값
+     * (912기: 1층 864 · 2층 24 · 3층 24). 렉 피더가 factory 없이도 계속 취출 동작을 하려면
+     * 좌표가 있어야 한다({@code FALLBACK_NODES}와 같은 이유). 1층 864개는 리터럴로 나열하지
+     * 않고 {@link #buildFallbackRacks()}가 {@code RackMap}과 같은 공식(밴드 12 × 열 72)으로
+     * 생성한다 — 이 리스트에는 2·3층(D5, 무변경)만 남는다.
      */
     private static final List<Object[]> FALLBACK_RACKS = List.of(
-            new Object[]{"WH-1F-R01", (short) 1, 8.0, 4.0, "V"}, new Object[]{"WH-1F-R02", (short) 1, 21.0, 4.0, "V"},
-            new Object[]{"WH-1F-R03", (short) 1, 33.5, 4.0, "V"}, new Object[]{"WH-1F-R04", (short) 1, 8.0, 13.5, "V"},
-            new Object[]{"WH-1F-R05", (short) 1, 21.0, 13.5, "V"}, new Object[]{"WH-1F-R06", (short) 1, 33.5, 13.5, "V"},
-            new Object[]{"WH-1F-R07", (short) 1, 8.0, 22.0, "V"}, new Object[]{"WH-1F-R08", (short) 1, 21.0, 22.0, "V"},
-            new Object[]{"WH-1F-R09", (short) 1, 33.5, 22.0, "V"},
-            new Object[]{"WH-1F-R10", (short) 1, 13.0, 4.0, "V"}, new Object[]{"WH-1F-R11", (short) 1, 26.0, 4.0, "V"},
-            new Object[]{"WH-1F-R12", (short) 1, 38.5, 4.0, "V"}, new Object[]{"WH-1F-R13", (short) 1, 13.0, 13.5, "V"},
-            new Object[]{"WH-1F-R14", (short) 1, 26.0, 13.5, "V"}, new Object[]{"WH-1F-R15", (short) 1, 38.5, 13.5, "V"},
-            new Object[]{"WH-1F-R16", (short) 1, 13.0, 22.0, "V"}, new Object[]{"WH-1F-R17", (short) 1, 26.0, 22.0, "V"},
-            new Object[]{"WH-1F-R18", (short) 1, 38.5, 22.0, "V"},
             new Object[]{"WH-2F-R01", (short) 2, 8.0, 4.0, "V"}, new Object[]{"WH-2F-R02", (short) 2, 21.0, 4.0, "V"},
             new Object[]{"WH-2F-R03", (short) 2, 33.5, 4.0, "V"}, new Object[]{"WH-2F-R04", (short) 2, 8.0, 13.5, "V"},
             new Object[]{"WH-2F-R05", (short) 2, 21.0, 13.5, "V"}, new Object[]{"WH-2F-R06", (short) 2, 33.5, 13.5, "V"},
@@ -249,10 +286,7 @@ public class LocationRegistry {
             new Object[]{"WH-3F-R14", (short) 3, 26.0, 13.5, "V"}, new Object[]{"WH-3F-R15", (short) 3, 38.5, 13.5, "V"},
             new Object[]{"WH-3F-R16", (short) 3, 13.0, 22.0, "V"}, new Object[]{"WH-3F-R17", (short) 3, 26.0, 22.0, "V"},
             new Object[]{"WH-3F-R18", (short) 3, 38.5, 22.0, "V"},
-            // P30: 4번째 베이(x=45/50) — 18기 증설.
-            new Object[]{"WH-1F-R19", (short) 1, 45.0, 4.0, "V"}, new Object[]{"WH-1F-R20", (short) 1, 50.0, 4.0, "V"},
-            new Object[]{"WH-1F-R21", (short) 1, 45.0, 13.5, "V"}, new Object[]{"WH-1F-R22", (short) 1, 50.0, 13.5, "V"},
-            new Object[]{"WH-1F-R23", (short) 1, 45.0, 22.0, "V"}, new Object[]{"WH-1F-R24", (short) 1, 50.0, 22.0, "V"},
+            // P30: 4번째 베이(x=45/50) — 18기 증설(2·3층만, 1층은 P32로 밴드 구조에 흡수됐다).
             new Object[]{"WH-2F-R19", (short) 2, 45.0, 4.0, "V"}, new Object[]{"WH-2F-R20", (short) 2, 50.0, 4.0, "V"},
             new Object[]{"WH-2F-R21", (short) 2, 45.0, 13.5, "V"}, new Object[]{"WH-2F-R22", (short) 2, 50.0, 13.5, "V"},
             new Object[]{"WH-2F-R23", (short) 2, 45.0, 22.0, "V"}, new Object[]{"WH-2F-R24", (short) 2, 50.0, 22.0, "V"},
@@ -483,6 +517,43 @@ public class LocationRegistry {
         return lowerAisleY;
     }
 
+    /**
+     * 이 좌표가 속한 창고동 밴드의 배타 잠금 세그먼트 ID(P32 D3) — {@code null}이면 어느
+     * 밴드에도 속하지 않는다(밴드 12개 범위 밖, 예: 게이트 근처).
+     *
+     * <p><b>왜 필요한가.</b> AGV 이동은 {@code LaneGraph}를 안 타서(P21 D2, {@code
+     * OrderService#planLeg}) 그래프 엣지를 지나며 자동으로 구간을 예약하는 매커니즘이
+     * AGV에는 애초에 적용되지 않는다 — 밴드 아이슬을 그래프 엣지로만 만들어 두면 D3가
+     * 요구하는 "밴드당 AGV 1대"가 AMR 쪽에만(즉 아무도 안 쓰는 경로에만) 적용되고 정작
+     * 밴드를 실제로 오가는 AGV에는 효과가 없다. 그래서 AGV 레그가 이 메서드로 시작점·
+     * 도착점이 속한 밴드를 직접 찾아 {@link com.pixelfleet.traffic.TrafficController}에
+     * 명시적으로 예약을 건다({@code OrderService#planLeg} 참고) — 세그먼트 ID 형식은
+     * {@code LaneGraph.horizontalAisle}과 똑같이 맞춰서({@code "A{y}:2-52"}) 그래프 쪽
+     * 예약과 문자열이 우연히라도 갈리지 않게 한다.
+     *
+     * <p>정확한 물리적 경계(렉 발자국)까지는 안 따진다 — 가장 가까운 밴드 아이슬 y가
+     * {@code BAND_PITCH} 이내면 그 밴드 소속으로 본다(도크·엘리베이터처럼 밴드 열 사이에
+     * 낀 지점도 가장 가까운 밴드에 자연스럽게 포함된다). 그보다 멀면(게이트 근처 등)
+     * {@code null} — 어차피 그 구간은 밴드 통로가 아니다.
+     */
+    public String bandSegmentFor(double[] pos) {
+        int nearestBand = -1;
+        double bestDy = Double.MAX_VALUE;
+        for (int band = 1; band <= BAND_COUNT; band++) {
+            double aisleY = BAND1_AISLE_Y + (band - 1) * BAND_PITCH;
+            double dy = Math.abs(pos[1] - aisleY);
+            if (dy < bestDy) {
+                bestDy = dy;
+                nearestBand = band;
+            }
+        }
+        if (nearestBand < 0 || bestDy > BAND_PITCH) {
+            return null;
+        }
+        double aisleY = BAND1_AISLE_Y + (nearestBand - 1) * BAND_PITCH;
+        return String.format("A%.0f:2-52", aisleY);
+    }
+
     // ---- 렉(P21) ----
 
     public boolean isRackCode(String code) {
@@ -546,6 +617,16 @@ public class LocationRegistry {
         return best;
     }
 
+    /** P32 밴드 구조 상수 — factory V22 마이그레이션·robot-sim {@code RackMap}과 반드시 같아야 한다. */
+    private static final int BAND_COUNT = 12;
+    private static final int RACKS_PER_BAND = 72;
+    private static final double LEFT_SPINE_X = 2.0;
+    private static final double COL_OFFSET = 1.75;
+    private static final double COL_PITCH = 1.3;
+    private static final double BAND1_AISLE_Y = 4.0;
+    private static final double BAND_PITCH = 5.7;
+    private static final double ROW_OFFSET_Y = 1.75;
+
     private static Map<String, RackInfo> buildFallbackRacks() {
         Map<String, RackInfo> result = new HashMap<>();
         for (Object[] row : FALLBACK_RACKS) {
@@ -555,6 +636,18 @@ public class LocationRegistry {
             double y = (double) row[3];
             String orientation = (String) row[4];
             result.put(code, new RackInfo(code, floor, new double[]{x, y}, orientation));
+        }
+        // 창고동 1층 864기(P32) — factory V22의 생성 공식과 정확히 같아야 한다(열 1~36=앞줄,
+        // 37~72=뒷줄, orientation='VD').
+        for (int band = 1; band <= BAND_COUNT; band++) {
+            double aisleY = BAND1_AISLE_Y + (band - 1) * BAND_PITCH;
+            for (int col = 1; col <= RACKS_PER_BAND; col++) {
+                int colInRow = (col - 1) % 36;
+                double x = LEFT_SPINE_X + COL_OFFSET + colInRow * COL_PITCH;
+                double y = col <= 36 ? aisleY - ROW_OFFSET_Y : aisleY + ROW_OFFSET_Y;
+                String code = String.format("WH-1F-B%02d-R%02d", band, col);
+                result.put(code, new RackInfo(code, (short) 1, new double[]{x, y}, "VD"));
+            }
         }
         return result;
     }

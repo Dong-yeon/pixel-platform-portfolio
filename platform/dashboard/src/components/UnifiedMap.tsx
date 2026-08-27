@@ -40,6 +40,12 @@ const STALE_FADE_MINUTES = 15
 /** 통로가 벽을 지나는 자리는 출입구다 — 그만큼 벽을 끊어 그린다. */
 const DOOR_HALF_HEIGHT = 1.1
 
+/**
+ * 한 층의 렉 수가 이걸 넘으면 RackShape를 단순화한다(P32 — 창고동 1층 864기).
+ * 기존 최대 밀도(2·3층 24기)보다 훨씬 높은 값이라 옛 층은 전혀 영향받지 않는다.
+ */
+const RACK_LOD_THRESHOLD = 150
+
 const ROBOT_COLOR: Record<RobotStatus, string> = {
   IDLE: '#27ae60',
   MOVING: '#2d7ff9',
@@ -176,6 +182,11 @@ export function UnifiedMap({
   const floorTasks = activeTasks.filter((t) => t.floorNo === view.floorNo)
   const qcBuilding = layout.buildings.find((b) => b.buildingCode === 'QC') ?? null
 
+  // 보고 있는 층의 렉만(위층은 같은 자리를 쓴다). P32로 창고동 1층이 864기가 되면서
+  // 이 목록이 커지면 RackShape를 단순화한다(성능, 아래 렌더링 참고).
+  const floorRacks = layout.racks.filter((rack) => rack.floorNo === view.floorNo)
+  const simplifiedRacks = floorRacks.length > RACK_LOD_THRESHOLD
+
   // 건물을 고르면 그 외곽으로 확대한다. 여백을 둬 벽이 잘리지 않게.
   const pad = 1.5
   const viewWidth = selected ? selected.width + pad * 2 : width
@@ -224,18 +235,21 @@ export function UnifiedMap({
         <line key={`aisle-${y}`} x1={2} y1={y} x2={width - 2} y2={y} className="umap-aisle" />
       ))}
 
-      {/* ---- 렉 ---- 보고 있는 층의 것만(위층은 같은 자리를 쓴다) */}
-      {layout.racks
-        .filter((rack) => rack.floorNo === view.floorNo)
-        .map((rack) => (
-          <RackShape
-            key={rack.rackCode}
-            rack={rack}
-            quantity={rackStock[rack.rackCode] ?? 0}
-            pallets={rackPallets[rack.rackCode] ?? []}
-            active={activeRackCodes.has(rack.rackCode)}
-          />
-        ))}
+      {/* ---- 렉 ---- 보고 있는 층의 것만(위층은 같은 자리를 쓴다). P32로 창고동 1층이
+             864기가 되면서, 렉마다 칸 단위 격자(cols×levels)를 전부 그리면 SVG 노드가
+             수천 개로 불어나 렌더링이 무거워진다 — 밀도가 이 문턱을 넘으면(RACK_LOD_THRESHOLD)
+             칸 세부묘사·라벨을 생략한 단순 렉으로 낮춘다(RackShape의 simplified). 툴팁은
+             그대로라 코드·재고는 hover로 여전히 보인다. */}
+      {floorRacks.map((rack) => (
+        <RackShape
+          key={rack.rackCode}
+          rack={rack}
+          quantity={rackStock[rack.rackCode] ?? 0}
+          pallets={rackPallets[rack.rackCode] ?? []}
+          active={activeRackCodes.has(rack.rackCode)}
+          simplified={simplifiedRacks}
+        />
+      ))}
 
       {/* ---- AMR 이동 경로 ---- 설비/로봇보다 아래에 깔린다.
              **앞으로 갈 길만 그린다.** 로봇이 아직 짐을 싣지 않았으면 목적지로 직행하는 게
@@ -566,7 +580,7 @@ function BuildingNameplate({ x, y, scale, text }: { x: number; y: number; scale:
  * "바닥부터 쌓는다"는 창고 직관을 따른다.
  */
 function RackShape({
-  rack, quantity, pallets = [], active = false,
+  rack, quantity, pallets = [], active = false, simplified = false,
 }: {
   rack: LayoutRack
   quantity: number
@@ -574,13 +588,62 @@ function RackShape({
   pallets?: Pallet[]
   /** 지금 AGV가 이 렉에서 취출 중인가(P21) — 실제 진행 중인 주문 근거만(지도 시각 규칙). */
   active?: boolean
+  /**
+   * P32 — 한 층에 렉이 아주 많을 때(창고동 1층 864기) 칸 단위 격자·라벨을 생략한다
+   * (RACK_LOD_THRESHOLD, UnifiedMap 참고). 툴팁은 그대로라 hover로는 여전히 코드·재고가
+   * 보인다 — "안 보이게" 지운 게 아니라 "한눈에 다 그리기엔 너무 잘다"는 판단이다.
+   */
+  simplified?: boolean
 }) {
   const ratio = rack.capacityQty > 0 ? Math.min(1, quantity / rack.capacityQty) : 0
-  const vertical = rack.orientation !== 'H'
-  const w = vertical ? 1.6 : 4.6
-  const h = vertical ? 4.4 : 1.6
+  // 'V'/'H' = 기존 성긴 렉(2·3층, P28~P30). 'VD'/'HD' = P32 창고동 1층 밀집 렉 —
+  // 발자국이 훨씬 작다(실측 밀도를 내려면 렉 하나하나가 작아야 한다). 기존 값은
+  // 글자 하나도 안 바뀌었다 — 새 방향만 추가한다.
+  const dense = rack.orientation === 'VD' || rack.orientation === 'HD'
+  const vertical = rack.orientation === 'V' || rack.orientation === 'VD'
+  const w = dense ? (vertical ? 1.0 : 1.6) : (vertical ? 1.6 : 4.6)
+  const h = dense ? (vertical ? 1.6 : 1.0) : (vertical ? 4.4 : 1.6)
   const x = rack.posX - w / 2
   const y = rack.posY - h / 2
+  const filledColor = rackFill(ratio)
+
+  // 렉 코드에서 짧은 번호만 뽑는다(WH-1F-R01→R01, WH-1F-B01-R01→B01-R01) — 풀네임은
+  // title 툴팁에 그대로 남긴다.
+  const shortLabel = rack.rackCode.replace(/^WH-\d+F-/, '')
+
+  const title = (
+    <title>
+      {`${rack.rackCode} · ${quantity}/${rack.capacityQty} EA (${Math.round(ratio * 100)}%)`
+        + `${active ? ' · AGV 취출 중' : ''}`
+        // P23 — 로봇이 실제로 옮기는 단위는 EA가 아니라 파렛트 한 장이다. 적재율 %만으론
+        // "몇 장이 있는지·각각 뭘 실었는지"가 안 보여서 파렛트별로 한 줄씩 덧붙인다.
+        + (pallets.length > 0
+          ? '\n' + pallets
+              .map((p) => `  ${p.pltCode}: ${p.itemCode ?? '?'} ${p.quantity ?? '?'}개`
+                + (p.status === 'IN_TRANSIT' ? ' (운송 중)' : ''))
+              .join('\n')
+          : '')}
+    </title>
+  )
+
+  if (simplified) {
+    // 칸 단위 격자 대신 "아래부터 ratio만큼 채운 막대" 하나로 — 노드 수를 렉당 7~8개에서
+    // 3개(프레임·채움·title)로 줄인다. 라벨도 뺀다 — 렉 수백 개가 한 화면에 있으면
+    // 글자가 겹쳐 어차피 못 읽는다(hover 툴팁으로 대신한다).
+    const filledH = h * ratio
+    return (
+      <g className={`umap-rack-g${active ? ' servicing' : ''}`}>
+        <rect x={x} y={y} width={w} height={h} rx={0.1} className="umap-rack-frame" />
+        {ratio > 0 && (
+          <rect
+            x={x} y={y + (h - filledH)} width={w} height={filledH}
+            fill={filledColor} className="umap-rack-cell"
+          />
+        )}
+        {title}
+      </g>
+    )
+  }
 
   const cols = Math.max(1, rack.columnsCount)
   const levels = Math.max(1, rack.levelsCount)
@@ -588,7 +651,6 @@ function RackShape({
   const filledCells = Math.round(ratio * totalCells)
   const cellW = w / cols
   const cellH = h / levels
-  const filledColor = rackFill(ratio)
 
   // 아래 단(level 0)부터, 한 단 안에서는 왼쪽부터 채운다.
   const cells: { cx: number; cy: number; filled: boolean }[] = []
@@ -599,11 +661,6 @@ function RackShape({
       seq++
     }
   }
-
-  // 렉 코드에서 "R01" 같은 짧은 번호만 뽑는다 — 풀네임(WH-1F-R01)은 title 툴팁에 그대로
-  // 남긴다. 라벨이 없으면 27개 렉이 색만 다른 똑같은 막대로 보여 "몇 번 렉인지" 한눈에
-  // 셀 수가 없다(사용자 피드백: "렉들이 덩어리로 보인다, 렉 하나가 개수로 있어야 할 것 같다").
-  const shortLabel = rack.rackCode.replace(/^WH-\d+F-/, '')
 
   return (
     <g className={`umap-rack-g${active ? ' servicing' : ''}`}>
@@ -620,18 +677,7 @@ function RackShape({
       <text x={rack.posX} y={y + h + 0.9} textAnchor="middle" className="umap-rack-label">
         {shortLabel}
       </text>
-      <title>
-        {`${rack.rackCode} · ${quantity}/${rack.capacityQty} EA (${Math.round(ratio * 100)}%) · `
-          + `${cols}열 ${levels}단 (${filledCells}/${totalCells}칸)${active ? ' · AGV 취출 중' : ''}`
-          // P23 — 로봇이 실제로 옮기는 단위는 EA가 아니라 파렛트 한 장이다. 적재율 %만으론
-          // "몇 장이 있는지·각각 뭘 실었는지"가 안 보여서 파렛트별로 한 줄씩 덧붙인다.
-          + (pallets.length > 0
-            ? '\n' + pallets
-                .map((p) => `  ${p.pltCode}: ${p.itemCode ?? '?'} ${p.quantity ?? '?'}개`
-                  + (p.status === 'IN_TRANSIT' ? ' (운송 중)' : ''))
-                .join('\n')
-            : '')}
-      </title>
+      {title}
     </g>
   )
 }

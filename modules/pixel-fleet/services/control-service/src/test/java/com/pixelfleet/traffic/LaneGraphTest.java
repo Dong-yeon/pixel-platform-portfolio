@@ -26,51 +26,46 @@ class LaneGraphTest {
     private final LaneGraph laneGraph = new LaneGraph(locations, obstacles);
 
     @Test
-    void 다른_건물_노드간_경로는_옛_LaneGraph_계산값과_비용이_일치한다() {
-        // WH-DOCK-1이 있던 자리(4,3) -> PROD-A1(62,6). P30으로 창고동에 4번째 베이가
-        // 생기며(연결로 41) 생산동은 그만큼(+13) 밀렸다 — 코드는 그대로(JCT-9-*, JCT-14-*,
-        // JCT-27-* 등)라 실제 x만 다르다.
-        // addVertical(4,3,9)=6 + addAisle(4→17→30→41→56→62)=13+13+11+15+6=58
-        //   + addVertical(62,9,6)=3 = 67.
-        // (30↔62 구간은 4번째 베이 연결로(41)와 게이트(56)를 거친다 — 11+15+6=32,
-        // 물리적으로 베이 하나가 더 생겼으니 P22의 "총비용 그대로" 패턴과 달리 실제로 늘어난다.)
-        RoutePlan plan = laneGraph.plan(new double[]{4, 3}, new double[]{62, 6});
+    void 다른_건물_노드간_경로는_실제_계산값과_비용이_일치한다() {
+        // P32 — 창고동 내부가 좌우 스파인 + 밴드 12개로 바뀌었다. WH-RECV(2,3)는 좌측
+        // 스파인의 밴드1 진입 노드(WH-B01-L)에 붙어 있고, 좌→우 스파인을 건너려면 밴드
+        // 아이슬(D3에서 배타 잠금을 거는 그 세그먼트, 비용 50) 하나를 반드시 타야 한다.
+        // WH-RECV→WH-B01-L(1) → 밴드1 아이슬(50) → WH-B01-R→게이트접속(5) →
+        // 접속→WH-GATE-U(4) → WH-GATE-U→JCT-27-U(6) → JCT-27-U→PROD-A1(3) = 69.
+        RoutePlan plan = laneGraph.plan(locations.resolve("WH-RECV"), new double[]{62, 6});
 
-        assertThat(plan.cost()).isEqualTo(67.0); // P20-5 — 배차 정책이 쓰는 그래프 비용
-        assertThat(totalCost(plan.waypoints(), new double[]{4, 3})).isEqualTo(67.0);
-        assertThat(plan.waypoints()).containsExactly(
-                new double[]{4, 9}, new double[]{62, 9}, new double[]{62, 6});
-        assertThat(plan.segments()).containsExactlyInAnyOrder(
-                "V:4:top", "AU:4-17", "AU:17-30", "AU:30-41", "AU:41-56", "AU:56-62", "V:62:top");
+        assertThat(plan.cost()).isEqualTo(69.0); // P20-5 — 배차 정책이 쓰는 그래프 비용
+        assertThat(totalCost(plan.waypoints(), locations.resolve("WH-RECV"))).isEqualTo(69.0);
+        assertThat(plan.segments()).contains("A4:2-52"); // 밴드1 아이슬 — D3 배타 잠금 대상
     }
 
     @Test
-    void 이동중인_로봇의_실좌표에서_출발해도_통로꺾인점의_x는_로봇의_실제_x다() {
-        // 로봇이 (20,5)에 있다 — 어느 노드도 아닌 임의의 실시간 좌표. 가장 가까운 연결로는
-        // 17이다(|20-17|=3 < |20-30|=10). 목적지는 QC-OUT(P30에서 97,6로 이동).
+    void 이동중인_로봇의_실좌표에서_출발해도_밴드_아이슬_세그먼트가_밴드마다_구분된다() {
+        // 로봇이 (2,6)에 있다 — 어느 노드도 아닌 임의의 실시간 좌표. 좌측 스파인(x=2) 위지만
+        // 밴드1 진입(y=4.0)보다 밴드2 진입(y=9.7)에 진입점 탐색이 더 가깝다고 본다(원래
+        // 로직이 "가상 좌표보다 위에 있는 가장 가까운 노드"를 우선한다).
         //
-        // 연결로 17에 WH-RECV(17,6)가 얹혀 있다 — 진입점 탐색이 "이 연결로 위에서
-        // 가상 좌표(y=5)보다 위에 있는 가장 가까운 노드"를 찾는데, 그게 교차점(JCT-9-U,
-        // y=9)이 아니라 WH-RECV(y=6)다. 그래서 경로가 가상 좌표 → WH-RECV → JCT-9-U를
-        // 실제로 거친다(비용은 1+3=4로, 교차점에 바로 이어졌을 때의 |5-9|=4와 우연히 같다).
-        RoutePlan plan = laneGraph.plan(new double[]{20, 5}, new double[]{97, 6});
+        // 핵심 검증: 밴드2 아이슬 세그먼트("A10:2-52")가 밴드1 아이슬("A4:2-52")과 다른
+        // 문자열이어야 한다 — 옛 코드는 AU/AL 두 버킷뿐이라 서로 다른 밴드가 같은 세그먼트로
+        // 뭉쳐 잠기는 버그가 있었다(이번에 고침).
+        RoutePlan plan = laneGraph.plan(new double[]{2, 6}, new double[]{97, 6});
 
-        assertThat(plan.waypoints()).containsExactly(
-                new double[]{20, 6}, new double[]{17, 9}, new double[]{97, 9}, new double[]{97, 6});
-        assertThat(plan.segments()).contains("V:17:top", "V:97:top");
-        assertThat(totalCost(plan.waypoints(), new double[]{20, 5})).isEqualTo(90.0);
+        assertThat(plan.segments()).contains("A10:2-52");
+        assertThat(plan.segments()).doesNotContain("A4:2-52");
+        assertThat(plan.waypoints()).contains(new double[]{97, 6});
     }
 
     @Test
-    void 같은_연결로의_다른_명명노드로는_교차점을_거치지_않고_직행한다() {
-        // WH-DOCK-1(4,19)과 WH-DOCK-2(4,20.5) 사이(P29 — 도크 4개가 좌하단 코너로
-        // 모였다) — 둘 다 같은 연결로 위, 교차점(y=18)보다 훨씬 가깝다. 명명 노드가
-        // 교차점에만 연결돼 있어도(P20-1 데이터), 진입점 탐색이 같은 연결로의 가장
-        // 가까운 이웃(교차점이 아니라 다른 명명 노드일 수도 있음)을 우선 찾아야 한다.
-        RoutePlan plan = laneGraph.plan(new double[]{4, 20}, locations.resolve("WH-DOCK-2"));
+    void 같은_밴드_진입_노드를_공유하는_도크끼리는_그_노드를_거쳐_이어진다() {
+        // 충전 도크 8개(P32, D4)는 전부 밴드12 좌측 진입 노드(WH-B12-L) 하나에만 붙어
+        // 있다 — 옛 4베이 시절처럼 도크끼리 같은 연결로 위에서 교차점 없이 바로 이어지던
+        // 배치와 달리, 이제는 별 모양(star) 토폴로지라 항상 WH-B12-L을 거친다.
+        RoutePlan plan = laneGraph.plan(locations.resolve("WH-DOCK-1"), locations.resolve("WH-DOCK-5"));
 
-        assertThat(plan.waypoints()).containsExactly(new double[]{4, 20.5});
-        assertThat(totalCost(plan.waypoints(), new double[]{4, 20})).isEqualTo(0.5);
+        assertThat(plan.waypoints()).contains(locations.resolve("WH-DOCK-5"));
+        // WH-DOCK-1→WH-B12-L(1.8) + WH-B12-L→WH-DOCK-5(3.3) = 5.1(부동소수 오차 허용).
+        assertThat(totalCost(plan.waypoints(), locations.resolve("WH-DOCK-1")))
+                .isCloseTo(5.1, org.assertj.core.data.Offset.offset(1e-9));
     }
 
     @Test
@@ -84,9 +79,10 @@ class LaneGraphTest {
 
     @Test
     void segmentAt_통로위에서는_AU_AL_구간을_돌려준다() {
-        // x=20은 이제 연결로 17과 30 사이다(V16 — V15 때는 13과 22 사이였다).
-        assertThat(laneGraph.segmentAt(20, 9)).isEqualTo("AU:17-30");
-        assertThat(laneGraph.segmentAt(20, 18)).isEqualTo("AL:17-30");
+        // x=72는 생산동 연결로 69(JCT-34)와 76(JCT-41) 사이 — P32로 창고동 내부가
+        // 바뀌어도 생산동 쪽은 무변경이라 그대로다.
+        assertThat(laneGraph.segmentAt(72, 9)).isEqualTo("AU:69-76");
+        assertThat(laneGraph.segmentAt(72, 18)).isEqualTo("AL:69-76");
     }
 
     @Test
@@ -98,17 +94,17 @@ class LaneGraphTest {
 
     @Test
     void 엣지가_막히면_그_엣지를_안_쓰고_다른_길로_우회한다() {
-        // WH-DOCK-1이 있던 자리 -> PROD-A1의 정상 경로(비용 67)는 상단 통로의 AU:56-62
-        // 구간(게이트→JCT-27)을 지난다. 게이트 안쪽(WH-GATE-U↔JCT-27-U)을 막으면 하단
-        // 통로를 거쳐서라도(더 길어도) 도착해야 한다 — 아예 못 가면 안 된다.
-        when(obstacles.isBlocked(LaneGraph.canonicalEdgeId("WH-GATE-U", "JCT-27-U"))).thenReturn(true);
+        // WH-RECV -> PROD-A1의 정상 경로(비용 69)는 상단 게이트 접속(WH-SPINE-R-GATE-U↔
+        // WH-GATE-U)을 지난다. 그 구간을 막으면 하단 게이트로라도(더 길어도) 도착해야
+        // 한다 — 아예 못 가면 안 된다.
+        when(obstacles.isBlocked(LaneGraph.canonicalEdgeId("WH-SPINE-R-GATE-U", "WH-GATE-U"))).thenReturn(true);
 
-        RoutePlan plan = laneGraph.plan(new double[]{4, 3}, new double[]{62, 6});
+        RoutePlan plan = laneGraph.plan(locations.resolve("WH-RECV"), new double[]{62, 6});
 
-        assertThat(plan.segments()).doesNotContain("AU:56-62");
+        assertThat(plan.segments()).doesNotContain("AU:52-56");
         assertThat(plan.waypoints()).contains(new double[]{62, 6}); // 그래도 목적지엔 도달한다
-        assertThat(plan.cost()).isGreaterThan(67.0); // P20-5 배차 비교가 이 값을 쓴다
-        assertThat(totalCost(plan.waypoints(), new double[]{4, 3})).isGreaterThan(67.0);
+        assertThat(plan.cost()).isGreaterThan(69.0); // P20-5 배차 비교가 이 값을 쓴다
+        assertThat(totalCost(plan.waypoints(), locations.resolve("WH-RECV"))).isGreaterThan(69.0);
     }
 
     @Test
@@ -117,15 +113,16 @@ class LaneGraphTest {
         // 그 엣지 하나로 국한되는지 확인 — 옆 라인까지 통째로 못 쓰게 되면 그건 버그다).
         when(obstacles.isBlocked(LaneGraph.canonicalEdgeId("JCT-34-U", "JCT-41-U"))).thenReturn(true);
 
-        RoutePlan plan = laneGraph.plan(new double[]{4, 3}, new double[]{62, 6});
+        RoutePlan plan = laneGraph.plan(locations.resolve("WH-RECV"), new double[]{62, 6});
 
-        assertThat(totalCost(plan.waypoints(), new double[]{4, 3})).isEqualTo(67.0);
+        assertThat(totalCost(plan.waypoints(), locations.resolve("WH-RECV"))).isEqualTo(69.0);
     }
 
     @Test
     void canonicalEdgeId는_방향과_무관하게_같다() {
-        assertThat(LaneGraph.canonicalEdgeId("JCT-14-U", "JCT-27-U"))
-                .isEqualTo(LaneGraph.canonicalEdgeId("JCT-27-U", "JCT-14-U"));
+        // 순수 문자열 정규화 로직이라 두 인자가 실제 그래프 노드일 필요는 없다.
+        assertThat(LaneGraph.canonicalEdgeId("WH-B01-L", "WH-B01-R"))
+                .isEqualTo(LaneGraph.canonicalEdgeId("WH-B01-R", "WH-B01-L"));
     }
 
     // ---- P25: 통로폭 강제 ----
@@ -153,10 +150,10 @@ class LaneGraphTest {
         // "새 loaded 매개변수가 무제한 엣지에서는 실질적으로 아무것도 안 바꾼다"만 증명한다
         // (설계 근거: docs/p25-robot-spec-routing-design.md 6절) — 실제 2000mm 시드에서도
         // 950/1400보다 넉넉히 크므로 같은 결론이 성립한다(D1 근거, 별도 통합 테스트는 안 둔다).
-        RoutePlan unloaded = laneGraph.plan(new double[]{4, 3}, new double[]{62, 6}, false);
-        RoutePlan loaded = laneGraph.plan(new double[]{4, 3}, new double[]{62, 6}, true);
+        RoutePlan unloaded = laneGraph.plan(locations.resolve("WH-RECV"), new double[]{62, 6}, false);
+        RoutePlan loaded = laneGraph.plan(locations.resolve("WH-RECV"), new double[]{62, 6}, true);
 
-        assertThat(loaded.cost()).isEqualTo(unloaded.cost()).isEqualTo(67.0);
+        assertThat(loaded.cost()).isEqualTo(unloaded.cost()).isEqualTo(69.0);
         assertThat(loaded.segments()).isEqualTo(unloaded.segments());
     }
 

@@ -26,9 +26,11 @@ import org.junit.jupiter.api.Test;
  * 없이 즉시 완료된다 — 그래서 코드 집합의 일치는 반드시 지켜야 한다.
  *
  * <p><b>마스터가 여러 마이그레이션에 걸쳐 있다.</b> V12가 원본 27기, V19(P28)가 추가
- * 27기, V21(P30)이 4번째 베이 18기(기존 렉은 V19/V21에서 자리만 옮기고 INSERT는 안
- * 한다 — 그래서 코드 집합은 각 파일의 INSERT문만 보면 된다, UPDATE문은 이 정규식에
- * 안 걸린다).
+ * 27기, V21(P30)이 4번째 베이 18기, V22(P32)가 창고동 <b>1층만</b> 전면 재발번(864기,
+ * {@code WH-1F-B01-R01}~ 형태)했다. V12/V19/V21에 있던 옛 1층 코드({@code WH-1F-R\d+})는
+ * V22가 대체했으므로 이 테스트에서 제외한다 — 파일 텍스트 자체는 그대로 남아 있지만
+ * (과거 마이그레이션은 안 고친다, P20 이후 관행) DB에는 더 이상 없는 행이다. 2·3층 코드
+ * (WH-2F-R*, WH-3F-R*)는 D5(무변경)라 V12/V19/V21에서 그대로 유효하다.
  */
 class RackMapLayoutConsistencyTest {
 
@@ -38,11 +40,16 @@ class RackMapLayoutConsistencyTest {
             Path.of("..", "..", "pixel-factory", "services", "oee-service",
                     "src", "main", "resources", "db", "migration", "V19__more_warehouse_racks.sql"),
             Path.of("..", "..", "pixel-factory", "services", "oee-service",
-                    "src", "main", "resources", "db", "migration", "V21__warehouse_fourth_bay.sql"));
+                    "src", "main", "resources", "db", "migration", "V21__warehouse_fourth_bay.sql"),
+            Path.of("..", "..", "pixel-factory", "services", "oee-service",
+                    "src", "main", "resources", "db", "migration", "V22__warehouse_band_relayout.sql"));
 
     /** ('WH-1F-R01', 'WH', 1,  7.0,  4.0, 'V', 4, 5, 200, now(), now()) */
     private static final Pattern RACK_ROW = Pattern.compile(
             "\\('([A-Z0-9-]+)',\\s*'[A-Z]+',\\s*([0-9]+)");
+
+    /** V22가 대체한 옛 창고동 1층 코드 — V12/V19/V21 텍스트엔 남아 있지만 DB엔 없다. */
+    private static final Pattern RETIRED_1F_CODE = Pattern.compile("^WH-1F-R\\d+$");
 
     private static Set<String> masterRackCodes;
 
@@ -73,6 +80,9 @@ class RackMapLayoutConsistencyTest {
                 masterRackCodes.add(rows.group(1));
             }
         }
+        // V22가 지운 옛 1층 코드를 걷어낸다 — 안 그러면 "V22에서 이미 delete된 행"이 여전히
+        // 기대 집합에 남아, RackMap과의 대조가 실제 DB 상태와 어긋난 채로 통과해 버린다.
+        masterRackCodes.removeIf(code -> RETIRED_1F_CODE.matcher(code).matches());
     }
 
     @Test

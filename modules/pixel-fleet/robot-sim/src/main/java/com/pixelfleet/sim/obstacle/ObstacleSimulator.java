@@ -34,14 +34,16 @@ public class ObstacleSimulator {
     private record BlockableEdge(String from, String to, String buildingCode) {}
 
     private static final List<BlockableEdge> BLOCKABLE_EDGES = List.of(
-            // P22: JCT-14↔JCT-27 직결 엣지는 게이트 경유 두 구간으로 바뀌었다 — 둘 다 막을 수 있다.
-            new BlockableEdge("JCT-14-U", "WH-GATE-U", "WH"),
+            // P32: 창고동 우측 스파인 ↔ 게이트 접속 엣지(2개, D1) — 게이트 경유 두 구간이다.
+            new BlockableEdge("WH-SPINE-R-GATE-U", "WH-GATE-U", "WH"),
             new BlockableEdge("WH-GATE-U", "JCT-27-U", "PROD"),
             new BlockableEdge("JCT-27-U", "JCT-34-U", "PROD"),
             new BlockableEdge("JCT-34-U", "JCT-41-U", "PROD"),
             new BlockableEdge("JCT-41-U", "JCT-48-U", "PROD"),
-            new BlockableEdge("JCT-4-U", "JCT-4-L", "WH"),
-            new BlockableEdge("JCT-14-L", "WH-GATE-L", "WH"),
+            // P32: 밴드1 아이슬(D3 배타 잠금 대상) — 통로 하나가 막히면 그 밴드 전체가
+            // 못 지나가는 그림을 데모로 보여준다.
+            new BlockableEdge("WH-B01-L", "WH-B01-R", "WH"),
+            new BlockableEdge("WH-SPINE-R-GATE-L", "WH-GATE-L", "WH"),
             new BlockableEdge("WH-GATE-L", "JCT-27-L", "PROD"),
             // P20-3 신관 — 새 건물의 엣지도 똑같이 막을 수 있는지 데모로 보여준다.
             new BlockableEdge("GATE-WH-A", "MACH-1", "BLDG-A"),

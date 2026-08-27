@@ -68,10 +68,10 @@ public class DemoTaskGenerator {
             new Flow("QC-OUT", "PROD-B1"),
             // 출하: 창고에 들어온 완제품을 출하장으로
             new Flow("WH-PICK", "WH-SHIP"),
-            // P30: 4번째 베이의 보조 출하장 — 이 흐름이 실제로 새 연결로(JCT-19) 구간을
-            // 지나간다. 렉은 LaneGraph를 안 타므로(P21 D2) 이 흐름 없이는 그 구간이
-            // 죽은 엣지로 남는다(설계 근거: docs/p30-warehouse-fourth-bay-design.md D3).
-            new Flow("WH-PICK", "WH-SHIP-2"),
+            // P30의 WH-SHIP-2(4번째 베이 전용 보조 출하장)는 P32로 은퇴했다 — 이제 렉 취출
+            // 흐름(아래)이 밴드 12개 전부에 실제 트래픽을 흩어 주므로, 밴드 하나만을 위한
+            // 별도 목적지가 더 이상 필요 없다(설계 근거:
+            // docs/p32-warehouse-realistic-relayout-design.md D1).
             // 위층 보관: 1층에 다 못 두는 물량은 2·3층에 올린다.
             // 층이 다르므로 TaskService가 엘리베이터에서 두 구간으로 끊는다 —
             // 앞 구간은 1층 로봇이 승강장까지, 뒷 구간은 그 층 로봇이 이어받는다.
@@ -96,21 +96,25 @@ public class DemoTaskGenerator {
             // "AGV가 렉을 빼는 장면"이 눈에 띄게 더 자주 보인다(설계 근거:
             // docs/p28-warehouse-rack-density-design.md D4).
             //
-            // P30 — 4번째 베이(렉 18기 추가, 54→72)에서도 3개를 추가한다(10→13,
-            // 아래 WH-PICK→WH-SHIP-2와 합쳐 전체 흐름 30→34, 설계 근거:
+            // P30 — 4번째 베이(렉 18기 추가, 54→72)에서도 3개를 추가한다(10→13, 설계 근거:
             // docs/p30-warehouse-fourth-bay-design.md D4).
-            new Flow("WH-1F-R05", "PROD-A2"),
-            new Flow("WH-1F-R08", "WH-SHIP"),
-            new Flow("WH-1F-R13", "PROD-A3"),
-            new Flow("WH-1F-R16", "WH-SHIP"),
+            //
+            // P32 — 창고동 1층 렉 코드가 WH-1F-B{밴드}-R{열}로 전면 재발번됐다(D6). 같은
+            // 자리를 그대로 옮기는 대신, 일부러 서로 다른 밴드(02·05·08·11·12)에서 하나씩
+            // 골랐다 — 렉 취출 흐름이 밴드 하나에 몰리면 D3(밴드 배타 잠금)가 그 밴드만
+            // 계속 막아 서서 나머지 11개 밴드가 안 도는 것처럼 보인다.
+            new Flow("WH-1F-B02-R05", "PROD-A2"),
+            new Flow("WH-1F-B05-R08", "WH-SHIP"),
+            new Flow("WH-1F-B08-R13", "PROD-A3"),
+            new Flow("WH-1F-B11-R16", "WH-SHIP"),
+            new Flow("WH-1F-B12-R21", "PROD-A4"),
             new Flow("WH-2F-R04", "WH-2F-P2"),
             new Flow("WH-2F-R11", "WH-2F-P1"),
             new Flow("WH-2F-R14", "WH-2F-P2"),
             new Flow("WH-3F-R02", "WH-3F-P1"),
             new Flow("WH-3F-R12", "WH-3F-P2"),
             new Flow("WH-3F-R15", "WH-3F-P1"),
-            // P30 — 4번째 베이(R19~R24) 렉도 취출 대상에 넣는다(층별 1개씩).
-            new Flow("WH-1F-R21", "PROD-A4"),
+            // P30 — 4번째 베이(R19~R24) 렉도 취출 대상에 넣는다(2·3층, D5 무변경).
             new Flow("WH-2F-R23", "WH-2F-P2"),
             new Flow("WH-3F-R19", "WH-3F-P1"));
 

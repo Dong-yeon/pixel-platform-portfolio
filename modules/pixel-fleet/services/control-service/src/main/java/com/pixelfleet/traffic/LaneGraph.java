@@ -413,10 +413,24 @@ public class LaneGraph {
         return String.format("V:%.0f:mid", x);
     }
 
+    /**
+     * P32 — 창고동 밴드 아이슬 12개가 생기며 "가로 통로는 상/하단 둘뿐"이라는 옛 전제가
+     * 깨졌다. {@code upperAisleY}/{@code lowerAisleY}와 정확히 같은 y만 AU/AL로 묶고(PROD/QC
+     * 통로, 기존 세그먼트 ID·테스트와 100% 호환), 그 외의 가로 엣지(밴드 아이슬 등)는 y값
+     * 자체로 구분한다 — 안 그러면 y가 다른 아이슬끼리 같은 AU/AL 버킷에 묶여, 서로 다른
+     * 밴드인데 같은 세그먼트를 잠그는(D3가 막으려던 것과 정반대의) 버그가 된다.
+     */
     private String horizontalAisle(double y, double x1, double x2) {
         double upper = locations.upperAisleY();
         double lower = locations.lowerAisleY();
-        String prefix = Math.abs(y - upper) <= Math.abs(y - lower) ? "AU" : "AL";
+        String prefix;
+        if (Math.abs(y - upper) < EPS) {
+            prefix = "AU";
+        } else if (Math.abs(y - lower) < EPS) {
+            prefix = "AL";
+        } else {
+            prefix = String.format("A%.0f", y);
+        }
         double lo = Math.min(x1, x2);
         double hi = Math.max(x1, x2);
         return String.format("%s:%.0f-%.0f", prefix, lo, hi);

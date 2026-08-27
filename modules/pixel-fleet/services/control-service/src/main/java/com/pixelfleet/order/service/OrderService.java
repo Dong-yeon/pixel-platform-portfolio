@@ -378,11 +378,15 @@ public class OrderService {
     /**
      * 스텝 하나의 이동 계획. AMR은 지금처럼 {@link LaneGraph}(공유 레인망, 구간 점유 통제)를
      * 탄다. AGV는 존 안 로컬 직선 이동이다 — {@code LaneGraph}에 렉·창고동 내부 노드를
-     * 그래프로 넣지 않기로 했으므로(P21 D2) 여기서 좌표를 직접 계산하고, 점유할 구간은
-     * 없다(빈 리스트 — {@link TrafficController#tryReserve}가 항상 그대로 성공하고, 그
-     * 로봇은 애초에 아무 구간도 쥔 적이 없어 {@code progress}/{@code release}도 자연히
-     * no-op이다). P22에서 담당 구역이 렉에서 창고동 1층 전체로 넓어졌을 뿐, 이 로컬 이동
-     * 모델 자체는 그대로다.
+     * 그래프로 넣지 않기로 했으므로(P21 D2) 여기서 좌표를 직접 계산한다.
+     *
+     * <p><b>P32 D3 — 그래도 밴드 세그먼트는 예약한다.</b> AGV가 그래프를 안 타는 건
+     * 그대로지만(경로 자체는 여전히 직선), 시작·도착점이 속한 창고동 밴드({@link
+     * LocationRegistry#bandSegmentFor})는 명시적으로 {@link TrafficController}에 걸어 둔다
+     * — 안 그러면 밴드 통로를 배타 자원으로 만든 의미가 없어진다(밴드 아이슬을 그래프
+     * 엣지로만 표현하면 AGV는 애초에 그 엣지를 절대 지나지 않으므로 잠금이 실질적으로
+     * 아무 효과가 없다). 두 밴드가 다르면(예: 다른 밴드의 렉으로 이동) 둘 다 예약한다 —
+     * 이동 중 두 밴드 다 걸치는 셈이라 보수적으로 둘 다 막는 편이 안전하다.
      */
     private LaneGraph.RoutePlan planLeg(double[] fromPos, FleetOrder order, String toNode) {
         if (order.getRobotType() != RobotType.AGV) {
@@ -393,7 +397,24 @@ public class OrderService {
         double[] to = resolveForAgv(toNode);
         double dx = to[0] - fromPos[0];
         double dy = to[1] - fromPos[1];
-        return new LaneGraph.RoutePlan(List.of(to.clone()), List.of(), Math.hypot(dx, dy));
+        List<String> bandSegments = agvBandSegments(fromPos, to);
+        return new LaneGraph.RoutePlan(List.of(to.clone()), bandSegments, Math.hypot(dx, dy));
+    }
+
+    /** {@link #planLeg}의 P32 D3 밴드 예약 — 시작·도착이 걸친 밴드(최대 2개, 중복 제거). */
+    private List<String> agvBandSegments(double[] fromPos, double[] to) {
+        String fromBand = locations.bandSegmentFor(fromPos);
+        String toBand = locations.bandSegmentFor(to);
+        if (fromBand == null && toBand == null) {
+            return List.of();
+        }
+        if (fromBand == null || fromBand.equals(toBand)) {
+            return toBand == null ? List.of() : List.of(toBand);
+        }
+        if (toBand == null) {
+            return List.of(fromBand);
+        }
+        return List.of(fromBand, toBand);
     }
 
     /** 렉 코드면 정면 접근점, 아니면(피킹존 등 일반 노드) 그대로 노드 좌표. */
