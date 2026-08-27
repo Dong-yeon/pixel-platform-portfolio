@@ -12,6 +12,7 @@ import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.TreeSet;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Pattern;
@@ -107,12 +108,15 @@ public class LocationRegistry {
             // 우측 스파인이 게이트(y=9/18)와 만나는 접속점 — D1 게이트 좌표 무변경 요구사항.
             Map.entry("WH-SPINE-R-GATE-U", new double[]{52, 9}),
             Map.entry("WH-SPINE-R-GATE-L", new double[]{52, 18}),
+            // 우측 스파인이 엘리베이터와 만나는 접속점(P32 D8, V23) — WH-B02-R/WH-B03-R 사이.
+            Map.entry("WH-SPINE-R-ELEV", new double[]{52, 13.5}),
             // 기능 노드 — 입고·피킹·출하는 가까운 밴드 진입 노드 옆에.
             Map.entry("WH-RECV", new double[]{2, 3.00}),
             Map.entry("WH-PICK", new double[]{2, 33.50}),
             Map.entry("WH-SHIP", new double[]{52, 65.70}),
-            // 엘리베이터 1층 — 좌표(30,13) 무변경(2·3층 샤프트와 같은 자리, D5).
-            Map.entry("WH-ELEV-1F", new double[]{30, 13}),
+            // 엘리베이터 1층 — P32 D8(V23)로 우측 스파인 위(52,13.5)로 재배치. 원래(30,13)는
+            // 밴드 그리드 한복판에 파묻혀 있었다(구현 후 스크린샷으로 발견).
+            Map.entry("WH-ELEV-1F", new double[]{52, 13.5}),
             // 충전 도크 8개 — 좌하단 코너(밴드12 아래) 클러스터(P29 패턴 재사용, D4로 4→8).
             Map.entry("WH-DOCK-1", new double[]{2.0, 68.5}),
             Map.entry("WH-DOCK-2", new double[]{3.5, 68.5}),
@@ -173,7 +177,8 @@ public class LocationRegistry {
             // ---- 우측 스파인 — 게이트 접속점 2개를 y순서대로 끼워 넣는다 ----
             new Object[]{"WH-B01-R", "WH-SPINE-R-GATE-U", 5.0},
             new Object[]{"WH-SPINE-R-GATE-U", "WH-B02-R", 0.7},
-            new Object[]{"WH-B02-R", "WH-B03-R", 5.7},
+            new Object[]{"WH-B02-R", "WH-SPINE-R-ELEV", 3.8},
+            new Object[]{"WH-SPINE-R-ELEV", "WH-B03-R", 1.9},
             new Object[]{"WH-B03-R", "WH-SPINE-R-GATE-L", 2.6},
             new Object[]{"WH-SPINE-R-GATE-L", "WH-B04-R", 3.1},
             new Object[]{"WH-B04-R", "WH-B05-R", 5.7}, new Object[]{"WH-B05-R", "WH-B06-R", 5.7},
@@ -203,12 +208,12 @@ public class LocationRegistry {
             new Object[]{"JCT-27-L", "JCT-34-L", 7.0},
             new Object[]{"JCT-34-L", "JCT-41-L", 7.0}, new Object[]{"JCT-41-L", "JCT-48-L", 7.0},
             new Object[]{"JCT-48-L", "JCT-62-L", 14.0},
-            // 기능 노드 → 가장 가까운 스파인 진입 노드(P32). 엘리베이터는 (30,13)에 고정된
-            // 채라(D5) 스파인에서 멀어 비용이 크다.
+            // 기능 노드 → 가장 가까운 스파인 진입 노드(P32). 엘리베이터는 D8(V23)로 스파인
+            // 접속점과 같은 자리가 돼서 비용이 작다(옛 (30,13)일 때는 25.3/24.4였다).
             new Object[]{"WH-RECV", "WH-B01-L", 1.0},
             new Object[]{"WH-PICK", "WH-B06-L", 1.0},
             new Object[]{"WH-SHIP", "WH-B12-R", 1.0},
-            new Object[]{"WH-ELEV-1F", "WH-B02-R", 25.3}, new Object[]{"WH-ELEV-1F", "WH-B03-R", 24.4},
+            new Object[]{"WH-ELEV-1F", "WH-SPINE-R-ELEV", 1.0},
             // 충전 도크 8개 → 밴드12 좌측 진입(P32, D4).
             new Object[]{"WH-DOCK-1", "WH-B12-L", 1.8}, new Object[]{"WH-DOCK-2", "WH-B12-L", 1.8},
             new Object[]{"WH-DOCK-3", "WH-B12-L", 1.8}, new Object[]{"WH-DOCK-4", "WH-B12-L", 1.8},
@@ -537,21 +542,56 @@ public class LocationRegistry {
      * {@code null} — 어차피 그 구간은 밴드 통로가 아니다.
      */
     public String bandSegmentFor(double[] pos) {
+        int band = bandNumberFor(pos);
+        if (band < 0) {
+            return null;
+        }
+        return String.format("A%.0f:2-52", bandAisleY(band));
+    }
+
+    /**
+     * 이 좌표가 속한 창고동 밴드의 존 코드(P32 D10, {@code "WH-1F-B01"} 형식) —
+     * {@code null}이면 {@link #bandSegmentFor}와 같은 이유로 밴드 밖.
+     *
+     * <p>{@link com.pixelfleet.order.service.OrderService#requiredPool}이 예전엔 창고동
+     * 1층 전체를 존 하나({@code "WH-PICK"})로 뭉뚱그렸다 — 밴드 12개를 배타 잠금(D3)으로
+     * 나눠 놓고 배차 존은 그대로 하나면, 로봇이 자기가 못 가는 밴드의 작업까지 받아 대기만
+     * 하다 다른 로봇 기회를 막는 비효율이 생긴다. 존을 밴드 단위로 쪼개면 배차 시점부터
+     * "이 로봇은 이 밴드 담당"이 갈린다({@code robots.zone_code}, fleet V13 마이그레이션).
+     */
+    public String bandZoneCodeFor(double[] pos) {
+        int band = bandNumberFor(pos);
+        return band < 0 ? null : String.format("WH-1F-B%02d", band);
+    }
+
+    /**
+     * 이 좌표가 속한 밴드 아이슬의 y좌표(P32 D10) — {@code null}이면 어느 밴드에도
+     * 안 속함(다른 두 메서드와 같은 기준). {@code OrderService#planLeg}가 밴드가 다른
+     * 두 지점 사이를 이동할 때, 좌측 스파인(x=2, 모든 렉 열보다 왼쪽이라 항상 비어 있음)을
+     * 거쳐 가는 경유 웨이포인트를 만드는 데 쓴다 — 직선으로 이으면 다른 밴드의 렉을
+     * 가로지르기 때문이다(구현 후 실측으로 발견).
+     */
+    public Double bandAisleYFor(double[] pos) {
+        int band = bandNumberFor(pos);
+        return band < 0 ? null : bandAisleY(band);
+    }
+
+    /** {@link #bandSegmentFor}/{@link #bandZoneCodeFor}가 공유하는 "가장 가까운 밴드" 계산. */
+    private int bandNumberFor(double[] pos) {
         int nearestBand = -1;
         double bestDy = Double.MAX_VALUE;
         for (int band = 1; band <= BAND_COUNT; band++) {
-            double aisleY = BAND1_AISLE_Y + (band - 1) * BAND_PITCH;
-            double dy = Math.abs(pos[1] - aisleY);
+            double dy = Math.abs(pos[1] - bandAisleY(band));
             if (dy < bestDy) {
                 bestDy = dy;
                 nearestBand = band;
             }
         }
-        if (nearestBand < 0 || bestDy > BAND_PITCH) {
-            return null;
-        }
-        double aisleY = BAND1_AISLE_Y + (nearestBand - 1) * BAND_PITCH;
-        return String.format("A%.0f:2-52", aisleY);
+        return (nearestBand < 0 || bestDy > BAND_PITCH) ? -1 : nearestBand;
+    }
+
+    private static double bandAisleY(int band) {
+        return BAND1_AISLE_Y + (band - 1) * BAND_PITCH;
     }
 
     // ---- 렉(P21) ----
@@ -626,6 +666,12 @@ public class LocationRegistry {
     private static final double BAND1_AISLE_Y = 4.0;
     private static final double BAND_PITCH = 5.7;
     private static final double ROW_OFFSET_Y = 1.75;
+    /**
+     * P32 D9(V23) — 밴드12 뒷줄 앞쪽 4칸이 충전존(CZ-1F, x∈[1,8])과 좌표상 겹쳐서
+     * 생성에서 건너뛴다. factory V23·robot-sim {@code RackMap}과 같은 예외 조건.
+     */
+    private static final int EXCLUDED_BAND = 12;
+    private static final Set<Integer> EXCLUDED_COLS = Set.of(37, 38, 39, 40);
 
     private static Map<String, RackInfo> buildFallbackRacks() {
         Map<String, RackInfo> result = new HashMap<>();
@@ -637,11 +683,14 @@ public class LocationRegistry {
             String orientation = (String) row[4];
             result.put(code, new RackInfo(code, floor, new double[]{x, y}, orientation));
         }
-        // 창고동 1층 864기(P32) — factory V22의 생성 공식과 정확히 같아야 한다(열 1~36=앞줄,
-        // 37~72=뒷줄, orientation='VD').
+        // 창고동 1층 860기(P32, D9로 4기 제외) — factory V22+V23의 생성 공식과 정확히
+        // 같아야 한다(열 1~36=앞줄, 37~72=뒷줄, orientation='VD').
         for (int band = 1; band <= BAND_COUNT; band++) {
             double aisleY = BAND1_AISLE_Y + (band - 1) * BAND_PITCH;
             for (int col = 1; col <= RACKS_PER_BAND; col++) {
+                if (band == EXCLUDED_BAND && EXCLUDED_COLS.contains(col)) {
+                    continue;
+                }
                 int colInRow = (col - 1) % 36;
                 double x = LEFT_SPINE_X + COL_OFFSET + colInRow * COL_PITCH;
                 double y = col <= 36 ? aisleY - ROW_OFFSET_Y : aisleY + ROW_OFFSET_Y;

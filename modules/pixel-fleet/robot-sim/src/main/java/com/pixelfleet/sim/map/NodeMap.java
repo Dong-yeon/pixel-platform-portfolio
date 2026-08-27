@@ -90,12 +90,15 @@ public class NodeMap {
             // 우측 스파인이 게이트(y=9/18)와 만나는 접속점 — D1 게이트 좌표 무변경 요구사항.
             Map.entry("WH-SPINE-R-GATE-U", new double[]{52, 9}),
             Map.entry("WH-SPINE-R-GATE-L", new double[]{52, 18}),
+            // 우측 스파인이 엘리베이터와 만나는 접속점(P32 D8) — WH-B02-R/WH-B03-R 사이.
+            Map.entry("WH-SPINE-R-ELEV", new double[]{52, 13.5}),
             // 기능 노드 — 입고·피킹·출하는 가까운 밴드 진입 노드 옆에.
             Map.entry("WH-RECV", new double[]{2, 3.00}),
             Map.entry("WH-PICK", new double[]{2, 33.50}),
             Map.entry("WH-SHIP", new double[]{52, 65.70}),
-            // 엘리베이터 1층 — 좌표(30,13) 무변경(2·3층 샤프트와 같은 자리, D5).
-            Map.entry("WH-ELEV-1F", new double[]{30, 13}),
+            // 엘리베이터 1층 — P32 D8로 우측 스파인 위(52,13.5)로 재배치. 원래(30,13)
+            // 좌표는 밴드 그리드 한복판에 파묻혀 있었다(구현 후 스크린샷으로 발견).
+            Map.entry("WH-ELEV-1F", new double[]{52, 13.5}),
             // 충전 도크 8개 — 좌하단 코너(밴드12 아래) 클러스터(P29 패턴 재사용, D4).
             Map.entry("WH-DOCK-1", new double[]{2.0, 68.5}),
             Map.entry("WH-DOCK-2", new double[]{3.5, 68.5}),
@@ -105,15 +108,16 @@ public class NodeMap {
             Map.entry("WH-DOCK-6", new double[]{3.5, 70.0}),
             Map.entry("WH-DOCK-7", new double[]{5.0, 70.0}),
             Map.entry("WH-DOCK-8", new double[]{6.5, 70.0}),
-            // 창고동 2·3층 — **좌표 무변경**(D5, 1층과 물리적으로 같은 자리).
+            // 창고동 2·3층 — **좌표 무변경**(D5, 1층과 물리적으로 같은 자리). 단
+            // 엘리베이터는 예외(D8) — 세 층 다 같은 샤프트라 1층과 같이 옮긴다.
             Map.entry("WH-DOCK-2F", new double[]{4, 21}),
             Map.entry("WH-2F-P1", new double[]{17, 6}),
             Map.entry("WH-2F-P2", new double[]{17, 13}),
-            Map.entry("WH-ELEV-2F", new double[]{30, 13}),
+            Map.entry("WH-ELEV-2F", new double[]{52, 13.5}),
             Map.entry("WH-DOCK-3F", new double[]{4, 21}),
             Map.entry("WH-3F-P1", new double[]{17, 6}),
             Map.entry("WH-3F-P2", new double[]{17, 13}),
-            Map.entry("WH-ELEV-3F", new double[]{30, 13}),
+            Map.entry("WH-ELEV-3F", new double[]{52, 13.5}),
             // P22: AMR ↔ AGV 게이트 — 창고동 벽 밖, 생산동 벽 앞의 중립 지대. P32에서도 무변경.
             Map.entry("WH-GATE-U", new double[]{56, 9}),
             Map.entry("WH-GATE-L", new double[]{56, 18}),

@@ -132,16 +132,25 @@ public class OrderService {
     }
 
     /**
-     * 창고동 1층 전체를 하나의 AGV 존으로 본다(P22) — {@code nearestPickNode}가 1층 렉에도
-     * 항상 이 값을 주므로({@code WH-PICK}이 1층 유일한 피킹존이다), 렉이든 입고장·출하장
-     * 이든 1층 안쪽은 전부 같은 존이다. 2·3층은 그대로 좁은 피킹존 단위 존을 쓴다(P21 D10).
+     * 창고동 1층이 밴드 12개를 못 찾을 때의 존 폴백(P32 D10) — {@code bandZoneCodeFor}가
+     * {@code null}을 주는 경우(밴드 아이슬에서 너무 먼 좌표)에만 쓰인다. 지금 배치상 실제로
+     * 걸릴 일은 없지만(모든 1층 명명 노드가 어느 밴드의 {@code BAND_PITCH} 이내), 로봇을
+     * 완전히 세우는 것보다 낫다는 원칙(P21)을 지키려고 남겨 둔다.
      */
-    private static final String WH_1F_ZONE = "WH-PICK";
+    private static final String WH_1F_ZONE_FALLBACK = "WH-PICK";
 
     /**
-     * 스텝 하나가 요구하는 로봇 풀(P21, P22) — (층, 로봇 종류, 존). 렉 코드거나 창고동 1층
-     * 안쪽 명명 노드(입고장·피킹존·출하장·도크·엘리베이터)면 AGV 풀, 아니면 그 노드가 속한
-     * 층의 AMR 풀이다.
+     * 스텝 하나가 요구하는 로봇 풀(P21, P22, P32 D10) — (층, 로봇 종류, 존). 렉 코드거나
+     * 창고동 1층 안쪽 명명 노드(입고장·피킹존·출하장·도크·엘리베이터)면 AGV 풀, 아니면 그
+     * 노드가 속한 층의 AMR 풀이다.
+     *
+     * <p><b>P32 D10 — 1층 존이 밴드 단위로 갈린다.</b> 예전엔 1층 전체가 존 하나
+     * ({@code WH-PICK})였다 — 밴드 12개를 배타 잠금(D3)으로 나눠 놓고 배차 존은 하나로
+     * 뭉치면, 로봇이 자기가 물리적으로 못 가는(또는 멀리 도는) 밴드 작업까지 후보가 돼
+     * 비효율이 생긴다. 이제 렉·명명 노드 각각의 좌표로 {@code bandZoneCodeFor}를 불러
+     * "이 좌표는 밴드 몇" 존을 직접 매긴다(로봇 쪽은 fleet V13이 같은 형식의
+     * {@code zone_code}를 밴드별로 나눠 시드한다). 2·3층은 그대로 좁은 피킹존 단위
+     * 존을 쓴다(P21 D10, 무변경).
      *
      * <p>층 경계(엘리베이터)만 다루던 예전의 {@code crossFloor} 판정을 일반화한 것 —
      * "로봇 풀이 바뀌는 경계"가 이제 층이 다른 경우와 로봇 종류가 다른 경우 두 가지다
@@ -153,13 +162,20 @@ public class OrderService {
     private RobotPool requiredPool(String locationNode) {
         if (locations.isRackCode(locationNode)) {
             LocationRegistry.RackInfo rack = locations.rack(locationNode);
-            String zone = rack.floorNo() == 1 ? WH_1F_ZONE : locations.nearestPickNode(locationNode);
+            String zone = rack.floorNo() == 1
+                    ? bandZoneOrFallback(rack.pos())
+                    : locations.nearestPickNode(locationNode);
             return new RobotPool(rack.floorNo(), RobotType.AGV, zone);
         }
         if (locations.isWarehouseFloor1Node(locationNode)) {
-            return new RobotPool((short) 1, RobotType.AGV, WH_1F_ZONE);
+            return new RobotPool((short) 1, RobotType.AGV, bandZoneOrFallback(locations.resolve(locationNode)));
         }
         return new RobotPool(locations.floorOf(locationNode), RobotType.AMR, null);
+    }
+
+    private String bandZoneOrFallback(double[] pos) {
+        String zone = locations.bandZoneCodeFor(pos);
+        return zone != null ? zone : WH_1F_ZONE_FALLBACK;
     }
 
     /**
@@ -387,6 +403,14 @@ public class OrderService {
      * 엣지로만 표현하면 AGV는 애초에 그 엣지를 절대 지나지 않으므로 잠금이 실질적으로
      * 아무 효과가 없다). 두 밴드가 다르면(예: 다른 밴드의 렉으로 이동) 둘 다 예약한다 —
      * 이동 중 두 밴드 다 걸치는 셈이라 보수적으로 둘 다 막는 편이 안전하다.
+     *
+     * <p><b>P32 D10 — 웨이포인트는 항상 축 정렬(가로 또는 세로)만, 대각선은 절대 없다.</b>
+     * 목적지 하나로 직행하는 웨이포인트 1개짜리 직선은 대각선으로 다른 밴드의 렉을
+     * 가로지른다(구현 후 실측·대시보드 스크린샷으로 발견 — robot-sim은 서버가 준
+     * 웨이포인트를 그대로 믿고 두 점 사이를 직선으로 잇지, 자체 경로계산을 안 한다).
+     * 그래서 항상 "내 밴드 아이슬로 수직 이동 → 아이슬을 타고 수평 이동 → 목적지로
+     * 수직 이동" 순서로만 웨이포인트를 만든다 — 밴드가 다르면 그 사이에 좌측
+     * 스파인(x=2, 모든 밴드 렉 열보다 왼쪽이라 항상 비어 있다)을 세로로 한 번 더 탄다.
      */
     private LaneGraph.RoutePlan planLeg(double[] fromPos, FleetOrder order, String toNode) {
         if (order.getRobotType() != RobotType.AGV) {
@@ -395,10 +419,52 @@ public class OrderService {
             return laneGraph.planByNode(fromPos, toNode, order.isLoaded());
         }
         double[] to = resolveForAgv(toNode);
-        double dx = to[0] - fromPos[0];
-        double dy = to[1] - fromPos[1];
         List<String> bandSegments = agvBandSegments(fromPos, to);
-        return new LaneGraph.RoutePlan(List.of(to.clone()), bandSegments, Math.hypot(dx, dy));
+        List<double[]> waypoints = agvWaypoints(fromPos, to);
+        double cost = totalHopDistance(fromPos, waypoints);
+        return new LaneGraph.RoutePlan(waypoints, bandSegments, cost);
+    }
+
+    private static final double AGV_SPINE_X = 2.0;
+
+    /**
+     * {@link #planLeg}의 P32 D10 경유 웨이포인트 — 항상 가로/세로 이동만(대각선 금지).
+     * 밴드를 못 찾으면(게이트 근처 등 범위 밖) 어쩔 수 없이 직행한다 — 그 구간은 애초에
+     * 밴드 개념이 없는 곳이라 축 정렬 기준 자체가 없다.
+     */
+    private List<double[]> agvWaypoints(double[] fromPos, double[] to) {
+        Double fromY = locations.bandAisleYFor(fromPos);
+        Double toY = locations.bandAisleYFor(to);
+        if (fromY == null || toY == null) {
+            return List.of(to.clone());
+        }
+        if (fromY.equals(toY)) {
+            // 같은 밴드 — 내 아이슬로 수직 이동 → 그 아이슬을 타고 목적지 x까지 수평
+            // 이동 → 목적지로 수직 이동.
+            return List.of(
+                    new double[]{fromPos[0], fromY},
+                    new double[]{to[0], fromY},
+                    to.clone());
+        }
+        // 다른 밴드 — 내 아이슬 → 좌측 스파인(세로) → 목적지 아이슬(스파인 위를 세로로
+        // 이동) → 목적지 x(그 아이슬을 타고 수평 이동) → 목적지(수직 이동).
+        return List.of(
+                new double[]{fromPos[0], fromY},
+                new double[]{AGV_SPINE_X, fromY},
+                new double[]{AGV_SPINE_X, toY},
+                new double[]{to[0], toY},
+                to.clone());
+    }
+
+    /** 웨이포인트를 순서대로 이었을 때의 총 이동 거리(직선 구간들의 합). */
+    private static double totalHopDistance(double[] from, List<double[]> waypoints) {
+        double total = 0;
+        double[] cursor = from;
+        for (double[] point : waypoints) {
+            total += Math.hypot(point[0] - cursor[0], point[1] - cursor[1]);
+            cursor = point;
+        }
+        return total;
     }
 
     /** {@link #planLeg}의 P32 D3 밴드 예약 — 시작·도착이 걸친 밴드(최대 2개, 중복 제거). */

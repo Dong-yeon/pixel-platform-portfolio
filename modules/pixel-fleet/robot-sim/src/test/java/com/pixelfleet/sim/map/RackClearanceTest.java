@@ -15,9 +15,11 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 /**
- * 창고동 1층 렉 864기가 전부 커넥터(스파인)·아이슬에서 ≥1.75 떨어져 있는지 자동 검증한다
+ * 창고동 1층 렉 860기가 전부 커넥터(스파인)·아이슬에서 ≥1.75 떨어져 있는지 자동 검증한다
  * (P32 — 이전까지 이 규칙은 마이그레이션 주석에만 있던 수기 관례였다, 설계 근거:
  * docs/p32-warehouse-realistic-relayout-design.md 3절 "커넥터 클리어런스(≥1.75) 검증").
+ * 864가 아니라 860인 이유: V23(D9)이 충전존과 겹치던 4기(밴드12 열37~40)를 지웠다 —
+ * 그 4기는 V22 텍스트엔 남아 있지만 DB엔 없으므로 파싱 후 걷어낸다.
  *
  * <p>1.75 = 로봇 반지름(0.95) + 렉 반폭(0.8, {@code orientation='VD'} 발자국 1.6의 절반) —
  * V12 주석이 원래 밝힌 산식과 같다. 두 방향을 각각 검사한다:
@@ -49,7 +51,11 @@ class RackClearanceTest {
 
     /** ('WH-1F-B01-R01', 'WH', 1, 3.75, 2.25, 'VD', 1, 3, 45, now(), now()) */
     private static final Pattern RACK_ROW = Pattern.compile(
-            "\\('WH-1F-B(\\d{2})-R\\d{2}',\\s*'WH',\\s*1,\\s*([0-9.]+),\\s*([0-9.]+),\\s*'VD'");
+            "\\('WH-1F-B(\\d{2})-R(\\d{2})',\\s*'WH',\\s*1,\\s*([0-9.]+),\\s*([0-9.]+),\\s*'VD'");
+
+    /** V23(D9)이 지운 4기 — 충전존(CZ-1F)과 좌표상 겹쳐서 제외됐다. */
+    private static final int EXCLUDED_BAND = 12;
+    private static final java.util.Set<Integer> EXCLUDED_COLS = java.util.Set.of(37, 38, 39, 40);
 
     private record RackPoint(int band, double x, double y) {
     }
@@ -70,17 +76,21 @@ class RackClearanceTest {
         racks = new ArrayList<>();
         Matcher rows = RACK_ROW.matcher(sql.substring(racksStart));
         while (rows.find()) {
-            racks.add(new RackPoint(
-                    Integer.parseInt(rows.group(1)),
-                    Double.parseDouble(rows.group(2)),
-                    Double.parseDouble(rows.group(3))));
+            int band = Integer.parseInt(rows.group(1));
+            int col = Integer.parseInt(rows.group(2));
+            if (band == EXCLUDED_BAND && EXCLUDED_COLS.contains(col)) {
+                continue; // V23이 DELETE했다 — V22 텍스트엔 남아 있지만 DB엔 없다.
+            }
+            racks.add(new RackPoint(band,
+                    Double.parseDouble(rows.group(3)),
+                    Double.parseDouble(rows.group(4))));
         }
     }
 
     @Test
-    @DisplayName("마이그레이션 파싱 자체가 성공했는지 — 864기가 다 잡혔는지")
+    @DisplayName("마이그레이션 파싱 자체가 성공했는지 — 860기가 다 잡혔는지")
     void parsedAllRacks() {
-        assertThat(racks).as("V22에서 파싱된 밴드 렉").hasSize(864);
+        assertThat(racks).as("V22에서 파싱된 밴드 렉(V23 D9 제외분 반영)").hasSize(860);
     }
 
     @Test

@@ -31,6 +31,10 @@ import org.junit.jupiter.api.Test;
  * V22가 대체했으므로 이 테스트에서 제외한다 — 파일 텍스트 자체는 그대로 남아 있지만
  * (과거 마이그레이션은 안 고친다, P20 이후 관행) DB에는 더 이상 없는 행이다. 2·3층 코드
  * (WH-2F-R*, WH-3F-R*)는 D5(무변경)라 V12/V19/V21에서 그대로 유효하다.
+ *
+ * <p>V23(P32 D9)이 충전존과 겹치던 4기({@code WH-1F-B12-R37}~{@code R40})를 DELETE만
+ * 한다(INSERT 없음, 렉을 새로 만들지 않으므로) — 이 파서는 "insert into layout_racks"만
+ * 보므로 V23은 애초에 이 목록에 넣지 않고, V22에서 파싱된 그 4개 코드를 대신 걷어낸다.
  */
 class RackMapLayoutConsistencyTest {
 
@@ -50,6 +54,10 @@ class RackMapLayoutConsistencyTest {
 
     /** V22가 대체한 옛 창고동 1층 코드 — V12/V19/V21 텍스트엔 남아 있지만 DB엔 없다. */
     private static final Pattern RETIRED_1F_CODE = Pattern.compile("^WH-1F-R\\d+$");
+
+    /** V23(D9)이 충전존과 겹쳐 DELETE한 4기 — V22 텍스트엔 남아 있지만 DB엔 없다. */
+    private static final Set<String> EXCLUDED_BY_V23 = Set.of(
+            "WH-1F-B12-R37", "WH-1F-B12-R38", "WH-1F-B12-R39", "WH-1F-B12-R40");
 
     private static Set<String> masterRackCodes;
 
@@ -80,9 +88,11 @@ class RackMapLayoutConsistencyTest {
                 masterRackCodes.add(rows.group(1));
             }
         }
-        // V22가 지운 옛 1층 코드를 걷어낸다 — 안 그러면 "V22에서 이미 delete된 행"이 여전히
-        // 기대 집합에 남아, RackMap과의 대조가 실제 DB 상태와 어긋난 채로 통과해 버린다.
+        // V22가 지운 옛 1층 코드 + V23이 지운 충전존 겹침 4기를 걷어낸다 — 안 그러면
+        // "이미 delete된 행"이 여전히 기대 집합에 남아, RackMap과의 대조가 실제 DB
+        // 상태와 어긋난 채로 통과해 버린다.
         masterRackCodes.removeIf(code -> RETIRED_1F_CODE.matcher(code).matches());
+        masterRackCodes.removeAll(EXCLUDED_BY_V23);
     }
 
     @Test

@@ -81,7 +81,7 @@ sim:
     # AGV(P21에서 신설, P22에서 랙 피더→AGV로 이름과 담당 구역을 넓혔다) — 창고동 1층
     # 안쪽 전체(렉·입고장·피킹존·출하장)를 담당한다. AMR의 레인망을 타지 않으므로(fleet
     # OrderService.planLeg가 로컬 직선 이동으로 계산) home은 창고동 도크다 — 관제 서버
-    # robots.zone_code(V10/V11 마이그레이션)와 같아야 한다.
+    # robots.zone_code(V10/V11/V13 마이그레이션)와 같아야 한다.
     - code: AGV-01
       name: 1층 AGV 1호
       home: WH-DOCK-1
@@ -112,6 +112,119 @@ sim:
       name: 3층 AGV 2호
       home: WH-3F-P2
       floor: 3
+      type: AGV
+    # P32 D10(V13) — 창고동 1층 존이 밴드 12개로 갈리면서, 밴드당 2대 원칙(V10 주석의
+    # 교훈: 존당 1대뿐이면 그 1대가 충전 들어가면 존 전체가 멈춘다)으로 22대를 늘렸다.
+    # AGV-01/02는 각각 밴드1/2의 첫 번째 대수를 겸한다(fleet V13이 zone_code를 갱신).
+    - code: AGV-07
+      name: 1층 AGV 7호(밴드1)
+      home: WH-DOCK-3
+      floor: 1
+      type: AGV
+    - code: AGV-08
+      name: 1층 AGV 8호(밴드2)
+      home: WH-DOCK-4
+      floor: 1
+      type: AGV
+    - code: AGV-09
+      name: 1층 AGV 9호(밴드3)
+      home: WH-DOCK-5
+      floor: 1
+      type: AGV
+    - code: AGV-10
+      name: 1층 AGV 10호(밴드3)
+      home: WH-DOCK-6
+      floor: 1
+      type: AGV
+    - code: AGV-11
+      name: 1층 AGV 11호(밴드4)
+      home: WH-DOCK-7
+      floor: 1
+      type: AGV
+    - code: AGV-12
+      name: 1층 AGV 12호(밴드4)
+      home: WH-DOCK-8
+      floor: 1
+      type: AGV
+    - code: AGV-13
+      name: 1층 AGV 13호(밴드5)
+      home: WH-DOCK-1
+      floor: 1
+      type: AGV
+    - code: AGV-14
+      name: 1층 AGV 14호(밴드5)
+      home: WH-DOCK-2
+      floor: 1
+      type: AGV
+    - code: AGV-15
+      name: 1층 AGV 15호(밴드6)
+      home: WH-DOCK-3
+      floor: 1
+      type: AGV
+    - code: AGV-16
+      name: 1층 AGV 16호(밴드6)
+      home: WH-DOCK-4
+      floor: 1
+      type: AGV
+    - code: AGV-17
+      name: 1층 AGV 17호(밴드7)
+      home: WH-DOCK-5
+      floor: 1
+      type: AGV
+    - code: AGV-18
+      name: 1층 AGV 18호(밴드7)
+      home: WH-DOCK-6
+      floor: 1
+      type: AGV
+    - code: AGV-19
+      name: 1층 AGV 19호(밴드8)
+      home: WH-DOCK-7
+      floor: 1
+      type: AGV
+    - code: AGV-20
+      name: 1층 AGV 20호(밴드8)
+      home: WH-DOCK-8
+      floor: 1
+      type: AGV
+    - code: AGV-21
+      name: 1층 AGV 21호(밴드9)
+      home: WH-DOCK-1
+      floor: 1
+      type: AGV
+    - code: AGV-22
+      name: 1층 AGV 22호(밴드9)
+      home: WH-DOCK-2
+      floor: 1
+      type: AGV
+    - code: AGV-23
+      name: 1층 AGV 23호(밴드10)
+      home: WH-DOCK-3
+      floor: 1
+      type: AGV
+    - code: AGV-24
+      name: 1층 AGV 24호(밴드10)
+      home: WH-DOCK-4
+      floor: 1
+      type: AGV
+    - code: AGV-25
+      name: 1층 AGV 25호(밴드11)
+      home: WH-DOCK-5
+      floor: 1
+      type: AGV
+    - code: AGV-26
+      name: 1층 AGV 26호(밴드11)
+      home: WH-DOCK-6
+      floor: 1
+      type: AGV
+    - code: AGV-27
+      name: 1층 AGV 27호(밴드12)
+      home: WH-DOCK-7
+      floor: 1
+      type: AGV
+    - code: AGV-28
+      name: 1층 AGV 28호(밴드12)
+      home: WH-DOCK-8
+      floor: 1
       type: AGV
 
 logging:

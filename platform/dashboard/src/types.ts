@@ -286,6 +286,44 @@ export function routePoints(
   return points
 }
 
+/** 창고동 밴드 진입 노드(`WH-B01-L` 형식) — {@link agvRoutePoints}가 밴드 아이슬 y를 찾는 데 쓴다. */
+const BAND_ENTRY_NODE = /^WH-B\d+-L$/
+
+/**
+ * AGV(랙 피더) 전용 경로 — {@link routePoints}(AMR의 연결로 스냅 로직)를 안 탄다. AGV는
+ * `LaneGraph`를 안 타는 존 안 로컬 이동이라(P21 D2) 연결로 개념 자체가 없다 — 그 스냅
+ * 로직을 그대로 쓰면 렉 접근점을 엉뚱한 연결로로 당겨 붙여 실제 주행과 다른 선이 그려진다.
+ *
+ * <p><b>대각선 금지 — fleet `OrderService#agvWaypoints`와 같은 규칙.</b> 두 점을 직선으로
+ * 그으면 대각선이 다른 밴드의 렉 열을 가로지른다(대시보드 스크린샷으로 실제 발견). 항상
+ * "내 밴드 아이슬로 수직 이동 → 아이슬을 타고 수평 이동 → 목적지로 수직 이동" 순서로만
+ * 웨이포인트를 만든다 — 밴드가 다르면 그 사이에 좌측 스파인을 세로로 한 번 더 탄다.
+ *
+ * <p>밴드 아이슬 y·스파인 x는 하드코딩하지 않고 {@code layout.nodes}의 밴드 진입 노드
+ * (`WH-B01-L` 등, factory가 준 실제 좌표)에서 그때그때 찾는다 — 서버 fleet 쪽 상수가
+ * 바뀌어도 여기가 따로 어긋나지 않는다.
+ */
+export function agvRoutePoints(
+  layout: Layout,
+  from: [number, number],
+  to: [number, number],
+): [number, number][] {
+  const bandEntries = layout.nodes.filter((n) => BAND_ENTRY_NODE.test(n.nodeCode))
+  if (bandEntries.length === 0) return [from, to]
+
+  const spineX = bandEntries[0].posX
+  const nearestBandY = (y: number) =>
+    bandEntries.reduce((best, n) => (Math.abs(n.posY - y) < Math.abs(best - y) ? n.posY : best), bandEntries[0].posY)
+
+  const fromY = nearestBandY(from[1])
+  const toY = nearestBandY(to[1])
+
+  if (fromY === toY) {
+    return [from, [from[0], fromY], [to[0], fromY], to]
+  }
+  return [from, [from[0], fromY], [spineX, fromY], [spineX, toY], [to[0], toY], to]
+}
+
 // ---------- pixel-factory (OEE) ----------
 
 // 서버 EquipmentStatus 와 일치해야 한다. SETUP·PLANNED_STOP 은 P9에서 추가됐다

@@ -100,12 +100,23 @@ public class DemoTaskGenerator {
             // docs/p30-warehouse-fourth-bay-design.md D4).
             //
             // P32 — 창고동 1층 렉 코드가 WH-1F-B{밴드}-R{열}로 전면 재발번됐다(D6). 같은
-            // 자리를 그대로 옮기는 대신, 일부러 서로 다른 밴드(02·05·08·11·12)에서 하나씩
-            // 골랐다 — 렉 취출 흐름이 밴드 하나에 몰리면 D3(밴드 배타 잠금)가 그 밴드만
-            // 계속 막아 서서 나머지 11개 밴드가 안 도는 것처럼 보인다.
+            // 자리를 그대로 옮기는 대신, 일부러 서로 다른 밴드에서 하나씩 골랐다 — 렉
+            // 취출 흐름이 밴드 하나에 몰리면 D3(밴드 배타 잠금)가 그 밴드만 계속 막아
+            // 서서 나머지 밴드가 안 도는 것처럼 보인다.
+            //
+            // P32 D10 — 밴드별 존(zone_code)이 생기고 로봇도 밴드당 2대씩 늘었다(fleet
+            // V13). 흐름이 5개 밴드에만 있으면 나머지 7개 밴드의 로봇 14대는 배차받을
+            // 렉 취출 작업 자체가 없어 영원히 논다 — 12밴드 전부에 최소 1개씩 채운다.
+            new Flow("WH-1F-B01-R10", "PROD-A1"),
             new Flow("WH-1F-B02-R05", "PROD-A2"),
+            new Flow("WH-1F-B03-R10", "PROD-A2"),
+            new Flow("WH-1F-B04-R10", "WH-SHIP"),
             new Flow("WH-1F-B05-R08", "WH-SHIP"),
+            new Flow("WH-1F-B06-R10", "PROD-A3"),
+            new Flow("WH-1F-B07-R10", "PROD-A4"),
             new Flow("WH-1F-B08-R13", "PROD-A3"),
+            new Flow("WH-1F-B09-R10", "WH-SHIP"),
+            new Flow("WH-1F-B10-R10", "PROD-A1"),
             new Flow("WH-1F-B11-R16", "WH-SHIP"),
             new Flow("WH-1F-B12-R21", "PROD-A4"),
             new Flow("WH-2F-R04", "WH-2F-P2"),
@@ -125,8 +136,13 @@ public class DemoTaskGenerator {
      * <p>층이 생기면서 한 번 더 올렸다. 배차가 <b>층별로 갈리므로</b> 큐가 한 층 작업으로
      * 차면 다른 층 로봇은 큐가 비어 있는 것과 같아진다 — 큐 하나를 셋이 나눠 쓰는 셈이다.
      * 위층 증차(8대)에 맞춰 대수보다 여유 있게 둔다 — 큐가 로봇보다 얕으면 증차가 헛돈다.
+     *
+     * <p>P32 D10 — 창고동 1층 AGV가 밴드별 존 12개(밴드당 2대, V13)로 갈리면서 로봇
+     * 총량이 14→36대로 뛰었다. 존이 잘게 쪼개질수록 같은 논리(큐 하나를 여러 그룹이
+     * 나눠 쓴다)가 더 세게 적용된다 — 안 올리면 밴드 12개 중 몇 개만 계속 일감을 받고
+     * 나머지는 큐가 마른 것처럼 보인다. 로봇 총량보다 여유 있게 40으로 올린다.
      */
-    private static final int MAX_PENDING = 12;
+    private static final int MAX_PENDING = 40;
 
     private final OrderService orderService;
     private final FleetOrderRepository orderRepository;

@@ -1,9 +1,13 @@
+import { useEffect, useRef, useState } from 'react'
 import type { Pallet } from '../api'
 import {
-  nodeIndex, routePoints,
+  agvRoutePoints, nodeIndex, routePoints,
   type Equipment, type EquipmentStatus, type Layout, type LayoutBuilding, type LayoutRack,
   type MrbOpenSummary, type Robot, type RobotStatus, type Task, type TerminalPresence,
 } from '../types'
+
+/** P34 — 팬/줌 뷰박스. viewBox 문자열로 직렬화하기 전 상태다. */
+interface ViewBox { x: number; y: number; w: number; h: number }
 
 /** 지도 레이어 on/off. 밀도가 빠듯해 겹치는 시스템을 끌 수 있게 한다(지도 시각 규칙). */
 export interface MapLayers {
@@ -45,6 +49,14 @@ const DOOR_HALF_HEIGHT = 1.1
  * 기존 최대 밀도(2·3층 24기)보다 훨씬 높은 값이라 옛 층은 전혀 영향받지 않는다.
  */
 const RACK_LOD_THRESHOLD = 150
+
+// ---- P34: 팬/줌 ----
+/** 휠 한 번에 배율이 이만큼 바뀐다(15%). */
+const ZOOM_STEP = 1.15
+/** 최대 축소 — 전체 보기(기본 viewBox)보다 더 못 나간다. */
+const ZOOM_OUT_LIMIT = 1.0
+/** 최대 확대 — 밀집 렉(VD, 폭 1.0) 1~2개가 화면에 꽉 차는 수준. */
+const MIN_ZOOM_WIDTH = 2.5
 
 const ROBOT_COLOR: Record<RobotStatus, string> = {
   IDLE: '#27ae60',
@@ -167,6 +179,13 @@ export function UnifiedMap({
   const presenceByTerminal = new Map(presence.map((p) => [p.terminalCode, p]))
   const equipByCode = new Map(equipments.map((e) => [e.equipmentCode, e]))
   const NODES = nodeIndex(layout)
+  // P32 D10 — 렉도 경로 좌표 조회 대상에 넣는다. 예전엔 NODES(layout_nodes)에서만
+  // 찾아서 목적지가 렉 코드(AGV 취출)면 좌표를 못 찾고 그 작업의 경로 전체가 조용히
+  // 스킵됐다 — 로봇 마커만 있고 선이 없어 "공중에 뜬 것처럼" 보이던 원인.
+  const RACKS: Record<string, [number, number]> = Object.fromEntries(
+    layout.racks.map((r) => [r.rackCode, [r.posX, r.posY]]),
+  )
+  const resolvePoint = (code: string): [number, number] | undefined => NODES[code] ?? RACKS[code]
   const { width, height } = layout
   const aisles = [layout.upperAisleY, layout.lowerAisleY]
 
@@ -190,9 +209,64 @@ export function UnifiedMap({
   // 건물을 고르면 그 외곽으로 확대한다. 여백을 둬 벽이 잘리지 않게.
   const pad = 1.5
   const viewWidth = selected ? selected.width + pad * 2 : width
-  const viewBox = selected
-    ? `${selected.posX - pad} ${selected.posY - pad} ${viewWidth} ${selected.height + pad * 2}`
-    : `0 0 ${width} ${height}`
+  const baseBox: ViewBox = selected
+    ? { x: selected.posX - pad, y: selected.posY - pad, w: viewWidth, h: selected.height + pad * 2 }
+    : { x: 0, y: 0, w: width, h: height }
+
+  // ---- P34: 팬/줌 ----
+  // null이면 수동 줌 안 한 상태 — baseBox(건물 선택에 따른 기본 확대)를 그대로 쓴다.
+  // 건물 선택이 바뀌면 그 확대와 수동 줌이 같이 안 꼬이게 수동 줌을 리셋한다.
+  const [zoomBox, setZoomBox] = useState<ViewBox | null>(null)
+  const svgRef = useRef<SVGSVGElement>(null)
+  const dragRef = useRef<{ startX: number; startY: number; box: ViewBox } | null>(null)
+  useEffect(() => setZoomBox(null), [view.buildingCode])
+  const box = zoomBox ?? baseBox
+  const viewBox = `${box.x} ${box.y} ${box.w} ${box.h}`
+
+  /** 화면 픽셀 좌표(clientX/Y) → 지금 viewBox 기준 SVG 좌표. */
+  function toSvgPoint(clientX: number, clientY: number): { x: number; y: number } | null {
+    const rect = svgRef.current?.getBoundingClientRect()
+    if (!rect || rect.width === 0 || rect.height === 0) return null
+    return {
+      x: box.x + ((clientX - rect.left) / rect.width) * box.w,
+      y: box.y + ((clientY - rect.top) / rect.height) * box.h,
+    }
+  }
+
+  function onWheel(e: React.WheelEvent<SVGSVGElement>) {
+    e.preventDefault()
+    const cursor = toSvgPoint(e.clientX, e.clientY)
+    if (!cursor) return
+    const rawFactor = e.deltaY > 0 ? ZOOM_STEP : 1 / ZOOM_STEP
+    const maxW = baseBox.w * ZOOM_OUT_LIMIT
+    const newW = Math.min(maxW, Math.max(MIN_ZOOM_WIDTH, box.w * rawFactor))
+    const factor = newW / box.w // 한계에 걸려 배율이 잘렸으면 그 실제 배율로 다시 계산
+    const newH = box.h * factor
+    setZoomBox({
+      x: cursor.x - (cursor.x - box.x) * factor,
+      y: cursor.y - (cursor.y - box.y) * factor,
+      w: newW,
+      h: newH,
+    })
+  }
+
+  function onPointerDown(e: React.MouseEvent<SVGSVGElement>) {
+    if (e.button !== 0) return
+    dragRef.current = { startX: e.clientX, startY: e.clientY, box }
+  }
+
+  function onPointerMove(e: React.MouseEvent<SVGSVGElement>) {
+    const drag = dragRef.current
+    const rect = svgRef.current?.getBoundingClientRect()
+    if (!drag || !rect || rect.width === 0 || rect.height === 0) return
+    const dx = ((e.clientX - drag.startX) / rect.width) * drag.box.w
+    const dy = ((e.clientY - drag.startY) / rect.height) * drag.box.h
+    setZoomBox({ x: drag.box.x - dx, y: drag.box.y - dy, w: drag.box.w, h: drag.box.h })
+  }
+
+  function endDrag() {
+    dragRef.current = null
+  }
 
   /**
    * 글자 크기 보정.
@@ -213,7 +287,18 @@ export function UnifiedMap({
     : []
 
   return (
-    <svg className="umap" viewBox={viewBox} preserveAspectRatio="xMidYMid meet">
+    <svg
+      ref={svgRef}
+      className="umap"
+      viewBox={viewBox}
+      preserveAspectRatio="xMidYMid meet"
+      onWheel={onWheel}
+      onMouseDown={onPointerDown}
+      onMouseMove={onPointerMove}
+      onMouseUp={endDrag}
+      onMouseLeave={endDrag}
+      onDoubleClick={() => setZoomBox(null)}
+    >
       <rect x={0} y={0} width={width} height={height} className="umap-bg" />
 
       {/* ---- 건물 ---- */}
@@ -256,8 +341,8 @@ export function UnifiedMap({
              아니라 픽업 지점을 먼저 들른다 — 그 구간을 빼먹으면 그려진 선이 실제 주행과
              어긋나 "지나간 경로"처럼 보인다. */}
       {layers.routes && floorTasks.map((t) => {
-        const to = NODES[t.destinationNode]
-        const origin = NODES[t.originNode]
+        const to = resolvePoint(t.destinationNode)
+        const origin = resolvePoint(t.originNode)
         if (!to) return null
 
         const robot = t.assignedRobotId ? robotById.get(t.assignedRobotId) : undefined
@@ -267,16 +352,22 @@ export function UnifiedMap({
         let points: [number, number][]
         let pickup: [number, number] | null = null
 
+        // P32 D10 — AGV는 LaneGraph의 연결로 스냅 로직(routePoints)을 안 탄다(P21 D2,
+        // 존 안 로컬 이동) — 대신 agvRoutePoints가 fleet OrderService#agvWaypoints와
+        // 같은 규칙(대각선 금지, 밴드 아이슬·좌측 스파인만 타고 이동)으로 그린다.
+        const isAgv = robot?.robotType === 'AGV'
+        const legPoints = isAgv ? agvRoutePoints : routePoints
+
         if (robot && !robot.laden && origin) {
           // 아직 가지러 가는 중 — 로봇 → 픽업 → 도착. 두 다리를 이어 붙인다(이음매 중복 제거).
-          const leg1 = routePoints(layout, [robot.posX, robot.posY], origin)
-          const leg2 = routePoints(layout, origin, to)
+          const leg1 = legPoints(layout, [robot.posX, robot.posY], origin)
+          const leg2 = legPoints(layout, origin, to)
           points = [...leg1, ...leg2.slice(1)]
           pickup = origin
         } else {
           const from: [number, number] | undefined = robot ? [robot.posX, robot.posY] : origin
           if (!from) return null
-          points = routePoints(layout, from, to)
+          points = legPoints(layout, from, to)
         }
 
         return (
