@@ -290,12 +290,9 @@ button.mini { padding: 3px 10px; font-size: 12px; margin-left: auto; }
 .umap-wall { stroke: #9aa5b4; stroke-width: 0.28; stroke-linecap: round; }
 .umap-building-label { font-size: 1.15px; fill: #4a5566; font-weight: 700; }
 .umap-nameplate rect { fill: #ffffff; stroke: #9aa5b4; stroke-width: 0.12; }
-.b-QC .umap-nameplate rect { stroke: #d95d39; }
-.b-QC .umap-building-fill { fill: #fdf7f5; }
-.b-QC .umap-wall { stroke: #d95d39; }
-.b-QC .umap-building-label { fill: #a53d20; }
 /* 창고동 — 렉 피더가 도는 자동화 보관 구역이라는 것을 벽 색으로 신호한다.
-   생산동(중립)·품질동(주황)과 나란히 놓았을 때 세 번째 색으로 바로 갈리게 슬레이트 톤을 쓴다. */
+   생산동(중립, 안에서 A/B/L/Q 구역 색으로 다시 갈린다)과 나란히 놓았을 때 두 번째 색으로
+   바로 갈리게 슬레이트 톤을 쓴다. */
 .b-WH .umap-nameplate rect { stroke: #46586b; }
 .b-WH .umap-building-fill { fill: #f2f6f9; }
 .b-WH .umap-wall { stroke: #46586b; }
@@ -333,11 +330,26 @@ button.mini { padding: 3px 10px; font-size: 12px; margin-left: auto; }
 .umap-gate-mark rect { fill: #6b4fbb; stroke: #4a3486; stroke-width: 0.15; }
 .umap-gate-label { fill: #4a3486; font-size: 0.85px; font-weight: 700; }
 
-/* ===== 품질(QMS) — 품질동 배지 · 정보 흐름 · MRB ===== */
-/* 품질동은 이제 평면도 안의 건물이다(예전엔 바깥에 떠 있는 박스였다). */
+/* ===== 생산동 내부 구역(P33) — A(가공)/B(조립·검사)/L(물류)/Q(품질) ===== */
+/* 품질동이 별도 건물에서 생산동 안의 Q 구역으로 바뀌었다(P33) — 옛 .b-QC 주황 색은
+   .zone-Q가 물려받는다. 나머지 셋은 UnifiedMap의 로봇 경로 팔레트(ROUTE_PALETTE)에서
+   가져와 지도 전체 색 어휘와 겹치지 않게 했다. */
+.umap-zone-fill { stroke-width: 0.16; stroke-dasharray: 0.6 0.4; opacity: 0.55; }
+.umap-zone-label { font-size: 0.9px; font-weight: 700; }
+.zone-A .umap-zone-fill { fill: #eaf1ff; stroke: #2d7ff9; }
+.zone-A .umap-zone-label { fill: #1c5bd6; }
+.zone-B .umap-zone-fill { fill: #f0f6e3; stroke: #5f8b1e; }
+.zone-B .umap-zone-label { fill: #4a6e17; }
+.zone-L .umap-zone-fill { fill: #e6f7f5; stroke: #0f9b8e; }
+.zone-L .umap-zone-label { fill: #0c7d72; }
+.zone-Q .umap-zone-fill { fill: #fdf7f5; stroke: #d95d39; }
+.zone-Q .umap-zone-label { fill: #a53d20; }
+
+/* ===== 품질(QMS) — 품질(Q) 구역 배지 · 정보 흐름 · MRB ===== */
+/* P33 — Q 구역은 이제 별도 건물이 아니라 생산동 안의 구역이다(위 .zone-Q). */
 .umap-office-sub { font-size: 0.95px; fill: #a53d20; font-weight: 600; }
 .umap-office-badge { fill: #d95d39; }
-/* 정보 흐름 — 현장 설비 → 사무실. 운송 경로(파랑)와 다른 색 점선(지도 시각 규칙). */
+/* 정보 흐름 — 현장 설비 → Q 구역. 운송 경로(파랑)와 다른 색 점선(지도 시각 규칙). */
 .umap-quality-flow { fill: none; stroke: #d95d39; stroke-width: 0.22; stroke-dasharray: 0.5 0.5; opacity: 0.8; }
 
 .mrb-RAISED { background: #fde4e2; color: #c0271b; }

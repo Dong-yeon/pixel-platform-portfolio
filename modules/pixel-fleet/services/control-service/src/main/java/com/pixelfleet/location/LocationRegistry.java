@@ -158,6 +158,13 @@ public class LocationRegistry {
             Map.entry("JCT-41-L", new double[]{76, 18}),
             Map.entry("JCT-48-U", new double[]{83, 9}),
             Map.entry("JCT-48-L", new double[]{83, 18}),
+            // P33 — 생산동·품질동 통합(D2/D3). JCT-48↔JCT-62 사이(x=90)에 새 교차점을
+            // 끼워 넣고, 물류(WIP 스테이징) 노드를 매단다. QC는 더 이상 별도 건물이
+            // 아니다(PROD로 흡수, building_code만 변경 — 여기 nodes 맵엔 건물 개념이
+            // 없으므로 좌표 자체는 무영향).
+            Map.entry("JCT-55-U", new double[]{90, 9}),
+            Map.entry("JCT-55-L", new double[]{90, 18}),
+            Map.entry("PROD-L1", new double[]{90, 13.5}),
             Map.entry("JCT-62-U", new double[]{97, 9}),
             Map.entry("JCT-62-L", new double[]{97, 18})
     );
@@ -199,15 +206,19 @@ public class LocationRegistry {
             new Object[]{"JCT-27-U", "JCT-27-L", 9.0},
             new Object[]{"JCT-34-U", "JCT-34-L", 9.0}, new Object[]{"JCT-41-U", "JCT-41-L", 9.0},
             new Object[]{"JCT-48-U", "JCT-48-L", 9.0}, new Object[]{"JCT-62-U", "JCT-62-L", 9.0},
+            // P33 — JCT-55-U/L(물류 교차점, D2/D3)도 다른 JCT와 같은 패턴(수직 Δy=9).
+            new Object[]{"JCT-55-U", "JCT-55-L", 9.0},
             // 통로(가로) — PROD 내부(무변경). 창고동↔게이트는 스파인 접속 엣지로 대체됐다(위).
             new Object[]{"WH-GATE-U", "JCT-27-U", 6.0},
             new Object[]{"JCT-27-U", "JCT-34-U", 7.0},
             new Object[]{"JCT-34-U", "JCT-41-U", 7.0}, new Object[]{"JCT-41-U", "JCT-48-U", 7.0},
-            new Object[]{"JCT-48-U", "JCT-62-U", 14.0},
+            // P33 — JCT-48↔JCT-62 직결(옛 비용14)을 JCT-55(물류 교차점, x=90) 경유로
+            // 쪼갰다: 7+7.
+            new Object[]{"JCT-48-U", "JCT-55-U", 7.0}, new Object[]{"JCT-55-U", "JCT-62-U", 7.0},
             new Object[]{"WH-GATE-L", "JCT-27-L", 6.0},
             new Object[]{"JCT-27-L", "JCT-34-L", 7.0},
             new Object[]{"JCT-34-L", "JCT-41-L", 7.0}, new Object[]{"JCT-41-L", "JCT-48-L", 7.0},
-            new Object[]{"JCT-48-L", "JCT-62-L", 14.0},
+            new Object[]{"JCT-48-L", "JCT-55-L", 7.0}, new Object[]{"JCT-55-L", "JCT-62-L", 7.0},
             // 기능 노드 → 가장 가까운 스파인 진입 노드(P32). 엘리베이터는 D8(V23)로 스파인
             // 접속점과 같은 자리가 돼서 비용이 작다(옛 (30,13)일 때는 25.3/24.4였다).
             new Object[]{"WH-RECV", "WH-B01-L", 1.0},
@@ -226,7 +237,9 @@ public class LocationRegistry {
             new Object[]{"PROD-A3", "JCT-41-U", 3.0}, new Object[]{"PROD-A4", "JCT-48-U", 3.0},
             new Object[]{"PROD-B1", "JCT-27-L", 3.0}, new Object[]{"PROD-B2", "JCT-34-L", 3.0},
             new Object[]{"PROD-B3", "JCT-41-L", 3.0}, new Object[]{"PROD-B4", "JCT-48-L", 3.0},
-            new Object[]{"QC-OUT", "JCT-62-U", 3.0}, new Object[]{"QC-IN", "JCT-62-L", 3.0}
+            new Object[]{"QC-OUT", "JCT-62-U", 3.0}, new Object[]{"QC-IN", "JCT-62-L", 3.0},
+            // P33 — 물류(L) 구역: PROD-L1을 JCT-55-U/L 양쪽에 짧게 매단다(Δy=4.5).
+            new Object[]{"PROD-L1", "JCT-55-U", 4.5}, new Object[]{"PROD-L1", "JCT-55-L", 4.5}
     );
 
     /**

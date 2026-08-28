@@ -324,6 +324,57 @@ export function agvRoutePoints(
   return [from, [from[0], fromY], [spineX, fromY], [spineX, toY], [to[0], toY], to]
 }
 
+/**
+ * 생산동 내부 구역(P33) — A(가공)/B(조립·검사)/L(물류)/Q(품질). P33으로 품질동(QC)
+ * 건물이 폐지되고 생산동(PROD)에 흡수됐지만("건물 하나 = 사각형 하나"만으로는 예전에
+ * 있던 QC 색상·MRB 배지·품질 흐름선이 붙을 자리가 없어진다), 그 안에서 다시 구역을
+ * 나눠 보여 준다.
+ *
+ * <p>**좌표가 곧 소속** 원칙을 그대로 지킨다({@link LayoutBuilding} 문서 참고) — DB에
+ * zone 컬럼을 새로 두지 않고, `nodeCode` 접두어로 그때그때 분류해 소속 노드들의
+ * 바운딩박스(+패딩)를 사각형으로 계산한다. A/B는 위/아래 통로로 갈리는 기존 절반씩
+ * (건물 세로의 절반), L/Q는 건물을 세로로 온전히 가로지르는 슬랩으로 그린다 — 실제
+ * 물류·검사 노드가 위아래 통로 둘 다에 걸쳐 있기 때문이다(QC-IN은 하단, QC-OUT은 상단).
+ */
+export type ProdZoneKey = 'A' | 'B' | 'L' | 'Q'
+
+export interface ProdZoneBox {
+  key: ProdZoneKey
+  label: string
+  minX: number
+  maxX: number
+  minY: number
+  maxY: number
+}
+
+const PROD_ZONE_RULES: { prefix: RegExp; key: ProdZoneKey; label: string; spansFullHeight: boolean }[] = [
+  { prefix: /^PROD-A/, key: 'A', label: 'A · 가공', spansFullHeight: false },
+  { prefix: /^PROD-B/, key: 'B', label: 'B · 조립·검사', spansFullHeight: false },
+  { prefix: /^PROD-L/, key: 'L', label: 'L · 물류', spansFullHeight: true },
+  { prefix: /^QC-/, key: 'Q', label: 'Q · 품질', spansFullHeight: true },
+]
+
+/** 구역 사각형이 벽에 딱 붙지 않도록 두는 여백. */
+const PROD_ZONE_PAD = 2.0
+
+export function prodZones(layout: Layout, building: LayoutBuilding): ProdZoneBox[] {
+  const midY = (layout.upperAisleY + layout.lowerAisleY) / 2
+  const zones: ProdZoneBox[] = []
+  for (const rule of PROD_ZONE_RULES) {
+    const nodes = layout.nodes.filter(
+      (n) => n.buildingCode === building.buildingCode && rule.prefix.test(n.nodeCode),
+    )
+    if (nodes.length === 0) continue
+    const xs = nodes.map((n) => n.posX)
+    const minX = Math.max(building.posX, Math.min(...xs) - PROD_ZONE_PAD)
+    const maxX = Math.min(building.posX + building.width, Math.max(...xs) + PROD_ZONE_PAD)
+    const minY = rule.spansFullHeight || rule.key === 'A' ? building.posY : midY
+    const maxY = rule.spansFullHeight || rule.key === 'B' ? building.posY + building.height : midY
+    zones.push({ key: rule.key, label: rule.label, minX, maxX, minY, maxY })
+  }
+  return zones
+}
+
 // ---------- pixel-factory (OEE) ----------
 
 // 서버 EquipmentStatus 와 일치해야 한다. SETUP·PLANNED_STOP 은 P9에서 추가됐다

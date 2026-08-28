@@ -13,11 +13,16 @@ import org.springframework.stereotype.Component;
  * <pre>
  *   창고동 1층 — 좌측 스파인(x=2) ─── 밴드1~12(각자 아이슬, y=4.0~66.7) ─── 우측 스파인(x=52)
  *   [밴드1  렉행·렉행]
- *   [밴드2  렉행·렉행]                                게이트   생산동(58~90)      품질동(94~102)
- *      ...                                              ╫    [CNC-01..MCT-01]
+ *   [밴드2  렉행·렉행]                                게이트   생산동(58~102, P33로 품질동까지 흡수)
+ *      ...                                              ╫    [CNC-01..MCT-01]  ○물류(PROD-L1)
  *   [밴드12 렉행·렉행]                                    ╫    ○A1..A4 ○B1..B4    ○QC-IN/OUT
  *   ○충전 도크 8개(좌하단 코너)
  * </pre>
+ *
+ * <p><b>P33: 품질동(QC)이 별도 건물이 아니다.</b> QC-IN/QC-OUT 좌표(x=97)는 그대로지만
+ * 건물 경계가 생산동에 흡수됐다(P33 D1) — {@code building_code}만 바뀌고 노드 코드·좌표는
+ * 무변경이다(opaque identifier 관례). JCT-48↔JCT-62 사이(x=90)에 물류 교차점
+ * {@code JCT-55-U/L}과 그 물류 노드 {@code PROD-L1}이 새로 생겼다(P33 D2/D3).
  *
  * <p><b>P32: 왜 창고동만 세로로 훨씬 길어졌는가.</b> 밴드 12개(밴드마다 아이슬 + 렉 2행)를
  * 실측 밀도로 채우면 세로(y) 방향 소요가 옛 3행 구조(26)보다 훨씬 크다. 대신 가로(x)는
@@ -47,8 +52,8 @@ import org.springframework.stereotype.Component;
  * 받아 오지 않고 자기 복사본을 갖는다 — 시뮬레이터는 물리 세계를 흉내내는 쪽이라 실제 설비처럼
  * 서버가 알려주는 대로 위치를 바꾸지 않아야 하고, 서버가 죽어도 계속 돌아야 한다.
  *
- * <p>대신 {@code NodeMapLayoutConsistencyTest}가 서버 마스터(V22 마이그레이션 — 평면도를
- * 다시 그리는 마이그레이션마다 이 경로도 함께 옮긴다, V9→V12→V15→V16→V17→V20→V21→V22)와
+ * <p>대신 {@code NodeMapLayoutConsistencyTest}가 서버 마스터(V24 마이그레이션 — 평면도를
+ * 다시 그리는 마이그레이션마다 이 경로도 함께 옮긴다, V9→V12→V15→V16→V17→V20→V21→V22→V23→V24)와
  * 대조해 <b>어긋나면 빌드를 깨뜨린다.</b> 런타임 의존을 만들지 않으면서 조용한 불일치를 막는
  * 방법이다. 좌표를 바꿀 일이 있으면 마스터를 고치고 여기를 맞춘다(순서가 반대면 테스트가
  * 잡아 준다).
@@ -148,6 +153,11 @@ public class NodeMap {
             Map.entry("JCT-41-L", new double[]{76, 18}),
             Map.entry("JCT-48-U", new double[]{83, 9}),
             Map.entry("JCT-48-L", new double[]{83, 18}),
+            // P33 — 생산동·품질동 통합(D2/D3). JCT-48↔JCT-62 사이 정중앙에 새 교차점을
+            // 끼워 넣고, 거기 물류(WIP 스테이징) 노드를 매단다.
+            Map.entry("JCT-55-U", new double[]{90, 9}),
+            Map.entry("JCT-55-L", new double[]{90, 18}),
+            Map.entry("PROD-L1", new double[]{90, 13.5}),
             Map.entry("JCT-62-U", new double[]{97, 9}),
             Map.entry("JCT-62-L", new double[]{97, 18}),
             // 신관(BLDG-A/B, V14) — 무변경.

@@ -61,6 +61,13 @@ public class DemoTaskGenerator {
             new Flow("PROD-B2", "QC-IN"),
             new Flow("PROD-B3", "QC-IN"),
             new Flow("PROD-B4", "QC-IN"),
+            // P33 — 생산동·품질동이 한 건물로 합쳐지면서 그 사이(x=90)에 물류(WIP 스테이징)
+            // 구역 PROD-L1이 새로 생겼다. 이 홉이 실제 트래픽을 안 받으면 "죽은 엣지"가
+            // 되므로(P29/P30 원칙), B1 → 물류 → 검사입고 흐름 하나를 추가한다 — 다른
+            // B열(B2~B4)은 기존처럼 QC-IN 직행을 유지해 물류 구역만 지나는 경우와 안
+            // 지나는 경우가 섞여 보이게 한다.
+            new Flow("PROD-B1", "PROD-L1"),
+            new Flow("PROD-L1", "QC-IN"),
             // 판정 후: 합격이면 창고동 입고
             new Flow("QC-OUT", "WH-RECV"),
             new Flow("QC-OUT", "WH-RECV"),
