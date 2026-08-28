@@ -7,6 +7,7 @@ import { MasterView } from './components/master/MasterView'
 import { OutboxView } from './components/outbox/OutboxView'
 import { OverviewView } from './components/OverviewView'
 import { PopScreen } from './components/pop/PopScreen'
+import { ScenarioView } from './components/scenario/ScenarioView'
 import { usePlatformSocket } from './usePlatformSocket'
 import type {
   AuthUser, Equipment, EquipmentOee, FleetEvent, Layout, ModuleKey, ProductionLine,
@@ -23,6 +24,7 @@ const TAB_LABEL: Record<ModuleKey, string> = {
   inspection: '품질 (검사·MRB)',
   outbox: '발송함',
   master: '기준정보 (차종·BOM)',
+  scenario: '데모 시나리오',
 }
 
 /** 좁은 폭에서 라벨을 접었을 때 무엇인지 알아볼 수 있게. */
@@ -34,13 +36,17 @@ const TAB_ICON: Record<ModuleKey, string> = {
   inspection: '✓',
   outbox: '✉',
   master: '⌗',
+  scenario: '▶',
 }
 
 // 역할별 진입 화면·접근 범위(P12-4). 배열 첫 항목이 진입 탭이다.
 //   ADMIN → 통합현황(전체) · OPERATOR → POP · INSPECTOR → 품질 · DISPATCHER → Fleet 관제
 // 프론트 게이팅이 1차 차단이다(operator는 관제 탭이 아예 없다). 서버측 강제는 모듈 몫.
+//
+// P15-1 — 'scenario'(데모 이벤트 주입 컨트롤 패널)는 ADMIN 전용. 되돌리기 어려운 현장
+// 개입(설비 강제 고장·불량 주입)이라 서버도 같은 기준으로 막는다(ScenarioController).
 const ROLE_TABS: Record<string, ModuleKey[]> = {
-  ADMIN: ['overview', 'factory', 'fleet', 'inspection', 'outbox', 'master'],
+  ADMIN: ['overview', 'factory', 'fleet', 'inspection', 'outbox', 'master', 'scenario'],
   OPERATOR: ['pop'],
   INSPECTOR: ['inspection', 'outbox'],
   DISPATCHER: ['fleet'],
@@ -239,6 +245,9 @@ export function Dashboard({ user, onLogout }: { user: AuthUser; onLogout: () => 
         {tab === 'inspection' && <InspectionView />}
         {tab === 'outbox' && <OutboxView />}
         {tab === 'master' && <MasterView role={user.role} />}
+        {tab === 'scenario' && (
+          <ScenarioView equipments={equipments} workOrders={workOrders} layout={layout} />
+        )}
         {tab === 'factory' && (
           <FactoryView
             equipments={equipments}

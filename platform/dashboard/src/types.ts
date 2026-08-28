@@ -19,7 +19,7 @@ export interface AuthUser {
   role: string
 }
 
-export type ModuleKey = 'overview' | 'factory' | 'fleet' | 'pop' | 'inspection' | 'outbox' | 'master'
+export type ModuleKey = 'overview' | 'factory' | 'fleet' | 'pop' | 'inspection' | 'outbox' | 'master' | 'scenario'
 
 // ---------- pixel-fleet (AMR) ----------
 
