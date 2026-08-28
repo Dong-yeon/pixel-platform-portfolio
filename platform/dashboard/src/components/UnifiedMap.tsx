@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
 import type { Pallet } from '../api'
 import {
-  agvRoutePoints, nodeIndex, routePoints,
+  agvRoutePoints, nodeIndex, prodZones, routePoints,
   type Equipment, type EquipmentStatus, type Layout, type LayoutBuilding, type LayoutRack,
-  type MrbOpenSummary, type Robot, type RobotStatus, type Task, type TerminalPresence,
+  type MrbOpenSummary, type ProdZoneBox, type Robot, type RobotStatus, type Task, type TerminalPresence,
 } from '../types'
 
 /** P34 — 팬/줌 뷰박스. viewBox 문자열로 직렬화하기 전 상태다. */
@@ -127,14 +127,16 @@ function wallSegments(top: number, bottom: number, doorYs: number[]): [number, n
 }
 
 /**
- * 통합 공장 평면도 — 건물 3채를 하나의 좌표계 위에 그린다.
+ * 통합 공장 평면도 — 건물 4채(P33로 품질동이 생산동에 흡수돼 3채)를 하나의 좌표계 위에 그린다.
  *
- *   창고동  렉(적재율) · 도크 · 피킹존 · 출하장       ← 3층, 층 선택으로 본다
- *   생산동  설비(상태별 색) · 하역 지점 · POP 단말
- *   품질동  검사 입고/판정 출고 · MRB 대기 배지
+ *   창고동  렉(적재율) · 도크 · 피킹존 · 출하장                    ← 3층, 층 선택으로 본다
+ *   생산동  A(가공)·B(조립·검사)·L(물류)·Q(품질) 구역(P33) · POP 단말
  *
- * <p>물류 흐름은 창고동 → 생산동 → <b>품질동(전수 검사)</b> → 합격은 창고동 / 불합격은 생산동이다.
- * "한 공장을 네 시스템이 관제한다"는 플랫폼의 요지가 이 한 화면에 드러난다.
+ * <p>물류 흐름은 창고동 → 생산동 A(가공) → B(조립·검사) → <b>Q(품질, 전수 검사)</b> →
+ * 합격은 창고동 / 불합격은 생산동 재작업이다. P33 이전엔 생산동·품질동이 별개 건물이었는데,
+ * "가공→조립→물류→검사"가 한 건물 안에서 도는 그림으로 합쳤다(구역은 nodeCode 접두어로
+ * 계산 — {@link prodZones}). "한 공장을 네 시스템이 관제한다"는 플랫폼의 요지가 이 한
+ * 화면에 드러난다.
  */
 export function UnifiedMap({
   layout,
@@ -199,7 +201,11 @@ export function UnifiedMap({
   // 위층 노드는 아래층과 좌표가 겹치므로 걸러 내지 않으면 3개 층이 한 자리에 뭉친다.
   const floorRobots = robots.filter((r) => r.floorNo === view.floorNo)
   const floorTasks = activeTasks.filter((t) => t.floorNo === view.floorNo)
-  const qcBuilding = layout.buildings.find((b) => b.buildingCode === 'QC') ?? null
+  // P33 — 품질동(QC)은 별도 건물이 아니라 생산동(PROD) 안의 구역이 됐다. qcBuilding이
+  // 하던 일(MRB 배지·품질 흐름선 기준점)은 이제 계산된 Q 구역 바운딩박스가 대신한다.
+  const prodBuilding = layout.buildings.find((b) => b.buildingCode === 'PROD') ?? null
+  const prodZoneBoxes = prodBuilding ? prodZones(layout, prodBuilding) : []
+  const qZone = prodZoneBoxes.find((z) => z.key === 'Q') ?? null
 
   // 보고 있는 층의 렉만(위층은 같은 자리를 쓴다). P32로 창고동 1층이 864기가 되면서
   // 이 목록이 커지면 RackShape를 단순화한다(성능, 아래 렌더링 참고).
@@ -312,6 +318,17 @@ export function UnifiedMap({
           floorLabel={b.buildingCode === view.buildingCode
             ? b.floors.find((f) => f.floorNo === view.floorNo)?.name
             : undefined}
+        />
+      ))}
+
+      {/* ---- 생산동 내부 구역(P33) ---- A(가공)/B(조립·검사)/L(물류)/Q(품질). 품질동(QC)이
+             건물 통합으로 폐지되면서 필요해졌다 — 색·라벨로 예전 건물 구분을 대신한다. */}
+      {showGround && prodZoneBoxes.map((z) => (
+        <ZoneShape
+          key={`zone-${z.key}`}
+          zone={z}
+          textScale={k}
+          dim={selected !== null && selected.buildingCode !== 'PROD'}
         />
       ))}
 
@@ -507,25 +524,26 @@ export function UnifiedMap({
         )
       })}
 
-      {/* ---- 품질 정보 흐름 ---- 부적합 설비 → 품질동. 운송 경로와 다른 색 점선. */}
-      {qcBuilding && qualityFlows.map((e) => {
-        const targetX = qcBuilding.posX + qcBuilding.width / 2
-        const targetY = qcBuilding.posY + 2.5
+      {/* ---- 품질 정보 흐름 ---- 부적합 설비 → 품질(Q) 구역. 운송 경로와 다른 색 점선.
+             P33 — 기준점이 QC 건물 전체에서 계산된 Q 구역 바운딩박스로 바뀌었다. */}
+      {qZone && qualityFlows.map((e) => {
+        const targetX = (qZone.minX + qZone.maxX) / 2
+        const targetY = qZone.minY + 2.5
         return (
           <polyline
             key={`qflow-${e.equipmentCode}`}
-            points={`${e.posX},${e.posY} ${e.posX},${qcBuilding.posY - 0.6} ${targetX},${qcBuilding.posY - 0.6} ${targetX},${targetY}`}
+            points={`${e.posX},${e.posY} ${e.posX},${qZone.minY - 0.6} ${targetX},${qZone.minY - 0.6} ${targetX},${targetY}`}
             className="umap-quality-flow"
           />
         )
       })}
 
-      {/* ---- 품질동 MRB 대기 배지 ---- */}
-      {qcBuilding && layers.quality && (
+      {/* ---- 품질(Q) 구역 MRB 대기 배지 ---- */}
+      {qZone && layers.quality && (
         <g>
           <text
-            x={qcBuilding.posX + qcBuilding.width / 2}
-            y={qcBuilding.posY + qcBuilding.height - 1.2}
+            x={(qZone.minX + qZone.maxX) / 2}
+            y={qZone.maxY - 1.2}
             textAnchor="middle"
             className="umap-office-sub"
             style={fs(0.95)}
@@ -534,8 +552,8 @@ export function UnifiedMap({
           </text>
           {openMrbCount > 0 && (
             <circle
-              cx={qcBuilding.posX + qcBuilding.width - 1.0}
-              cy={qcBuilding.posY + 1.0}
+              cx={qZone.maxX - 1.0}
+              cy={qZone.minY + 1.0}
               r={0.65}
               className="umap-office-badge"
             />
@@ -638,6 +656,30 @@ function BuildingShape({
         scale={textScale}
         text={building.name + (floorLabel ? ` · ${floorLabel}` : '')}
       />
+    </g>
+  )
+}
+
+/**
+ * 생산동 내부 구역 사각형(P33) — A/B/L/Q. {@link BuildingShape}처럼 건물 하나를 통째로
+ * 그리지 않고, `prodZones`가 계산한 바운딩박스 하나를 그대로 그린다. 라벨은 사각형
+ * 안쪽 위에 작게 — 건물 명패(BuildingNameplate)만큼 무겁게 만들 필요는 없다(구역은
+ * 건물보다 한 단계 아래 정보).
+ */
+function ZoneShape({ zone, textScale, dim }: { zone: ProdZoneBox; textScale: number; dim: boolean }) {
+  const { minX, minY, maxX, maxY, key, label } = zone
+  return (
+    <g className={`umap-zone zone-${key}`} opacity={dim ? 0.35 : 1}>
+      <rect x={minX} y={minY} width={maxX - minX} height={maxY - minY} rx={0.5} className="umap-zone-fill" />
+      <text
+        x={(minX + maxX) / 2}
+        y={minY + 1.5 * textScale}
+        textAnchor="middle"
+        className="umap-zone-label"
+        style={{ fontSize: 0.9 * textScale }}
+      >
+        {label}
+      </text>
     </g>
   )
 }
