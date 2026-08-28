@@ -239,22 +239,40 @@ export function UnifiedMap({
     }
   }
 
-  function onWheel(e: React.WheelEvent<SVGSVGElement>) {
-    e.preventDefault()
-    const cursor = toSvgPoint(e.clientX, e.clientY)
-    if (!cursor) return
-    const rawFactor = e.deltaY > 0 ? ZOOM_STEP : 1 / ZOOM_STEP
-    const maxW = baseBox.w * ZOOM_OUT_LIMIT
-    const newW = Math.min(maxW, Math.max(MIN_ZOOM_WIDTH, box.w * rawFactor))
-    const factor = newW / box.w // 한계에 걸려 배율이 잘렸으면 그 실제 배율로 다시 계산
-    const newH = box.h * factor
-    setZoomBox({
-      x: cursor.x - (cursor.x - box.x) * factor,
-      y: cursor.y - (cursor.y - box.y) * factor,
-      w: newW,
-      h: newH,
-    })
-  }
+  /**
+   * 휠 줌 — <b>네이티브 리스너로 직접 붙인다</b>, JSX {@code onWheel}이 아니다.
+   *
+   * <p>React 17부터 wheel·touch 리스너는 성능을 위해 루트에 <b>passive</b>로 등록된다 —
+   * JSX {@code onWheel} 안에서 {@code e.preventDefault()}를 불러도 조용히 무시된다(콘솔에
+   * "Unable to preventDefault inside passive event listener invocation" 경고만 남는다).
+   * 그 결과 우리 줌(viewBox 갱신)과 브라우저 기본 동작(페이지 스크롤·Ctrl+휠 페이지 확대)이
+   * <b>동시에</b> 일어나 서로 겹쳐 마구잡이로 확대되는 것처럼 보였다 — 실사용 중 발견.
+   * {@code addEventListener(..., {passive:false})}로 직접 등록해야 preventDefault가
+   * 실제로 먹는다.
+   */
+  useEffect(() => {
+    const svg = svgRef.current
+    if (!svg) return
+    const handleWheel = (e: WheelEvent) => {
+      e.preventDefault()
+      const cursor = toSvgPoint(e.clientX, e.clientY)
+      if (!cursor) return
+      const rawFactor = e.deltaY > 0 ? ZOOM_STEP : 1 / ZOOM_STEP
+      const maxW = baseBox.w * ZOOM_OUT_LIMIT
+      const newW = Math.min(maxW, Math.max(MIN_ZOOM_WIDTH, box.w * rawFactor))
+      const factor = newW / box.w // 한계에 걸려 배율이 잘렸으면 그 실제 배율로 다시 계산
+      const newH = box.h * factor
+      setZoomBox({
+        x: cursor.x - (cursor.x - box.x) * factor,
+        y: cursor.y - (cursor.y - box.y) * factor,
+        w: newW,
+        h: newH,
+      })
+    }
+    svg.addEventListener('wheel', handleWheel, { passive: false })
+    return () => svg.removeEventListener('wheel', handleWheel)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [box.x, box.y, box.w, box.h, baseBox.w])
 
   function onPointerDown(e: React.MouseEvent<SVGSVGElement>) {
     if (e.button !== 0) return
@@ -298,7 +316,6 @@ export function UnifiedMap({
       className="umap"
       viewBox={viewBox}
       preserveAspectRatio="xMidYMid meet"
-      onWheel={onWheel}
       onMouseDown={onPointerDown}
       onMouseMove={onPointerMove}
       onMouseUp={endDrag}
