@@ -425,33 +425,51 @@ public class OrderService {
         return new LaneGraph.RoutePlan(waypoints, bandSegments, cost);
     }
 
-    private static final double AGV_SPINE_X = 2.0;
+    private static final double AGV_SPINE_LEFT_X = 2.0;
+    /** 우측 스파인 x — 밴드 진입 노드({@code WH-B01-R} 등)와 같다. */
+    private static final double AGV_SPINE_RIGHT_X = 52.0;
 
     /**
      * {@link #planLeg}의 P32 D10 경유 웨이포인트 — 항상 가로/세로 이동만(대각선 금지).
      * 밴드를 못 찾으면(게이트 근처 등 범위 밖) 어쩔 수 없이 직행한다 — 그 구간은 애초에
      * 밴드 개념이 없는 곳이라 축 정렬 기준 자체가 없다.
+     *
+     * <p><b>버그 수정 — 목적지가 렉 그리드 밖(게이트 등)이면 실제 y를 쓴다.</b> D10 원안은
+     * 목적지 y도 항상 "가장 가까운 밴드 아이슬 y"로 대체했다 — 렉 목적지는 그래야
+     * 안전하지만(그 아이슬이 렉 열 사이 통로라서), {@code WH-GATE-U/L}(x=56)처럼 렉
+     * 그리드(스파인 사이, 2&lt;x&lt;52) 밖의 노드에 적용하면 "가장 가까운 밴드"가 전혀
+     * 무관한 밴드로 잡혀 그 밴드 렉 열을 가로지르는 경로가 나왔다(실사용 중 대시보드에서
+     * AGV가 렉 열을 옆으로 가로지르는 것으로 발견 — 예: 밴드12 렉 취출 → WH-GATE-L 이동이
+     * 밴드3 렉 열 전체를 관통). 목적지가 스파인 사이가 아니면(스파인 위·밖) 그 노드의
+     * 실제 y를 그대로 쓴다 — 스파인은 어느 y로 지나가도 항상 빈 통로라 안전하고, 우측
+     * 스파인 접속 노드({@code WH-SPINE-R-GATE-U/L} 등)가 실제로 이 정확한 y에 있다.
+     *
+     * <p>스파인도 목적지 쪽(x&gt;=52)이면 우측을, 그 외엔 기존대로 좌측을 쓴다 — 출발
+     * 쪽은 항상 자기 밴드 아이슬(전체 폭이 빈 통로)을 타고 스파인까지 가므로 어느
+     * 스파인을 골라도 안전하다.
      */
     private List<double[]> agvWaypoints(double[] fromPos, double[] to) {
         Double fromY = locations.bandAisleYFor(fromPos);
-        Double toY = locations.bandAisleYFor(to);
+        boolean toInsideRackGrid = to[0] > AGV_SPINE_LEFT_X && to[0] < AGV_SPINE_RIGHT_X;
+        Double toY = toInsideRackGrid ? locations.bandAisleYFor(to) : to[1];
         if (fromY == null || toY == null) {
             return List.of(to.clone());
         }
         if (fromY.equals(toY)) {
-            // 같은 밴드 — 내 아이슬로 수직 이동 → 그 아이슬을 타고 목적지 x까지 수평
-            // 이동 → 목적지로 수직 이동.
+            // 같은 높이 — 내 아이슬로 수직 이동 → 그 아이슬(또는 목적지가 이미 그 높이인
+            // 스파인 밖 노드)을 타고 목적지 x까지 수평 이동 → 목적지로 수직 이동.
             return List.of(
                     new double[]{fromPos[0], fromY},
                     new double[]{to[0], fromY},
                     to.clone());
         }
-        // 다른 밴드 — 내 아이슬 → 좌측 스파인(세로) → 목적지 아이슬(스파인 위를 세로로
-        // 이동) → 목적지 x(그 아이슬을 타고 수평 이동) → 목적지(수직 이동).
+        // 다른 높이 — 내 아이슬(세로) → 스파인(목적지가 오른쪽이면 우측, 아니면 좌측) →
+        // 목적지 높이(스파인 위를 세로로 이동) → 목적지 x(수평 이동) → 목적지(수직 이동).
+        double spineX = to[0] >= AGV_SPINE_RIGHT_X ? AGV_SPINE_RIGHT_X : AGV_SPINE_LEFT_X;
         return List.of(
                 new double[]{fromPos[0], fromY},
-                new double[]{AGV_SPINE_X, fromY},
-                new double[]{AGV_SPINE_X, toY},
+                new double[]{spineX, fromY},
+                new double[]{spineX, toY},
                 new double[]{to[0], toY},
                 to.clone());
     }

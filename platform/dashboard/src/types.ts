@@ -286,8 +286,10 @@ export function routePoints(
   return points
 }
 
-/** 창고동 밴드 진입 노드(`WH-B01-L` 형식) — {@link agvRoutePoints}가 밴드 아이슬 y를 찾는 데 쓴다. */
-const BAND_ENTRY_NODE = /^WH-B\d+-L$/
+/** 창고동 밴드 진입 노드 — 좌측(`WH-B01-L`)은 {@link agvRoutePoints}가 스파인 x·아이슬 y를 찾는 데,
+ * 우측(`WH-B01-R`)은 목적지가 오른쪽(게이트 등)일 때 어느 스파인을 탈지 고르는 데 쓴다. */
+const BAND_ENTRY_LEFT_NODE = /^WH-B\d+-L$/
+const BAND_ENTRY_RIGHT_NODE = /^WH-B\d+-R$/
 
 /**
  * AGV(랙 피더) 전용 경로 — {@link routePoints}(AMR의 연결로 스냅 로직)를 안 탄다. AGV는
@@ -297,10 +299,18 @@ const BAND_ENTRY_NODE = /^WH-B\d+-L$/
  * <p><b>대각선 금지 — fleet `OrderService#agvWaypoints`와 같은 규칙.</b> 두 점을 직선으로
  * 그으면 대각선이 다른 밴드의 렉 열을 가로지른다(대시보드 스크린샷으로 실제 발견). 항상
  * "내 밴드 아이슬로 수직 이동 → 아이슬을 타고 수평 이동 → 목적지로 수직 이동" 순서로만
- * 웨이포인트를 만든다 — 밴드가 다르면 그 사이에 좌측 스파인을 세로로 한 번 더 탄다.
+ * 웨이포인트를 만든다 — 밴드가 다르면 그 사이에 스파인을 세로로 한 번 더 탄다.
  *
- * <p>밴드 아이슬 y·스파인 x는 하드코딩하지 않고 {@code layout.nodes}의 밴드 진입 노드
- * (`WH-B01-L` 등, factory가 준 실제 좌표)에서 그때그때 찾는다 — 서버 fleet 쪽 상수가
+ * <p><b>버그 수정 — 목적지가 렉 그리드 밖(게이트 등)이면 실제 y·알맞은 스파인을 쓴다.</b>
+ * 원안은 목적지 y도 항상 "가장 가까운 밴드 아이슬 y"로 대체하고 스파인도 항상 좌측만
+ * 썼다 — 렉 목적지는 안전하지만, `WH-GATE-U/L`(x=56)처럼 렉 그리드(좌우 스파인 사이)
+ * 밖의 노드로 갈 때는 엉뚱한 밴드의 렉 열을 옆으로 가로지르는 선이 그려졌다(실사용 중
+ * 발견 — fleet `OrderService#agvWaypoints`와 같은 버그, 같은 방식으로 고친다). 목적지가
+ * 스파인 사이가 아니면 그 노드의 실제 y를 그대로 쓰고, 목적지가 오른쪽(x≥우측 스파인)이면
+ * 우측 스파인을 탄다 — 스파인은 어느 y로 지나가도 항상 빈 통로라 안전하다.
+ *
+ * <p>스파인 x·밴드 아이슬 y는 하드코딩하지 않고 {@code layout.nodes}의 밴드 진입 노드
+ * (`WH-B01-L/R` 등, factory가 준 실제 좌표)에서 그때그때 찾는다 — 서버 fleet 쪽 상수가
  * 바뀌어도 여기가 따로 어긋나지 않는다.
  */
 export function agvRoutePoints(
@@ -308,19 +318,23 @@ export function agvRoutePoints(
   from: [number, number],
   to: [number, number],
 ): [number, number][] {
-  const bandEntries = layout.nodes.filter((n) => BAND_ENTRY_NODE.test(n.nodeCode))
-  if (bandEntries.length === 0) return [from, to]
+  const leftEntries = layout.nodes.filter((n) => BAND_ENTRY_LEFT_NODE.test(n.nodeCode))
+  const rightEntries = layout.nodes.filter((n) => BAND_ENTRY_RIGHT_NODE.test(n.nodeCode))
+  if (leftEntries.length === 0) return [from, to]
 
-  const spineX = bandEntries[0].posX
+  const leftSpineX = leftEntries[0].posX
+  const rightSpineX = rightEntries.length > 0 ? rightEntries[0].posX : leftSpineX
   const nearestBandY = (y: number) =>
-    bandEntries.reduce((best, n) => (Math.abs(n.posY - y) < Math.abs(best - y) ? n.posY : best), bandEntries[0].posY)
+    leftEntries.reduce((best, n) => (Math.abs(n.posY - y) < Math.abs(best - y) ? n.posY : best), leftEntries[0].posY)
 
   const fromY = nearestBandY(from[1])
-  const toY = nearestBandY(to[1])
+  const toInsideGrid = to[0] > leftSpineX && to[0] < rightSpineX
+  const toY = toInsideGrid ? nearestBandY(to[1]) : to[1]
 
   if (fromY === toY) {
     return [from, [from[0], fromY], [to[0], fromY], to]
   }
+  const spineX = to[0] >= rightSpineX ? rightSpineX : leftSpineX
   return [from, [from[0], fromY], [spineX, fromY], [spineX, toY], [to[0], toY], to]
 }
 
