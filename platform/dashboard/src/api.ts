@@ -41,6 +41,21 @@ export interface Pallet {
   lotNo: string | null
 }
 
+/** 출고지시(P15-1) — 생성 순간 fleet에 실제 운송 작업이 만들어진다. */
+export interface OutboundOrder {
+  id: number
+  orderNo: string
+  itemCode: string
+  fromLocationCode: string
+  palletCode: string
+  toNodeCode: string
+  quantity: number
+  status: string
+  /** fleet 운송 작업 코드 — 이 작업이 끝나면 재고가 차감된다. */
+  taskCode: string | null
+  completedAt: string | null
+}
+
 export type ReplenishmentStatus = 'CREATED' | 'IN_TRANSIT' | 'COMPLETED' | 'CANCELLED'
 
 /** 안전재고 미달 자동 보충 지시(P26) — 파렛트를 로케이션 간에 옮긴다(출고와 달리 은퇴시키지 않는다). */
@@ -175,6 +190,20 @@ export const api = {
     reviseBom: (partCode: string) =>
       request<{ partCode: string; revNo: number }>(
         FACTORY, `/boms/${encodeURIComponent(partCode)}/revisions`, { method: 'POST' }),
+
+    // ---- 데모 이벤트 주입(P15-1) — ADMIN 전용, 서버도 같은 기준으로 막는다 ----
+    /** 설비를 DOWN으로 강제 전환한다. */
+    injectBreakdown: (equipmentCode: string) =>
+      request<void>(FACTORY, `/scenario/equipment/${encodeURIComponent(equipmentCode)}/breakdown`,
+        { method: 'POST' }),
+    /** 설비를 RUNNING으로 복구한다. */
+    injectRecover: (equipmentCode: string) =>
+      request<void>(FACTORY, `/scenario/equipment/${encodeURIComponent(equipmentCode)}/recover`,
+        { method: 'POST' }),
+    /** 진행 중 작업지시에 불량 사이클을 count회 반복 기록 — 임계 도달 시 검사요청이 실제로 발행된다. */
+    injectDefectBurst: (equipmentCode: string, count?: number) =>
+      request<void>(FACTORY, `/scenario/equipment/${encodeURIComponent(equipmentCode)}/defect-burst`,
+        { method: 'POST', body: JSON.stringify({ count }) }),
   },
 
   /** 창고(WMS) — 재고. 로케이션 코드가 곧 렉 코드라 지도의 적재율이 여기서 나온다. */
@@ -184,6 +213,15 @@ export const api = {
     pallets: () => request<Pallet[]>(WMS, '/pallets'),
     /** 안전재고 자동 보충 지시(P26) — 생성은 서버가 스스로 판단해서 한다, 조회만 연다. */
     replenishmentOrders: () => request<ReplenishmentOrder[]>(WMS, '/replenishment-orders'),
+    /**
+     * 출고지시(P15-1) — 생성 순간 fleet에 실제 운송 작업이 만들어진다(OrderService.createOutbound
+     * → FleetTaskClient). 파렛트가 정확히 그 수량만큼 있어야 한다(부분 피킹 불가) — 그래서
+     * 데모 화면은 blind 입력을 받지 않고 `stocks()` 목록에서 골라 그대로 보낸다.
+     */
+    createOutboundOrder: (input: {
+      orderNo: string; itemCode: string; fromLocationCode: string
+      palletCode?: string; toNodeCode: string; quantity: number
+    }) => request<OutboundOrder>(WMS, '/outbound-orders', { method: 'POST', body: JSON.stringify(input) }),
   },
 
   /** 품질(QMS) — 검사·부적합·MRB 심의·발송함. */
