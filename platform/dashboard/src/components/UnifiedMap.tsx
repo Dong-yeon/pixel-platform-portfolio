@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { memo, useEffect, useRef, useState } from 'react'
 import type { Pallet } from '../api'
 import {
   agvRoutePoints, nodeIndex, prodZones, routePoints,
@@ -49,6 +49,17 @@ const DOOR_HALF_HEIGHT = 1.1
  * 기존 최대 밀도(2·3층 24기)보다 훨씬 높은 값이라 옛 층은 전혀 영향받지 않는다.
  */
 const RACK_LOD_THRESHOLD = 150
+
+/**
+ * 렉 하나에 실린 파렛트가 없을 때 쓰는 고정 참조.
+ *
+ * <p><b>왜 필요한가.</b> `rackPallets[code] ?? []`처럼 폴백을 그 자리에서 매번 새로
+ * 만들면, 정작 아무것도 안 바뀐 렌더(팬·줌처럼 이 렉과 무관한 상태 변화)에서도 매번
+ * 새 배열 참조가 생겨 `RackShape`의 {@link memo}가 무력화된다 — 렉 860기 전부가 줌
+ * 한 번에 다시 렌더링돼 버벅였다(실사용 중 발견: 확대·축소가 버벅인다는 제보).
+ * 데이터가 없을 때는 항상 이 배열 하나를 재사용해 참조를 안정시킨다.
+ */
+const EMPTY_PALLETS: Pallet[] = []
 
 // ---- P34: 팬/줌 ----
 /** 휠 한 번에 배율이 이만큼 바뀐다(15%). */
@@ -364,7 +375,7 @@ export function UnifiedMap({
           key={rack.rackCode}
           rack={rack}
           quantity={rackStock[rack.rackCode] ?? 0}
-          pallets={rackPallets[rack.rackCode] ?? []}
+          pallets={rackPallets[rack.rackCode] ?? EMPTY_PALLETS}
           active={activeRackCodes.has(rack.rackCode)}
           simplified={simplifiedRacks}
         />
@@ -728,8 +739,14 @@ function BuildingNameplate({ x, y, scale, text }: { x: number; y: number; scale:
  * 환산한다(`round(ratio × 총칸수)`) — 같은 비율이면 항상 같은 칸 수가 찬다. 채운 칸의 색은
  * 기존 4단계 적재율 색을 그대로 쓰고, 빈 칸은 옅게 비워 둔다. 아래 단부터 채워 보이게 해
  * "바닥부터 쌓는다"는 창고 직관을 따른다.
+ *
+ * <p><b>{@link memo}로 감싼다.</b> 창고동 1층 렉이 860기라, 팬·줌처럼 이 렉과 무관한
+ * 상태가 바뀔 때마다 부모(`UnifiedMap`)가 다시 렌더링되면서 매번 860개를 전부 다시
+ * 계산·비교하면 휠 한 번에 눈에 띄게 버벅였다(실사용 중 발견). props가 실제로 안
+ * 바뀌었으면(줌은 `viewBox`만 바꾸고 렉 좌표는 안 바꾼다) 다시 그리지 않는다 —
+ * {@link EMPTY_PALLETS}로 `pallets` 참조도 안정시켜야 이 메모가 실제로 먹힌다.
  */
-function RackShape({
+const RackShape = memo(function RackShape({
   rack, quantity, pallets = [], active = false, simplified = false,
 }: {
   rack: LayoutRack
@@ -830,7 +847,7 @@ function RackShape({
       {title}
     </g>
   )
-}
+})
 
 /** ISO 시각으로부터 지난 분. 배지 흐리기 판정에 쓴다. */
 function minutesSince(iso: string): number {
