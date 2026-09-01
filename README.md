@@ -6,7 +6,7 @@
 
 ## 🚀 라이브 데모
 
-**[gateway-production-4f47.up.railway.app](https://gateway-production-4f47.up.railway.app)**
+**[happyeon-pixel-platform.up.railway.app](https://happyeon-pixel-platform.up.railway.app)**
 — `admin` / `password`로 로그인 (데모 계정)
 
 > **4개 모듈(Factory·Fleet·WMS·QMS) 전부 라이브입니다** — Railway 서비스 9개 + 플러그인 2개.
