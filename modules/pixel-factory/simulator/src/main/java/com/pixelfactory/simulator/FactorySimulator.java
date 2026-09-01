@@ -2,8 +2,10 @@ package com.pixelfactory.simulator;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.pixelfactory.simulator.ShiftClock.ShiftPhase;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
+import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
@@ -26,6 +28,12 @@ import org.eclipse.paho.client.mqttv3.persist.MemoryPersistence;
  * 3초마다 냈다. OEE는 실시간(occurred_at)으로 계산하므로 실시간 기준으로는 표준CT가 허용하는
  * 양의 10배를 낸 셈이 되어 P가 250~650% 로 나왔다. 지금은 <b>데모 공장을 "빠른 공장"으로
  * 정의</b>하고(사이클 1.5~4.5초) 배속을 쓰지 않는다 — 발행 주기는 전과 같고 P ≈ 1 이 된다.
+ *
+ * <p><b>P15-2 — {@link ShiftClock}이 정하는 교대 단계도 이 하나의 시간 기준을 그대로
+ * 쓴다.</b> factory {@code V5__shift_calendars.sql}의 실제 벽시계 교대(DAY 08:00~17:00,
+ * NIGHT 20:00~05:00)와 같은 시각에 SETUP·정기점검(PLANNED_STOP)을 발행한다 — 예전엔
+ * 이 두 상태를 아예 발행한 적이 없어 가동률(A)이 노이즈 수준으로만 흔들리고 OEE가
+ * 86% 근처에 평평하게 붙었다.
  *
  * 환경변수:
  *   MQTT_URL   기본 tcp://localhost:1883
@@ -62,6 +70,9 @@ public final class FactorySimulator {
      */
     private static final int BREAKDOWN_MIN_MS = 1500;
     private static final int BREAKDOWN_SPREAD_MS = 3000;
+
+    /** SETUP·PLANNED_STOP 구간에서 "아직 안 끝났나"를 다시 확인하는 주기(P15-2). */
+    private static final long PHASE_POLL_MS = 1000;
 
     private static final ObjectMapper objectMapper = new ObjectMapper();
 
@@ -130,10 +141,29 @@ public final class FactorySimulator {
 
     private static void runEquipment(MqttClient client, EquipmentSpec spec, double speed) {
         Random random = new Random();
-        publishStatus(client, spec, "RUNNING", null);
+        // 시작하자마자 지금이 어느 단계인지부터 맞게 잡는다 — 예전엔 언제 켜든 무조건
+        // RUNNING으로 발행해, 마침 SETUP·정기점검 창 한복판에 켰으면 첫 몇 초가 거짓으로
+        // RUNNING이었다.
+        ShiftPhase phase = ShiftClock.currentPhase(LocalTime.now());
+        publishPhaseStatus(client, spec, phase);
+        ShiftPhase lastPhase = phase;
 
         try {
             while (!Thread.currentThread().isInterrupted()) {
+                ShiftPhase current = ShiftClock.currentPhase(LocalTime.now());
+                if (current != lastPhase) {
+                    publishPhaseStatus(client, spec, current);
+                    lastPhase = current;
+                }
+
+                if (current != ShiftPhase.RUNNING) {
+                    // SETUP·정기점검 중엔 생산하지 않는다 — 구간이 끝날 때까지 짧게 쉬며
+                    // 다시 확인한다(사이클을 돌리면 그 시간에도 생산이 잡혀 A를 깎는
+                    // 의도 자체가 무의미해진다).
+                    Thread.sleep((long) (PHASE_POLL_MS / speed));
+                    continue;
+                }
+
                 int cycleTimeMs = (int) (spec.idealCycleTimeMs() * (0.9 + random.nextDouble() * 0.4));
                 Thread.sleep((long) (cycleTimeMs / speed));
 
@@ -143,11 +173,23 @@ public final class FactorySimulator {
                 if (random.nextDouble() < BREAKDOWN_RATE) {
                     publishStatus(client, spec, "DOWN", "BREAKDOWN");
                     Thread.sleep((long) ((BREAKDOWN_MIN_MS + random.nextInt(BREAKDOWN_SPREAD_MS)) / speed));
-                    publishStatus(client, spec, "RUNNING", null);
+                    // 고장 지속시간(1.5~4.5초)이 우연히 교대 경계와 겹칠 수 있으니, 복귀할
+                    // 때도 무조건 RUNNING이 아니라 지금 단계를 다시 물어 발행한다.
+                    ShiftPhase afterBreakdown = ShiftClock.currentPhase(LocalTime.now());
+                    lastPhase = afterBreakdown;
+                    publishPhaseStatus(client, spec, afterBreakdown);
                 }
             }
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
+        }
+    }
+
+    private static void publishPhaseStatus(MqttClient client, EquipmentSpec spec, ShiftPhase phase) {
+        switch (phase) {
+            case SETUP -> publishStatus(client, spec, "SETUP", "SHIFT_CHANGEOVER");
+            case PLANNED_STOP -> publishStatus(client, spec, "PLANNED_STOP", "SCHEDULED_MAINTENANCE");
+            case RUNNING -> publishStatus(client, spec, "RUNNING", null);
         }
     }
 
