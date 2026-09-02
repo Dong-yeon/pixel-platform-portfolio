@@ -201,7 +201,7 @@ jjwt를 직접 가져왔다.
 근거: 2026-07-30~31 국내 언론 다수 기사 분석(비공개 리서치 문서, 공개 버전에서 제외).
 **기사 자체를 플랫폼에 넣지 않는다.** 뉴스는 근거이고, 여기 적힌 것만 구현 대상이다.
 
-### P16. 인증 경계 정리 (보안 하드닝) 🔶 1파 완료(WP0 CORS + WP1 STOMP 인증, 2026-08-06) — M2M·MQTT는 별도 승인 대기
+### P16. 인증 경계 정리 (보안 하드닝) 🔶 2파 완료(WP0 CORS + WP1 STOMP 인증 + WP3 MQTT, 2026-09-02) — 남은 건 WP2(M2M)뿐
 
 > P15 배포 단계에 몰아둔 보안 항목을 앞당긴다. **근거가 생겼다** — IBM '2026 데이터 유출
 > 비용 보고서'에서 침해 원인 공동 1위가 **API·애플리케이션·플러그인 보안 취약점(27%)**과
@@ -234,7 +234,7 @@ jjwt를 직접 가져왔다.
       `FactoryQualityClient`), WMS→fleet(`ServiceTokenProvider` + `FleetTaskClient`)가 이미 같은
       방식으로 서비스 토큰을 쓴다. fleet→factory layout 쪽에 같은 패턴을 붙이기만 하면 된다 —
       새로 설계할 게 아니라 이미 검증된 패턴을 한 곳 더 적용하는 일이다.
-- [ ] 익명 MQTT 접속이 거부된다 (WP3, 미착수 — `mosquitto.conf`에 `allow_anonymous true` 그대로)
+- [x] 익명 MQTT 접속이 거부된다 — **완료(WP3, 2026-09-02, `docs/pixel-platform-roadmap.md` P15와 겹쳐서 그쪽 계기로 먼저 착수)**. `allow_anonymous false` + password file(컨테이너 기동마다 `MQTT_USERS` 환경변수로 생성, git엔 평문 없음) + ACL(도메인별 topic 접근 범위, wms/qms는 읽기 전용). 6개 서비스 전부 인증 접속 라이브 확인.
 - [x] 허용되지 않은 오리진의 브라우저 요청이 CORS에서 막힌다 — **완료(P16 1파)**
 
 주의
@@ -260,6 +260,16 @@ jjwt를 직접 가져왔다.
   토큰 없음(거부, "끊김 재연결 중" 지속)/토큰 있음(연결됨) 두 케이스 다 실측 확인.
 - **남은 것**: M2M(WP2)과 MQTT(WP3)는 각각 별도 승인 필요 — 설계 초안은 이미 확보돼 있다.
   `docs/auth-boundaries.md`는 WP2·WP3까지 끝난 뒤 마무리 단계로 작성한다.
+
+2파 완료 기록 (WP3 MQTT, 2026-09-02)
+
+- **계기가 P16이 아니라 P15였다**: `docs/pixel-platform-roadmap.md` P15("통합 시나리오 + 배포")
+  완료 기준에도 같은 항목("익명 MQTT 접속이 거부된다")이 중복으로 있었고, 그쪽 검증 도중
+  (`railway domain` 오조작으로 mosquitto가 잠깐 퍼블릭 노출된 사고) 실제 계기가 생겨 그 자리에서
+  WP3를 먼저 끝냈다. P16 문서는 사후에 갱신.
+- 구현·검증 상세는 `docs/pixel-platform-roadmap.md` P15 완료 기준 항목과 `docs/deploy-railway.md`
+  "반드시 알아둘 점" 3번 참고 — 여기서 중복 기록하지 않는다.
+- **남은 것**: M2M(WP2)뿐 — `GET /api/factory/layout` 무인증 문제. 아래 완료 기준 참고.
 
 ---
 
