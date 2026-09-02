@@ -157,6 +157,13 @@ DISPATCH_ENABLED=true
 > 다만 factory의 실제 평면도(레이아웃 변경·신규 렉 등)는 영영 반영되지 않는다. 로그에
 > `Loaded N layout nodes / N edge-sources from ...`가 찍히는지로 확인한다 — 대신
 > `평면도를 가져오지 못했다(ConnectException)` 경고가 반복되면 이 변수가 없거나 틀린 것이다.
+>
+> **P16 WP2(2026-09-02)부터 이 호출도 인증이 걸린다** — fleet의 `ServiceTokenProvider`
+> (`com.pixelfleet.location`, QMS/WMS와 같은 패턴)가 `PLATFORM_JWT_SECRET`으로 서비스
+> 토큰을 발급해 실어 보낸다. 새 환경변수는 필요 없다(fleet은 이미 `PLATFORM_JWT_SECRET`을
+> 갖고 있다). 두 서비스의 `PLATFORM_JWT_SECRET`이 어긋나면 위와 똑같이 "평면도를
+> 가져오지 못했다" 경고로 나타난다 — 이번엔 원인이 네트워크가 아니라 401/403이라는
+> 점만 다르고, 증상(폴백으로 조용히 넘어감)은 동일하다.
 
 ### 2-3b. pixel-wms (프라이빗)
 
@@ -181,8 +188,11 @@ FLEET_BASE_URL=http://pixel-fleet.railway.internal:9002
 PLATFORM_JWT_SECRET=<32바이트 이상 랜덤 문자열>   ← 게이트웨이·모든 모듈이 같은 값
 ```
 
-> WMS는 운송 주문을 fleet에 REST로 넘긴다(`FLEET_BASE_URL`). 프라이빗 네트워크 전제로
-> M2M 인증은 아직 없다(백로그 — P16 2파).
+> WMS는 운송 주문을 fleet에 REST로 넘긴다(`FLEET_BASE_URL`). 이 문서가 한동안 틀리게
+> 적어 왔는데(정정, 2026-09-02) — `ServiceTokenProvider`(`com.pixelwms.fleet`)가
+> `PLATFORM_JWT_SECRET`으로 서비스 토큰을 발급해 `Authorization: Bearer`로 실어 보내는
+> M2M 인증이 이미 P13/P14부터 있었다. 별도 시크릿·환경변수는 없다 — 위 `PLATFORM_JWT_SECRET`
+> 하나로 충분하다.
 
 ### 2-3c. pixel-qms (프라이빗)
 
@@ -208,7 +218,9 @@ PLATFORM_JWT_SECRET=<32바이트 이상 랜덤 문자열>   ← 게이트웨이�
 ```
 
 > QMS는 불량 임계 초과 이벤트로 검사를 만들고, MRB 홀드/릴리즈 때 factory 설비 상태를
-> REST로 전환한다(`FACTORY_BASE_URL`). 역시 M2M 인증은 백로그.
+> REST로 전환한다(`FACTORY_BASE_URL`). WMS와 같은 이유로 이 문서가 틀리게 적어 왔다(정정,
+> 2026-09-02) — `ServiceTokenProvider`(`com.pixelqms.factory`)가 이미 P14부터 서비스
+> 토큰을 실어 보낸다.
 
 ### 2-4. robot-sim (프라이빗)
 
