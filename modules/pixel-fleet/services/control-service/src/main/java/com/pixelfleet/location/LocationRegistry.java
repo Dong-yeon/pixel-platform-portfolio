@@ -340,13 +340,20 @@ public class LocationRegistry {
 
     /**
      * factory의 평면도 주소. 게이트웨이를 경유하지 않고 <b>모듈에 직접</b> 붙는다 —
-     * 게이트웨이는 인증을 요구하고 서비스 간 인증(M2M)이 아직 없기 때문이다.
-     * factory가 이 엔드포인트만 인증 없이 열어 두었다(평면도는 민감정보가 아니다).
+     * 프라이빗 네트워크 안이라 굳이 게이트웨이를 안 거친다(QMS→factory, WMS→fleet과
+     * 같은 방식). P16 WP2부터 {@link ServiceTokenProvider}가 발급한 서비스 토큰을 실어
+     * 보낸다 — factory {@code /api/layout}도 이제 인증을 요구한다.
      */
     private final String layoutUrl;
 
-    public LocationRegistry(@Value("${layout.url:http://localhost:9001/api/layout}") String layoutUrl) {
+    private final ServiceTokenProvider tokenProvider;
+
+    public LocationRegistry(
+            @Value("${layout.url:http://localhost:9001/api/layout}") String layoutUrl,
+            ServiceTokenProvider tokenProvider
+    ) {
         this.layoutUrl = layoutUrl;
+        this.tokenProvider = tokenProvider;
     }
 
     @EventListener(ApplicationReadyEvent.class)
@@ -363,6 +370,7 @@ public class LocationRegistry {
         try {
             HttpRequest request = HttpRequest.newBuilder(URI.create(layoutUrl))
                     .timeout(Duration.ofSeconds(5))
+                    .header("Authorization", "Bearer " + tokenProvider.token())
                     .GET()
                     .build();
 

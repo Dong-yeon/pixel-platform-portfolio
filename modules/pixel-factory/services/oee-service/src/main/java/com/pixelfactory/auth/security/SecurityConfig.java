@@ -53,10 +53,11 @@ public class SecurityConfig {
                         // Prometheus 스크레이핑용. 이 서비스는 Railway에서 퍼블릭 도메인이
                         // 없다(gateway만 연다) — 로컬·프라이빗 네트워크 전제로 인증 없이 연다.
                         .requestMatchers("/actuator/**").permitAll()
-                        // 평면도는 민감정보가 아니고(설비 위치·하역 좌표뿐), **fleet이 기동 시
-                        // 읽어야 한다**. 서비스 간 인증(M2M)이 아직 없어 토큰을 받을 방법이
-                        // 없으므로 열어 둔다 — 자세한 근거는 LayoutController Javadoc.
-                        .requestMatchers(HttpMethod.GET, "/api/layout").permitAll()
+                        // GET /api/layout은 P16 WP2 전까지 여기서 permitAll이었다(M2M 인증이
+                        // 없어 fleet이 토큰을 받을 방법이 없었기 때문 — 근거는 LayoutController
+                        // Javadoc). 이제 fleet도 QMS/WMS와 같은 ServiceTokenProvider 패턴으로
+                        // 서비스 토큰을 실어 보내므로 별도 예외 없이 anyRequest().authenticated()에
+                        // 맡긴다.
                         .requestMatchers("/swagger-ui.html", "/swagger-ui/**", "/v3/api-docs/**").permitAll()
                         // WebSocket(STOMP/SockJS) 핸드셰이크. SockJS는 핸드셰이크에 Authorization
                         // 헤더를 실을 수 없어 통과시킨다 — 게이트웨이도 /ws/**는 인증 없이 넘긴다.

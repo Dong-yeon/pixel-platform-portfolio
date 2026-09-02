@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.when;
 
 import com.pixelfleet.location.LocationRegistry;
+import com.pixelfleet.location.ServiceTokenProvider;
 import com.pixelfleet.order.domain.FleetOrder;
 import com.pixelfleet.robot.domain.RobotStatus;
 import com.pixelfleet.robot.domain.RobotType;
@@ -21,7 +22,8 @@ import org.mockito.Mockito;
  */
 class GraphCostAwareAssignmentPolicyTest {
 
-    private final LocationRegistry locations = new LocationRegistry("http://unused:0/api/layout");
+    private final LocationRegistry locations =
+            new LocationRegistry("http://unused:0/api/layout", Mockito.mock(ServiceTokenProvider.class));
     private final ObstacleStore obstacles = Mockito.mock(ObstacleStore.class);
     private final LaneGraph laneGraph = new LaneGraph(locations, obstacles);
     private final GraphCostAwareAssignmentPolicy graphCostPolicy =

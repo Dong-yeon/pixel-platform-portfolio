@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.when;
 
 import com.pixelfleet.location.LocationRegistry;
+import com.pixelfleet.location.ServiceTokenProvider;
 import com.pixelfleet.traffic.LaneGraph.RoutePlan;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
@@ -17,11 +18,13 @@ import org.mockito.Mockito;
  * 폴백 노드·엣지로 즉시 동작한다(필드 초기화 시점에 채워짐), 이번 리팩터로 처음 생기는
  * 안전망이다(리서치 확인: 이 모듈엔 이전까지 테스트가 하나도 없었다). {@link ObstacleStore}는
  * Redis가 필요해 Mockito로 대체한다 — 스텁하지 않으면 {@code isBlocked}는 기본값 false라
- * 기존 케이스에 영향이 없다.
+ * 기존 케이스에 영향이 없다. {@link ServiceTokenProvider}도 같은 이유로 Mockito 목이다 —
+ * {@code refresh()}(따라서 {@code token()})를 호출하지 않는 이 테스트엔 실제 JWT가 필요 없다.
  */
 class LaneGraphTest {
 
-    private final LocationRegistry locations = new LocationRegistry("http://unused:0/api/layout");
+    private final LocationRegistry locations =
+            new LocationRegistry("http://unused:0/api/layout", Mockito.mock(ServiceTokenProvider.class));
     private final ObstacleStore obstacles = Mockito.mock(ObstacleStore.class);
     private final LaneGraph laneGraph = new LaneGraph(locations, obstacles);
 

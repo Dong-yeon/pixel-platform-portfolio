@@ -201,7 +201,7 @@ jjwt를 직접 가져왔다.
 근거: 2026-07-30~31 국내 언론 다수 기사 분석(비공개 리서치 문서, 공개 버전에서 제외).
 **기사 자체를 플랫폼에 넣지 않는다.** 뉴스는 근거이고, 여기 적힌 것만 구현 대상이다.
 
-### P16. 인증 경계 정리 (보안 하드닝) 🔶 2파 완료(WP0 CORS + WP1 STOMP 인증 + WP3 MQTT, 2026-09-02) — 남은 건 WP2(M2M)뿐
+### P16. 인증 경계 정리 (보안 하드닝) ✅ 완료(WP0 CORS + WP1 STOMP 인증 + WP2 M2M + WP3 MQTT, 2026-09-02)
 
 > P15 배포 단계에 몰아둔 보안 항목을 앞당긴다. **근거가 생겼다** — IBM '2026 데이터 유출
 > 비용 보고서'에서 침해 원인 공동 1위가 **API·애플리케이션·플러그인 보안 취약점(27%)**과
@@ -228,12 +228,19 @@ jjwt를 직접 가져왔다.
 완료 기준
 
 - [x] 토큰 없이 `/ws/factory` STOMP CONNECT 시 연결이 거부된다 — **완료(P16 1파)**
-- [ ] `GET /api/factory/layout`에 토큰 없이 접근하면 401이다 (WP2, 미착수)
-- [ ] fleet이 서비스 토큰으로 게이트웨이를 경유해 평면도를 받아온다 (WP2, 미착수).
-      **다만 M2M 패턴 자체는 P13·P14에서 먼저 생겼다:** QMS→factory(`ServiceTokenProvider` +
-      `FactoryQualityClient`), WMS→fleet(`ServiceTokenProvider` + `FleetTaskClient`)가 이미 같은
-      방식으로 서비스 토큰을 쓴다. fleet→factory layout 쪽에 같은 패턴을 붙이기만 하면 된다 —
-      새로 설계할 게 아니라 이미 검증된 패턴을 한 곳 더 적용하는 일이다.
+- [x] `GET /api/factory/layout`(실제 경로는 `/api/layout`)에 토큰 없이 접근하면 401이다 —
+      **완료(WP2, 2026-09-02)**. `SecurityConfig`의 permitAll 목록에서 제거해
+      `anyRequest().authenticated()`에 맡겼다.
+- [x] fleet이 서비스 토큰으로 factory 평면도를 받아온다 — **완료(WP2, 2026-09-02)**.
+      QMS→factory(`ServiceTokenProvider` + `FactoryQualityClient`), WMS→fleet
+      (`ServiceTokenProvider` + `FleetTaskClient`)와 같은 패턴을 fleet에도 신설
+      (`com.pixelfleet.location.ServiceTokenProvider`) — `LocationRegistry`가 factory를
+      부를 때 `Authorization: Bearer` 헤더를 싣는다. **게이트웨이는 경유하지 않는다** —
+      원안은 "게이트웨이 경유"였지만, 이미 있던 QMS/WMS 선례가 프라이빗 네트워크 안에서
+      모듈 직접 호출 + 서비스 토큰 방식이라 그 관례를 그대로 따랐다(경유하려면 게이트웨이에
+      모듈→모듈 라우트를 새로 뚫어야 하는데, 기존 두 사례가 안 그랬던 이유를 뒤집을 근거가
+      없었다). 기동 순서 폴백(하드코딩 노드·엣지)은 그대로 유지 — factory가 늦게 뜨거나
+      토큰 검증이 실패해도 fleet은 계속 동작한다.
 - [x] 익명 MQTT 접속이 거부된다 — **완료(WP3, 2026-09-02, `docs/pixel-platform-roadmap.md` P15와 겹쳐서 그쪽 계기로 먼저 착수)**. `allow_anonymous false` + password file(컨테이너 기동마다 `MQTT_USERS` 환경변수로 생성, git엔 평문 없음) + ACL(도메인별 topic 접근 범위, wms/qms는 읽기 전용). 6개 서비스 전부 인증 접속 라이브 확인.
 - [x] 허용되지 않은 오리진의 브라우저 요청이 CORS에서 막힌다 — **완료(P16 1파)**
 
@@ -270,6 +277,20 @@ jjwt를 직접 가져왔다.
 - 구현·검증 상세는 `docs/pixel-platform-roadmap.md` P15 완료 기준 항목과 `docs/deploy-railway.md`
   "반드시 알아둘 점" 3번 참고 — 여기서 중복 기록하지 않는다.
 - **남은 것**: M2M(WP2)뿐 — `GET /api/factory/layout` 무인증 문제. 아래 완료 기준 참고.
+
+3파 완료 기록 (WP2 M2M, 2026-09-02 — 이걸로 P16 4개 워크패키지 전부 완료)
+
+- 새 파일 1개(`ServiceTokenProvider`, fleet), 수정 4곳(`LocationRegistry`에 헤더 추가,
+  factory `SecurityConfig`에서 permitAll 제거, `LayoutController` Javadoc, 기존 단위
+  테스트 2개의 `LocationRegistry` 생성자 호출부 — 새 파라미터를 Mockito 목으로 채움).
+- `docs/deploy-railway.md`가 QMS/WMS의 M2M을 "아직 없다/백로그"로 **틀리게** 적어 온 걸
+  이번에 같이 정정했다 — 실제로는 P13/P14부터 이미 서비스 토큰을 쓰고 있었다(코드 근거:
+  `com.pixelqms.factory.ServiceTokenProvider`/`com.pixelwms.fleet.ServiceTokenProvider`).
+  문서가 완료된 기능을 계속 미완료로 적어 둔 사례 — 코드가 앞서가고 문서가 못 따라간
+  경우였다.
+- 검증: control-service `./gradlew test` 전체 통과(영향받은 `LaneGraphTest`/
+  `GraphCostAwareAssignmentPolicyTest` 포함), oee-service `./gradlew test` 28/29 통과
+  (나머지 1개는 이 환경 Testcontainers/Docker 이슈로 기존부터 실패 — 무관).
 
 ---
 
