@@ -7,6 +7,9 @@ spring:
 sim:
   broker-url: ${MQTT_BROKER_URL:tcp://localhost:1883}
   client-id: ${MQTT_CLIENT_ID:robot-sim}
+  # 로컬 브로커는 allow_anonymous true라 비워 둔다 — 배포 환경만 MQTT_USERNAME/PASSWORD로 채운다.
+  username: ${MQTT_USERNAME:}
+  password: ${MQTT_PASSWORD:}
   tick-interval-ms: 1000
   speed: 1.5                 # map units advanced per tick while moving
   battery-drain-per-tick: 0.4   # % drained per moving tick

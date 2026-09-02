@@ -35,6 +35,9 @@ mqtt:
   client-id: ${MQTT_CLIENT_ID:qms-service}
   # factory가 발행하는 품질 신호(검사 요청)를 구독한다. factory는 QMS를 모른다.
   topic-filter: "factory/quality/#"
+  # 로컬 브로커는 allow_anonymous true라 비워 둔다 — 배포 환경만 MQTT_USERNAME/PASSWORD로 채운다.
+  username: ${MQTT_USERNAME:}
+  password: ${MQTT_PASSWORD:}
 
 factory:
   # MRB 홀드/해제를 factory에 요청한다. 서비스 간 인증(M2M)이 없어 모듈에 직접 붙는다.
@@ -100,6 +103,8 @@ mqtt:
   broker-url: ${MQTT_BROKER_URL:tcp://localhost:1883}
   client-id: ${MQTT_CLIENT_ID:qms-service}
   topic-filter: "factory/quality/#"
+  username: ${MQTT_USERNAME:}
+  password: ${MQTT_PASSWORD:}
 
 factory:
   base-url: ${FACTORY_BASE_URL:http://localhost:9001}

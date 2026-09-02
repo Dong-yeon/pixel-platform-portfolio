@@ -53,6 +53,11 @@ public class MqttEventSubscriber implements MqttCallbackExtended {
             options.setCleanSession(false);
             options.setAutomaticReconnect(true);
             options.setConnectionTimeout(5);
+            // 비어 있으면(로컬) 인증 없이 접속 — 배포 환경만 MQTT_USERNAME/PASSWORD로 채운다.
+            if (properties.getUsername() != null && !properties.getUsername().isBlank()) {
+                options.setUserName(properties.getUsername());
+                options.setPassword(properties.getPassword().toCharArray());
+            }
 
             client.connect(options);
         } catch (MqttException e) {

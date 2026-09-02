@@ -55,6 +55,10 @@ public class MqttEventSubscriber implements MqttCallbackExtended {
             options.setCleanSession(false);
             options.setAutomaticReconnect(true);
             options.setConnectionTimeout(5);
+            if (properties.getUsername() != null && !properties.getUsername().isBlank()) {
+                options.setUserName(properties.getUsername());
+                options.setPassword(properties.getPassword().toCharArray());
+            }
             client.connect(options);
             log.info("MQTT subscriber connected to {}", properties.getBrokerUrl());
         } catch (MqttException e) {

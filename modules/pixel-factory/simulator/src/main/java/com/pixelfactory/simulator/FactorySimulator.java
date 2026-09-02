@@ -36,8 +36,11 @@ import org.eclipse.paho.client.mqttv3.persist.MemoryPersistence;
  * 86% 근처에 평평하게 붙었다.
  *
  * 환경변수:
- *   MQTT_URL   기본 tcp://localhost:1883
- *   SIM_SPEED  배속 (기본 1 = 압축하지 않음). 올리면 OEE의 P가 그 배수만큼 부풀려진다.
+ *   MQTT_URL       기본 tcp://localhost:1883
+ *   SIM_SPEED      배속 (기본 1 = 압축하지 않음). 올리면 OEE의 P가 그 배수만큼 부풀려진다.
+ *   MQTT_USERNAME  비어 있으면(로컬) 인증 없이 접속 — 배포 환경만 채운다.
+ *   MQTT_PASSWORD  위와 같음. 8대 설비가 전부 같은 계정을 공유한다(하나의 시뮬레이터
+ *                  프로세스이므로 신뢰 경계가 이미 같다).
  */
 public final class FactorySimulator {
 
@@ -79,6 +82,8 @@ public final class FactorySimulator {
     public static void main(String[] args) throws Exception {
         String brokerUrl = env("MQTT_URL", "tcp://localhost:1883");
         double speed = Double.parseDouble(env("SIM_SPEED", "1"));
+        String username = env("MQTT_USERNAME", "");
+        String password = env("MQTT_PASSWORD", "");
 
         // 설비마다 **별개 접속**을 쓴다. LWT(유언)는 접속당 하나뿐이라, 접속을 공유하면
         // 8대 중 한 대의 status 토픽에만 유언을 걸 수 있다. 실제 현장에서도 설비마다
@@ -87,7 +92,7 @@ public final class FactorySimulator {
         ExecutorService pool = Executors.newFixedThreadPool(EQUIPMENTS.size());
 
         for (EquipmentSpec spec : EQUIPMENTS) {
-            MqttClient client = connect(brokerUrl, spec);
+            MqttClient client = connect(brokerUrl, spec, username, password);
             clients.add(client);
             pool.submit(() -> runEquipment(client, spec, speed));
         }
@@ -112,7 +117,8 @@ public final class FactorySimulator {
     }
 
     /** 설비 하나 몫의 접속을 만든다. 자기 status 토픽에 유언을 걸어 둔다. */
-    private static MqttClient connect(String brokerUrl, EquipmentSpec spec) throws MqttException {
+    private static MqttClient connect(String brokerUrl, EquipmentSpec spec, String username, String password)
+            throws MqttException {
         MqttClient client = new MqttClient(
                 brokerUrl,
                 "simulator-" + spec.code(),
@@ -122,6 +128,10 @@ public final class FactorySimulator {
         MqttConnectOptions options = new MqttConnectOptions();
         options.setCleanSession(true);
         options.setAutomaticReconnect(true);
+        if (!username.isBlank()) {
+            options.setUserName(username);
+            options.setPassword(password.toCharArray());
+        }
 
         // 유언(LWT) — 비정상 종료(프로세스 강제 종료·네트워크 단절)면 브로커가 대신 발행한다.
         // 없으면 설비가 마지막 RUNNING 상태로 영원히 남아 Availability 가 부풀려진다.

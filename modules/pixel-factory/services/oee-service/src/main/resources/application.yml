@@ -40,6 +40,9 @@ mqtt:
   # 서로 밀어낸다. 로컬에서 여러 개 띄울 때는 MQTT_CLIENT_ID 로 구분할 것.
   client-id: ${MQTT_CLIENT_ID:oee-service}
   topic-filter: "factory/#"
+  # 로컬 브로커는 allow_anonymous true라 비워 둔다 — 배포 환경만 MQTT_USERNAME/PASSWORD로 채운다.
+  username: ${MQTT_USERNAME:}
+  password: ${MQTT_PASSWORD:}
 
 pop:
   # POP 단말 presence(파생 위치) 타임아웃(분). 마지막 조작 후 이 시간이 지나면 지도 배지를 뗀다.
@@ -123,3 +126,5 @@ mqtt:
   broker-url: ${MQTT_BROKER_URL:tcp://localhost:1883}
   client-id: ${MQTT_CLIENT_ID:oee-service}
   topic-filter: "factory/#"
+  username: ${MQTT_USERNAME:}
+  password: ${MQTT_PASSWORD:}

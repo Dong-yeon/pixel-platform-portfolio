@@ -1,0 +1,4 @@
+# 컨테이너 안에서(리눅스) 실행되는 셸 스크립트는 CRLF가 섞이면 깨진다
+# (`#!/bin/sh\r` 셔뱅 오류). Windows 개발 환경(core.autocrlf=true)과 무관하게
+# 항상 LF로 저장한다.
+*.sh text eol=lf

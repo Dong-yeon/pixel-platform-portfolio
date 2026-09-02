@@ -37,6 +37,9 @@ mqtt:
   # fleet이 발행하는 운송 작업 생명주기(fleet/tasks/#)를 구독해 완료 시 재고를 차감한다.
   # fleet이 WMS를 모르게 하기 위해 REST 콜백이 아니라 이벤트 구독으로 받는다.
   topic-filter: "fleet/tasks/#"
+  # 로컬 브로커는 allow_anonymous true라 비워 둔다 — 배포 환경만 MQTT_USERNAME/PASSWORD로 채운다.
+  username: ${MQTT_USERNAME:}
+  password: ${MQTT_PASSWORD:}
 
 fleet:
   # 출고지시가 생기면 fleet에 운송 작업을 요청한다. 게이트웨이(9000) 경유가 원칙이지만
@@ -97,6 +100,8 @@ mqtt:
   broker-url: ${MQTT_BROKER_URL:tcp://localhost:1883}
   client-id: ${MQTT_CLIENT_ID:wms-service}
   topic-filter: "fleet/tasks/#"
+  username: ${MQTT_USERNAME:}
+  password: ${MQTT_PASSWORD:}
 
 fleet:
   base-url: ${FLEET_BASE_URL:http://localhost:9002}
