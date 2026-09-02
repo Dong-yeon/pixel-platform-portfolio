@@ -89,7 +89,17 @@ factory는 플러그인이 준 기본 DB를 그대로 쓴다.
 | Root Directory | `infra/mosquitto` |
 | 도메인 | **만들지 않는다** (프라이빗 전용) |
 
-환경변수 없음. 다른 서비스는 `tcp://mosquitto.railway.internal:1883`로 붙는다.
+```
+MQTT_USERS=factory-sim:<비번>,oee-service:<비번>,control-service:<비번>,robot-sim:<비번>,wms-service:<비번>,qms-service:<비번>
+```
+
+`MQTT_USERS`는 `user:pass,user:pass,...` 형식이다 — 각 값은 아래 5개 소비 서비스의
+`MQTT_PASSWORD`와 **정확히 같아야 한다**(같은 계정, 두 곳에 나눠 적는 값). 컨테이너가
+뜰 때마다 `docker-entrypoint.sh`가 이 값으로 비밀번호 파일을 새로 만든다 — 이미지에도
+git에도 평문이 남지 않는다. `acl.conf`가 계정별 토픽 접근 범위를 고정한다(각 서비스가
+자기 도메인 밖 토픽은 구독·발행 못 함 — wms-service/qms-service는 읽기 전용).
+
+다른 서비스는 `tcp://mosquitto.railway.internal:1883`로 붙는다.
 
 ### 2-2. pixel-factory (프라이빗)
 
@@ -108,6 +118,8 @@ SPRING_DATASOURCE_USERNAME=${{Postgres.PGUSER}}
 SPRING_DATASOURCE_PASSWORD=${{Postgres.PGPASSWORD}}
 MQTT_BROKER_URL=tcp://mosquitto.railway.internal:1883
 MQTT_CLIENT_ID=oee-service
+MQTT_USERNAME=oee-service
+MQTT_PASSWORD=<mosquitto MQTT_USERS의 oee-service 값과 동일>
 PLATFORM_JWT_SECRET=<32바이트 이상 랜덤 문자열>   ← 게이트웨이·모든 모듈이 같은 값
 DASHBOARD_ORIGIN=https://<게이트웨이 도메인>      ← P16 CORS. gateway·factory·fleet 세 곳 동일
 ```
@@ -130,6 +142,8 @@ SPRING_DATASOURCE_PASSWORD=<1단계에서 정한 비밀번호>
 REDIS_URL=${{Redis.REDIS_URL}}
 MQTT_BROKER_URL=tcp://mosquitto.railway.internal:1883
 MQTT_CLIENT_ID=control-service
+MQTT_USERNAME=control-service
+MQTT_PASSWORD=<mosquitto MQTT_USERS의 control-service 값과 동일>
 LAYOUT_URL=http://pixel-factory.railway.internal:9001/api/layout
 PLATFORM_JWT_SECRET=<32바이트 이상 랜덤 문자열>   ← 게이트웨이·모든 모듈이 같은 값
 DASHBOARD_ORIGIN=https://<게이트웨이 도메인>      ← P16 CORS. gateway·factory·fleet 세 곳 동일
@@ -161,6 +175,8 @@ SPRING_DATASOURCE_USERNAME=wms
 SPRING_DATASOURCE_PASSWORD=<1단계에서 정한 비밀번호>
 MQTT_BROKER_URL=tcp://mosquitto.railway.internal:1883
 MQTT_CLIENT_ID=wms-service
+MQTT_USERNAME=wms-service
+MQTT_PASSWORD=<mosquitto MQTT_USERS의 wms-service 값과 동일>
 FLEET_BASE_URL=http://pixel-fleet.railway.internal:9002
 PLATFORM_JWT_SECRET=<32바이트 이상 랜덤 문자열>   ← 게이트웨이·모든 모듈이 같은 값
 ```
@@ -185,6 +201,8 @@ SPRING_DATASOURCE_USERNAME=qms
 SPRING_DATASOURCE_PASSWORD=<1단계에서 정한 비밀번호>
 MQTT_BROKER_URL=tcp://mosquitto.railway.internal:1883
 MQTT_CLIENT_ID=qms-service
+MQTT_USERNAME=qms-service
+MQTT_PASSWORD=<mosquitto MQTT_USERS의 qms-service 값과 동일>
 FACTORY_BASE_URL=http://pixel-factory.railway.internal:9001
 PLATFORM_JWT_SECRET=<32바이트 이상 랜덤 문자열>   ← 게이트웨이·모든 모듈이 같은 값
 ```
@@ -202,6 +220,8 @@ PLATFORM_JWT_SECRET=<32바이트 이상 랜덤 문자열>   ← 게이트웨이�
 ```
 MQTT_BROKER_URL=tcp://mosquitto.railway.internal:1883
 MQTT_CLIENT_ID=robot-sim
+MQTT_USERNAME=robot-sim
+MQTT_PASSWORD=<mosquitto MQTT_USERS의 robot-sim 값과 동일>
 ```
 
 > 시뮬레이터는 1초마다 텔레메트리를 발행한다. 사용량이 부담되면 이 서비스만
@@ -216,7 +236,13 @@ MQTT_CLIENT_ID=robot-sim
 
 ```
 MQTT_URL=tcp://mosquitto.railway.internal:1883
+MQTT_USERNAME=factory-sim
+MQTT_PASSWORD=<mosquitto MQTT_USERS의 factory-sim 값과 동일>
 ```
+
+> 이 프로세스는 Spring이 아니라서 변수명이 다르다 — 브로커 URL은 `MQTT_URL`(다른
+> 서비스는 `MQTT_BROKER_URL`), 계정은 `MQTT_USERNAME`/`MQTT_PASSWORD`로 다른 서비스와
+> 같다. 설비 8대가 전부 이 계정 하나를 공유한다(같은 프로세스이므로 신뢰 경계가 이미 같다).
 
 > 설비 8대가 사이클·상태(RUNNING/DOWN)를 발행한다. 데모 공장은 사이클이 1.5~4.5초로
 > 짧게 정의돼 있어(V6에서 압축) 배속 없이도 화면이 활발하다.
@@ -347,8 +373,15 @@ Mosquitto도 같은 이유로 배포용 설정(`mosquitto.railway.conf`)에서 b
 도메인을 열면 누구나 로그인할 수 있다. 포트폴리오 공개용이면 그대로 두되, 그 이상이면
 시드 비밀번호부터 바꿀 것.
 
-**3. MQTT 인증 없음** — 브로커는 익명 접속을 허용한다. Railway 프라이빗 네트워크 안에서만
-접근 가능하다는 전제이므로 **mosquitto에 퍼블릭 도메인을 만들면 안 된다.**
+**3. MQTT 계정 인증 켬(2026-09-02)** — `allow_anonymous false` + 비밀번호 파일 + ACL.
+1차 방어선은 여전히 프라이빗 네트워크 격리(**mosquitto에 퍼블릭 도메인을 만들면 안
+된다** — 원칙은 그대로다), 계정 인증은 2차 방어선이다. 계기: `railway domain --service
+mosquitto`를 **조회 목적으로** 인자 없이 실행했더니 실제로 도메인이 생성돼 버렸다
+(`railway domain`은 인자가 없으면 조회가 아니라 **도메인을 새로 만드는** 명령이다 —
+목록만 보려면 `railway domain list --service <name>`을 쓸 것). 그 상태로 브로커가
+잠깐 익명 공개돼 있었다는 걸 뒤늦게 깨닫고(로그로 외부 접속 없음 확인 후) 그 자리에서
+계정 인증을 넣었다. `railway domain delete <도메인> --service <name> --yes`로 즉시
+삭제했다.
 
 **4. 이벤트 테이블 증가** — `fleet_events`/`factory_events`는 계속 쌓이되, 매일 새벽
 90일 초과분을 벌크 DELETE하는 보존 정책이 돈다. 무한히 자라지는 않지만 시뮬레이터를

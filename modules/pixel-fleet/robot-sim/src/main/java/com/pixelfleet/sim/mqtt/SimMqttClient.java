@@ -52,6 +52,10 @@ public class SimMqttClient implements MqttCallbackExtended {
             // 이 시뮬레이터엔 낮다(P20-4 이후 obstacle 발행까지 겹치며 실측: "Too many publishes
             // in progress"로 소리 없이 드롭됨 — 다음 하트비트가 자가 복구하지만 근본 원인을 둔다).
             options.setMaxInflight(50);
+            if (properties.getUsername() != null && !properties.getUsername().isBlank()) {
+                options.setUserName(properties.getUsername());
+                options.setPassword(properties.getPassword().toCharArray());
+            }
             client.connect(options);
         } catch (MqttException e) {
             log.warn("Could not connect to MQTT broker {}. Start it (docker compose up mosquitto) "

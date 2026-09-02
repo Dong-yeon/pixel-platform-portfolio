@@ -9,6 +9,9 @@ public class SimProperties {
 
     private String brokerUrl;
     private String clientId;
+    // 비어 있으면(로컬) 인증 없이 접속 — 배포 환경만 MQTT_USERNAME/PASSWORD로 채운다.
+    private String username;
+    private String password;
     private long tickIntervalMs = 1000;
     private double speed = 1.5;
     private double batteryDrainPerTick = 0.4;
@@ -93,6 +96,22 @@ public class SimProperties {
 
     public void setClientId(String clientId) {
         this.clientId = clientId;
+    }
+
+    public String getUsername() {
+        return username;
+    }
+
+    public void setUsername(String username) {
+        this.username = username;
+    }
+
+    public String getPassword() {
+        return password;
+    }
+
+    public void setPassword(String password) {
+        this.password = password;
     }
 
     public long getTickIntervalMs() {

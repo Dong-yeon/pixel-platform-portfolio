@@ -57,6 +57,10 @@ public class MqttQualityEventPublisher {
             options.setCleanSession(true);
             options.setAutomaticReconnect(true);
             options.setConnectionTimeout(5);
+            if (properties.getUsername() != null && !properties.getUsername().isBlank()) {
+                options.setUserName(properties.getUsername());
+                options.setPassword(properties.getPassword().toCharArray());
+            }
             client.connect(options);
             log.info("MQTT quality publisher connected to {}", properties.getBrokerUrl());
         } catch (MqttException e) {
