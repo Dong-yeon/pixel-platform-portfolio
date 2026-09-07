@@ -4,10 +4,23 @@
 
 > **Spring Cloud Gateway + MQTT 기반 실시간 IoT/로봇 군집 관제(FMS) 마이크로서비스 플랫폼**
 
+- 가공설비 OEE · AMR 로봇 군집 관제 · 창고 재고 · 품질 MRB, 4개 제조 도메인을 게이트웨이 하나로
+  묶은 컴포저블 마이크로서비스 플랫폼입니다.
+- 그래프 기반 AMR 경로탐색, MQTT 이벤트 기반 OEE 계산, MRB 심의가 별개 서비스의 설비를
+  홀드로 바꾸는 왕복까지 — 현장에서 겪은 규칙과 실제 사고가 코드·테스트에 그대로 남아 있습니다.
+- 로그인만 하면 4개 시스템이 실제로 도는 라이브 데모이며, 코드를 열지 않고도
+  [10분 투어](docs/10min-tour.md)로 핵심을 확인할 수 있습니다.
+
+<p align="center">
+  <img src="docs/images/overview.png" width="32%" alt="통합 현황 — 공장 지도·AMR·OEE 실시간" />
+  <img src="docs/images/fleet.png" width="32%" alt="PixelFleet — AGV 군집 관제·운송 작업 큐" />
+  <img src="docs/images/factory.png" width="32%" alt="PixelFactory — 설비 현황·작업지시·이벤트 타임라인" />
+</p>
+
 ## 🚀 라이브 데모
 
 **[happyeon-pixel-platform.up.railway.app](https://happyeon-pixel-platform.up.railway.app)**
-— `admin` / `password`로 로그인 (데모 계정)
+— `admin` / `password`로 로그인 (데모 계정) · [10분 투어 가이드](docs/10min-tour.md)
 
 > **4개 모듈(Factory·Fleet·WMS·QMS) 전부 라이브입니다** — Railway 서비스 9개 + 플러그인 2개.
 > 배포 절차는 [`docs/deploy-railway.md`](docs/deploy-railway.md) 참고.
@@ -98,6 +111,27 @@ A*/Dijkstra 경로탐색**으로 전면 교체했습니다. 그래프 엣지 비
 * **Database & Infrastructure:** PostgreSQL 16(모듈별 독립 DB), Redis 7(PixelFleet 실시간 상태 전용), Eclipse Mosquitto(MQTT Broker), Docker Compose
 * **Environment:** Windows / PowerShell 기준으로 작성됐지만, `./gradlew`(bash)도 동일하게
   동작합니다(CI가 Linux에서 이 방식으로 빌드). Gradle Wrapper — 모듈별 독립 빌드, 루트 통합 빌드 없음
+
+---
+
+## 🤝 AI 도구 활용 방식
+
+이 프로젝트는 Claude Code로 구현했습니다. 숨기지 않고 적습니다 — 대신 무엇을 맡기고 무엇을
+맡기지 않았는지를 명확히 하겠습니다.
+
+* **도메인 규칙과 완료 기준은 실무 경험에서 나온 판단입니다.** OEE 성능 지표가 100%를 넘어도
+  자르지 않고 표준CT 오류 신호로 남기는 것, BOM 개정 번호를 화면값이 아니라 DB `MAX+1`로
+  잡는 것, hold-and-wait 교착이나 배터리 사각지대 같은 장애를 먼저 "왜 일어났는지" 재현하고
+  나서 고치는 순서 — 전부 실제 MES 현장에서 부딪혀본 문제들이고, 그걸 어떻게 코드 규칙으로
+  못박을지는 제가 정했습니다.
+* **Claude Code는 그 규칙을 코드로 옮기는 실행기였습니다.** [`docs/pixel-platform-roadmap.md`](docs/pixel-platform-roadmap.md)가
+  실제로 그 작업 방식입니다 — 각 단계에 `목표 → 작업 → 완료 기준 → 주의`를 제가 먼저 쓰고,
+  **완료 기준을 통과하지 못하면 다음 단계로 넘어가지 않는다**는 원칙으로 한 단계당 한 커밋씩
+  검증하며 진행했습니다. 보일러플레이트, 리팩터링, 테스트 코드 작성, 오류 메시지를 보고 원인을
+  좁혀가는 반복 작업 대부분이 이 방식으로 나왔습니다.
+* **그래서 뭘 물어봐도 됩니다.** "왜 이 임계값인지", "왜 이 신호는 REST 대신 MQTT로 흘려보내는지"
+  같은 질문에는 코드가 아니라 제 경험과 판단으로 답할 수 있습니다 — 그 근거가 이미
+  로드맵·BACKLOG 문서에 커밋 단위로 남아 있습니다.
 
 ---
 

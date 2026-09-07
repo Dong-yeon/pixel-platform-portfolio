@@ -1,7 +1,8 @@
 # PixelFleet
 
 자율주행 물류로봇(AMR) 군집 관제 시스템(FMS) 데모.
-Spring Boot 관제 서버 + MQTT + (ROS 2 / 시뮬레이터) 로봇 + React 관제 화면.
+Spring Boot 관제 서버 + MQTT + 로봇(현재는 시뮬레이터, ROS 2 하드웨어 연동은 Phase 4 목표) +
+통합 관제 화면.
 
 전체 설계와 원칙은 [CLAUDE.md](CLAUDE.md), 통신 계약은 [docs/mqtt-topics.md](docs/mqtt-topics.md) 참고.
 
@@ -9,10 +10,13 @@ Spring Boot 관제 서버 + MQTT + (ROS 2 / 시뮬레이터) 로봇 + React 관�
 
 | 디렉터리 | 내용 | 상태 |
 |---|---|---|
-| `services/control-service/` | Spring Boot 3 관제 서버 (REST + MQTT 수집) | 골격 구현 |
-| `robot-sim/` | 가짜 로봇 시뮬레이터 (MQTT 발행) | 예정 (Phase 1) |
-| `web/` | React 실시간 관제 대시보드 | 예정 (Phase 3) |
-| `infra/` | docker-compose (PostgreSQL, Mosquitto) | 완료 |
+| `services/control-service/` | Spring Boot 3 관제 서버 (그래프 라우팅·교통정리·REST/WebSocket) | 완료, Railway 라이브 |
+| `robot-sim/` | 로봇 시뮬레이터 (위치·상태·배터리·작업 텔레메트리를 MQTT로 발행) | 완료 |
+| `infra/` | docker-compose (PostgreSQL, Mosquitto, Redis) | 완료 |
+
+실시간 관제 화면은 이 모듈 안이 아니라 통합 대시보드([`platform/dashboard`](../../platform/dashboard))에
+있다 — 초기엔 이 모듈 전용 `web/`을 따로 뒀지만 통합 대시보드로 흡수됐고(D3 결정,
+`docs/pixel-platform-plan.md`), 갱신 없이 방치된 옛 코드를 정리하며 삭제했다(2026-09).
 
 ## 로컬 실행
 

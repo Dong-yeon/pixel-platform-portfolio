@@ -2,8 +2,8 @@
 
 자율주행 물류로봇(AMR) **군집 관제 시스템(FMS)** 포트폴리오.
 관제 서버가 운송 작업을 받아 우선순위·로봇 상태·배터리를 근거로 로봇에 배정하고,
-로봇(ROS 2 / 시뮬레이터)은 MQTT로 상태를 보고하며, 웹 관제 화면이 이를 실시간으로
-보여주는 **이벤트 기반 컴포저블 구조**를 목표로 한다.
+로봇(현재는 시뮬레이터, ROS 2 하드웨어 연동은 Phase 4 목표)은 MQTT로 상태를 보고하며,
+웹 관제 화면이 이를 실시간으로 보여주는 **이벤트 기반 컴포저블 구조**를 목표로 한다.
 
 > 자매 프로젝트 **PixelFactory**(가공 라인 OEE 모니터링)와 도메인은 다르지만,
 > "이벤트 단일 진실 공급원 + MQTT 수집 + 실시간 push" 아키텍처 원칙과 공통 코어
@@ -28,9 +28,13 @@
 |---|---|
 | `services/control-service/` | Spring Boot 3 관제 서버 — 작업 수집·배정·상태머신, 이벤트 영속화, REST/WebSocket API |
 | `robot-sim/` | 가짜 로봇 시뮬레이터 — 위치/상태/배터리/작업 이벤트를 MQTT로 발행 (ROS 2 연동 전 단계) |
-| `web/` | 실시간 관제 대시보드 (공장 지도, 로봇 마커, 작업/장애 로그) |
 | `infra/` | docker-compose (PostgreSQL, Mosquitto, Redis) |
 | `docs/` | MQTT 토픽 계약, 백로그 |
+
+실시간 관제 화면(공장 지도, 로봇 마커, 작업/장애 로그)은 모듈 전용 `web/`이 아니라 통합
+대시보드([`platform/dashboard`](../../platform/dashboard))에 있다 — Phase 3에서 만든
+전용 `web/`은 통합 대시보드로 흡수된 뒤(D3 결정) 갱신 없이 방치돼 있었고, 정리하며
+삭제했다(2026-09).
 
 **저장소 분리:** Postgres = 이벤트 로그(SSOT) + 마스터(로봇 id/code/name, 작업).
 Redis = 로봇 라이브 상태(위치·배터리·상태, `fleet:robot:{code}`) — tick마다 나가던
@@ -62,12 +66,18 @@ Postgres UPDATE 제거. WebSocket 브로드캐스트도 Redis Pub/Sub(`fleet:rea
 - **Phase 0** — 리포 셋업, 공통 코어 이식, 도메인 골격(robot/task/event), MQTT 계약 ✅
 - **Phase 1** — robot-sim(상태·위치·배터리·작업 텔레메트리 + GOTO 수행),
   downlink 명령 토픽(`fleet/{code}/command`), 배차 스케줄러(주기 자동 dispatch),
-  할당 정책(우선순위 FIFO + 최근접·배터리 인지) ✅ (현재)
+  할당 정책(우선순위 FIFO + 최근접·배터리 인지) ✅
 - **Phase 2** — STOMP/WebSocket 실시간 push(`/topic/robots`·`/topic/events`),
   트랜잭션 커밋 후 브로드캐스트, 로밍-배차 레이스 수정 ✅
-- **Phase 3** — web 관제 대시보드(지도·로봇 마커·작업 조작·이벤트 타임라인) ✅ (현재).
-  남은 것: Railway 배포(단일 오리진으로 web 빌드 서빙 + Postgres + MQTT)
+- **Phase 3** — web 관제 대시보드(지도·로봇 마커·작업 조작·이벤트 타임라인) ✅. 이후 통합
+  대시보드(`platform/dashboard`)로 흡수(D3 결정)되고 Railway에 배포됨 — 이 로드맵은 그 이전
+  단계까지의 기록이다.
+- **Phase 3.5 이후(별도 설계 문서)** — 노드-엣지 그래프 + A*/Dijkstra 경로탐색으로 라우터
+  교체, 구간(segment) 단위 점유 예약, Redis Pub/Sub 실시간 상태, 다중 건물 확장 —
+  `docs/p20-layout-routing-design.md` 등 루트 `docs/`의 개별 설계 문서에 있다(이 CLAUDE.md는
+  갱신하지 않고 있었다).
 - **Phase 4** — robot-sim 을 ROS 2(Gazebo + TurtleBot3 + Nav2) 브릿지로 교체, 멀티로봇 교통정리
+  (교통정리는 위 그래프 라우팅 작업으로 이미 구현됨 — 남은 건 실물 ROS 2 연동)
 
 ## 개발 환경
 
