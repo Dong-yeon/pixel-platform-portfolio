@@ -4,10 +4,23 @@
 
 > **Spring Cloud Gateway + MQTT 기반 실시간 IoT/로봇 군집 관제(FMS) 마이크로서비스 플랫폼**
 
+- 가공설비 OEE · AMR 로봇 군집 관제 · 창고 재고 · 품질 MRB, 4개 제조 도메인을 게이트웨이 하나로
+  묶은 컴포저블 마이크로서비스 플랫폼입니다.
+- 그래프 기반 AMR 경로탐색, MQTT 이벤트 기반 OEE 계산, MRB 심의가 별개 서비스의 설비를
+  홀드로 바꾸는 왕복까지 — 현장에서 겪은 규칙과 실제 사고가 코드·테스트에 그대로 남아 있습니다.
+- 로그인만 하면 4개 시스템이 실제로 도는 라이브 데모이며, 코드를 열지 않고도
+  [10분 투어](docs/10min-tour.md)로 핵심을 확인할 수 있습니다.
+
+<p align="center">
+  <img src="docs/images/overview.png" width="32%" alt="통합 현황 — 공장 지도·AMR·OEE 실시간" />
+  <img src="docs/images/fleet.png" width="32%" alt="PixelFleet — AGV 군집 관제·운송 작업 큐" />
+  <img src="docs/images/factory.png" width="32%" alt="PixelFactory — 설비 현황·작업지시·이벤트 타임라인" />
+</p>
+
 ## 🚀 라이브 데모
 
 **[happyeon-pixel-platform.up.railway.app](https://happyeon-pixel-platform.up.railway.app)**
-— `admin` / `password`로 로그인 (데모 계정)
+— `admin` / `password`로 로그인 (데모 계정) · [10분 투어 가이드](docs/10min-tour.md)
 
 > **4개 모듈(Factory·Fleet·WMS·QMS) 전부 라이브입니다** — Railway 서비스 9개 + 플러그인 2개.
 > 배포 절차는 [`docs/deploy-railway.md`](docs/deploy-railway.md) 참고.
