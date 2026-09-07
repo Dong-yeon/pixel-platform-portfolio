@@ -12,8 +12,9 @@ import org.springframework.stereotype.Service;
 
 /**
  * Routes inbound MQTT telemetry to the domain services. This is the only bridge
- * between the ROS 2 world (via the MQTT broker) and the control server; the topic
- * and payload contract lives in docs/mqtt-topics.md.
+ * between the robot world (robot-sim today; a real ROS 2 bridge is future work, see
+ * CLAUDE.md Phase 4) and the control server; the topic and payload contract lives
+ * in docs/mqtt-topics.md.
  *
  * <p>Topic: {@code fleet/{robotCode}/{kind}}   kind ∈ {status, position, battery, task}
  *

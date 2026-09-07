@@ -7,11 +7,14 @@
 
 | 디렉터리 | 역할 | 상태 |
 |---|---|---|
-| `services/oee-service/` | Spring Boot 3 백엔드 (MQTT 수집·이벤트 영속화·API) | 개발 중 |
-| `simulator/` | 설비 시뮬레이터 (MQTT 발행) | 동작 |
-| `web/` | 실시간 OEE 대시보드 | Phase 3 예정 |
+| `services/oee-service/` | Spring Boot 3 백엔드 (MQTT 수집·이벤트 영속화·API) | 완료, Railway 라이브 |
+| `simulator/` | 설비 시뮬레이터 (MQTT 발행) | 완료 |
 | `infra/` | docker-compose (PostgreSQL, Mosquitto) | — |
 | `docs/` | MQTT 토픽 계약, 백로그 | — |
+
+실시간 OEE 대시보드는 이 모듈 안이 아니라 통합 대시보드([`platform/dashboard`](../../platform/dashboard))에
+있다 — 모듈 자체 `web/`은 "Phase 3 예정" 자리표시자 상태로만 있다가, 실제로는 만들지 않고
+바로 통합 대시보드로 갔다(정리하며 삭제).
 
 ## 실행 (로컬)
 
