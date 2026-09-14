@@ -96,7 +96,16 @@ A*/Dijkstra 경로탐색**으로 전면 교체했습니다. 그래프 엣지 비
 
 * **이벤트 기반 실시간 데이터 파이프라인**
   * `Mosquitto`(MQTT)로 설비/로봇 텔레메트리를 수집해 이벤트로 영속화(Event Sourcing) — OEE·작업지시 실적이 이 이벤트 스트림에서 계산됨
+  * 발행자가 비정상 종료하면 브로커가 대신 유언(LWT)을 발행 — 없으면 설비가 마지막
+    `RUNNING`으로 남아 가동률이 부풀려진다. 구독은 `cleanSession=false`+QoS 1이라
+    서버가 내려가 있는 동안 브로커가 큐에 쌓아 뒀다 재접속 때 밀어줌
   * 모듈별 `WebSocket(STOMP)`으로 대시보드에 실시간 push
+  * **다음 단계는 수집이 아니라 그 뒤입니다** — 토픽 루트가 모듈 이름인 지금 구조를
+    ISA-95 계층(UNS)으로 바꾸고, 지금 없는 발행 측 store-and-forward와 유실 카운터를
+    붙이고, 이벤트 테이블을 시계열 저장소로 옮기는 설계가
+    [`docs/p36-*.md`](docs/p36-uns-sparkplug-timeseries-design.md)에 있습니다.
+    **실측 발행량이 약 3 events/s라는 사실을 먼저 적고 시작합니다** — 겪지 않은 부하를
+    근거로 기술을 고르지 않기 위해서입니다
 
 * **컴포저블 도메인 설계**
   * DB per module(모듈별 독립 스키마) 원칙 준수, 모듈 간 직접 코드/DB 참조 금지 — 게이트웨이·REST·MQTT 계약으로만 통신
@@ -259,4 +268,9 @@ curl -H "Authorization: Bearer $TOKEN" http://localhost:9000/api/fleet/robots
   사각지대로 함대 전체가 멈춘 사고, leg 예약 도입 중 겪은 hold-and-wait 교착)
 * [`docs/p20-layout-routing-design.md`](docs/p20-layout-routing-design.md) — 정적 규칙 라우터를
   그래프 탐색으로 교체한 설계 결정과 검증 이력
+* [`docs/p36-uns-sparkplug-timeseries-design.md`](docs/p36-uns-sparkplug-timeseries-design.md) —
+  MQTT 백본을 UNS(ISA-95 토픽 계층)로 승격하고 시계열 저장으로 옮기는 설계. **아직
+  구현 전인 초안이고, 그래서 "왜 지금 하지 않아도 되는가"부터 적혀 있습니다**(0-A절) —
+  Sparkplug B를 규격째 채택하지 않기로 한 이유, OPC UA를 범위 밖으로 뺀 이유처럼
+  **넣지 않기로 한 결정**이 넣기로 한 결정만큼 자세합니다
 * [`docs/deploy-railway.md`](docs/deploy-railway.md) — Railway 배포 가이드와 실제로 겪은 배포 함정
