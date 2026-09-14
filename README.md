@@ -8,7 +8,7 @@
   묶은 컴포저블 마이크로서비스 플랫폼입니다.
 - 그래프 기반 AMR 경로탐색, MQTT 이벤트 기반 OEE 계산, MRB 심의가 별개 서비스의 설비를
   홀드로 바꾸는 왕복까지 — 현장에서 겪은 규칙과 실제 사고가 코드·테스트에 그대로 남아 있습니다.
-- 로그인만 하면 4개 시스템이 실제로 도는 라이브 데모이며, 코드를 열지 않고도
+- 로그인만 하면 4개 시스템이 실제로 함께 도는 구성이며, 코드를 열지 않고도
   [10분 투어](docs/10min-tour.md)로 핵심을 확인할 수 있습니다.
 
 <p align="center">
@@ -17,13 +17,18 @@
   <img src="docs/images/factory.png" width="32%" alt="PixelFactory — 설비 현황·작업지시·이벤트 타임라인" />
 </p>
 
-## 🚀 라이브 데모
+## 🚀 실행 — 지금은 로컬 Docker 기준입니다
 
-**[happyeon-pixel-platform.up.railway.app](https://happyeon-pixel-platform.up.railway.app)**
-— `admin` / `password`로 로그인 (데모 계정) · [10분 투어 가이드](docs/10min-tour.md)
-
-> **4개 모듈(Factory·Fleet·WMS·QMS) 전부 라이브입니다** — Railway 서비스 9개 + 플러그인 2개.
-> 배포 절차는 [`docs/deploy-railway.md`](docs/deploy-railway.md) 참고.
+> **상시 배포는 내려뒀습니다(2026-09-14).** Railway에 서비스 9개 + 플러그인 2개(Postgres·Redis)로
+> 4개 모듈을 전부 띄워 운영했고(2026-08-25 ~ 09-14), **컨테이너 10개가 24시간 떠 있는 비용이
+> 개인 포트폴리오로 감당할 수준을 넘어서** 상시 가동을 중단했습니다. 코드와 배포 설정은
+> 그대로 남아 있어 요청 시 다시 올립니다 — 절차·실측 로그·겪은 함정은
+> [`docs/deploy-railway.md`](docs/deploy-railway.md)에 그대로 있습니다.
+>
+> 아래 **[Quick Start](#-quick-start)** 한 줄이면 로컬에서 전 구간이 그대로 돕니다
+> (Postgres·Redis·Mosquitto + 4개 모듈 + 시뮬레이터 + 대시보드). 화면으로 먼저 보시려면
+> 위 스크린샷 3장과 [10분 투어 가이드](docs/10min-tour.md)가 실제 구동 화면 기준으로
+> 작성돼 있습니다. 데모 계정은 `admin` / `password`입니다.
 
 Pixel Platform은 제조 현장의 서로 다른 도메인(가공 설비 OEE, AMR 로봇 군집 관제, 창고 재고, 품질 검사)을
 **API Gateway + 중앙 인증 아래 4개의 독립 서비스**로 묶어, MQTT·Redis·WebSocket 기반 실시간 데이터를
