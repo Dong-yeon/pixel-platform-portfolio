@@ -7,10 +7,9 @@
 > `forUnload`, `stepFixed`, `externalId`) · P21(창고동 렉 취출) · P22(AMR/AGV 경계).
 > 이 문서는 그 위에서 "재고가 담기는 물리 단위가 스키마에 없다"는 구멍을 다룬다.
 >
-> 근거 자료(외부, `D:\happyeon\05.DongBang\Book`): `amr 사양요구서.docx`(IPLUS MOBOT
-> EMMA 600K 기술협의서, 닝보 동방 종합 용기), Cloudia/M4 Fleet API 문서, 동방플라스틱
-> `WMS_스키마도면.html`(실무 28테이블 SQL Server 스키마), `상품리스트.xlsx`(품목 마스터 컬럼).
-> 이 자료들은 실제 고객사 프로젝트 산출물이라 **값(품번·거래처·주문 데이터)은 가져오지
+> 근거 자료(외부, 비공개): 상용 AMR EMMA 600K 사양 문서, AMR 군집관제 API 문서,
+> 실무 WMS 스키마 구조(SQL Server 28테이블), 품목 마스터 컬럼 구성.
+> 이 자료들은 비공개 현장 자료라 **값(품번·거래처·주문 데이터)은 가져오지
 > 않는다** — 물리 규격 수치와 스키마 구조만 참고한다.
 
 ---
@@ -151,7 +150,7 @@ alter table stocks add constraint uq_stock_pallet unique (pallet_id);
 ```
 
 - **파렛트당 품목 하나(1:1)로 지금은 잠근다.** EMMA 600K 사양서의 전제 자체가 "지지
-  다리가 일체형으로 고정된" 단일 용도 파렛트다 — 실무 스키마(`WMS_스키마도면.html`)의
+  다리가 일체형으로 고정된" 단일 용도 파렛트다 — 실무 WMS 스키마의
   `TB_INVENTORY`는 `(PLT_ID, ITEM_CD, LOT_NO)`를 조합키로 둬 이론상 혼적 파렛트를
   허용하지만, 그건 지게차가 파렛트를 통째로 쌓는 랙 창고의 관례이지 이번 로봇 규격의
   전제가 아니다. **나중에 필요해지면** `uq_stock_pallet`을 `(pallet_id, item_id)`로
